@@ -72,3 +72,56 @@ ForkMind 在发起对话请求时，会在内存中执行以下操作：
 - [ ] 固化“主链 + 参考资料”上下文策略：`parentId` 负责主链遍历，`referenceNodeIds` 以“补充参考资料”形式注入提示词。
 - [ ] 支持在卡片文本中选中词/句直接追问：从选中内容拉线创建新卡片，并记录引用锚点。
 - [ ] 支持扩展卡片类型：图片卡片（Image Node）、链接卡片（Link Node）、文件卡片（File Node）等。
+
+## 🚀 快速开始 (Quick Start)
+
+### 1) 环境准备
+
+- Node.js: 建议 `20+`
+- npm: 建议 `10+`
+- Go: 建议 `1.22+`
+- Wails CLI: `v2`
+
+安装 Wails CLI（首次）：
+
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+```
+
+### 2) 安装依赖
+
+在项目根目录执行：
+
+```bash
+go mod tidy
+cd frontend
+npm install
+```
+
+### 3) 开发模式
+
+回到项目根目录后启动：
+
+```bash
+wails dev
+```
+
+### 4) 前端单独检查（可选）
+
+```bash
+cd frontend
+npm run build
+npm exec tsc -- --noEmit
+```
+
+### 5) 产物构建
+
+在项目根目录执行：
+
+```bash
+wails build
+```
+
+---
+
+如果你只想先审查前端交互，不跑完整桌面壳层，可以先执行第 2 步和第 4 步。
