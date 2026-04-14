@@ -1,216 +1,305 @@
-import { type ChangeEvent, useMemo, useState } from "react"
-import logo from "./assets/images/logo-universal.png"
-import { Greet } from "../wailsjs/go/main/App"
-import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
+﻿import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react"
+import { CanvasCreationType, CanvasWorkspace } from "./components/CanvasWorkspace"
+import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
+import { RightEditorSidebar } from "./components/RightEditorSidebar"
+import { PanelsToggleIcon } from "./components/icons/PanelsToggleIcon"
+import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import {
     selectActiveNode,
-    selectActiveThreadCards,
     selectActiveNodeId,
+    selectActiveThreadCards,
     useConversationStore,
 } from "./stores/useConversationStore"
 
+type ThemeMode = "dark" | "light"
+
+interface ResizeDragState {
+    side: "left" | "right"
+    startX: number
+    startWidth: number
+}
+
+const LEFT_SIDEBAR_MIN_WIDTH = 240
+const LEFT_SIDEBAR_MAX_WIDTH = 420
+const RIGHT_SIDEBAR_MIN_WIDTH = 320
+const RIGHT_SIDEBAR_MAX_WIDTH = 620
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max)
+}
+
 function App() {
     /**
-     * 这块保留 Wails 模板的最小调用链，用于验证前后端桥接可用。
-     * 后续接入真实 LLM 调用后，会由 conversation action 替代这条调用。
+     * UI 壳层状态：主题模式 + 左右栏整体隐藏开关。
+     * 业务场景：用户点击左上角 SVG 按钮后，左右栏一起收起，只保留左上角悬浮控制条。
      */
-    const [resultText, setResultText] = useState("Please enter your name below 👇")
-    const [name, setName] = useState("")
+    const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
+    const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
+    const [selectedCreationType, setSelectedCreationType] = useState<CanvasCreationType>("chat")
 
     /**
-     * 读状态：
-     * - cards：画布上全部节点
-     * - activeNodeId：当前选中节点 id
-     * - activeNode：右侧编辑栏实际编辑目标
+     * Figma 风格边栏宽度。
+     * 业务场景：用户可以拖拽分隔线，按自己习惯调整左右栏信息密度。
      */
+    const [leftSidebarWidth, setLeftSidebarWidth] = useState(288)
+    const [rightSidebarWidth, setRightSidebarWidth] = useState(420)
+
+    const resizeDragStateRef = useRef<ResizeDragState | null>(null)
+    const leftSidebarHostRef = useRef<HTMLDivElement | null>(null)
+    const rightSidebarHostRef = useRef<HTMLDivElement | null>(null)
+    const leftSidebarWidthRef = useRef(leftSidebarWidth)
+    const rightSidebarWidthRef = useRef(rightSidebarWidth)
+
+    const activeThread = useConversationStore((state) => state.activeThread)
     const cards = useConversationStore(selectActiveThreadCards)
     const activeNodeId = useConversationStore(selectActiveNodeId)
     const activeNode = useConversationStore(selectActiveNode)
 
-    /**
-     * 写状态（语义化 action）：
-     * 组件层只发业务意图，不自己拼接新数组。
-     */
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
     const addChatNode = useConversationStore((state) => state.addChatNode)
     const addNoteNode = useConversationStore((state) => state.addNoteNode)
+    const deleteNodes = useConversationStore((state) => state.deleteNodes)
+    const moveNode = useConversationStore((state) => state.moveNode)
+    const setNodeParent = useConversationStore((state) => state.setNodeParent)
+    const setNodeReferences = useConversationStore((state) => state.setNodeReferences)
     const updateChatPrompt = useConversationStore((state) => state.updateChatPrompt)
     const updateChatResponse = useConversationStore((state) => state.updateChatResponse)
     const updateNoteContent = useConversationStore((state) => state.updateNoteContent)
+    const undo = useConversationStore((state) => state.undo)
+    const redo = useConversationStore((state) => state.redo)
+
+    const rootNodeCount = useMemo(
+        () => cards.filter((card) => card.parentId === null).length,
+        [cards],
+    )
 
     /**
-     * 根节点告警：使用领域规则函数，保持 UI 与业务规则解耦。
+     * 直接把宽度推到 DOM。
+     * 业务场景：侧栏拖拽属于高频指针更新，不能每一帧都让整个 App 重渲染，否则会出现明显拖拽延迟。
      */
-    const rootNodesWarning = useMemo(() => buildRootNodesWarningMessage(cards), [cards])
+    const applySidebarWidth = (side: ResizeDragState["side"], nextWidth: number) => {
+        if (side === "left") {
+            leftSidebarWidthRef.current = nextWidth
+            if (leftSidebarHostRef.current) {
+                leftSidebarHostRef.current.style.width = `${nextWidth}px`
+            }
+            return
+        }
 
-    const updateName = (e: ChangeEvent<HTMLInputElement>) =>
-        setName(e.target.value)
-    const updateResultText = (result: string) => setResultText(result)
-
-    function greet() {
-        Greet(name).then(updateResultText)
+        rightSidebarWidthRef.current = nextWidth
+        if (rightSidebarHostRef.current) {
+            rightSidebarHostRef.current.style.width = `${nextWidth}px`
+        }
     }
 
-    return (
-        <div className="min-h-screen bg-slate-900 px-6 py-10 text-white">
-            <div className="mx-auto flex w-full max-w-4xl flex-col items-center">
-                <img
-                    src={logo}
-                    alt="ForkMind logo"
-                    className="w-full max-w-md object-contain pt-6"
-                />
-                <div className="mt-6 text-center text-base leading-6">
-                    {resultText}
-                </div>
-            </div>
+    const { handleCanvasMount, handleLinkHandlePointerDown } = useCanvasBridge({
+        cards,
+        activeNodeId,
+        setActiveNodeId,
+        selectedCreationType,
+        addChatNode,
+        addNoteNode,
+        moveNode,
+        setNodeParent,
+        setNodeReferences,
+        deleteNodes,
+        undo,
+        redo,
+    })
 
-            {rootNodesWarning ? (
-                <div className="mx-auto mt-6 w-full max-w-3xl rounded-lg border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-200">
-                    {rootNodesWarning}
+    /**
+     * 拖拽缩放左侧栏。
+     * 业务场景：用户希望快速查看更多会话信息时，直接拖宽左栏。
+     */
+    const startResizeLeftSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
+        event.preventDefault()
+
+        resizeDragStateRef.current = {
+            side: "left",
+            startX: event.clientX,
+            startWidth: leftSidebarWidthRef.current,
+        }
+
+        document.body.style.cursor = "col-resize"
+        document.body.style.userSelect = "none"
+    }
+
+    /**
+     * 拖拽缩放右侧栏。
+     * 业务场景：编辑 Markdown 时，用户会把右栏拉宽以获得更好的编辑体验。
+     */
+    const startResizeRightSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
+        event.preventDefault()
+
+        resizeDragStateRef.current = {
+            side: "right",
+            startX: event.clientX,
+            startWidth: rightSidebarWidthRef.current,
+        }
+
+        document.body.style.cursor = "col-resize"
+        document.body.style.userSelect = "none"
+    }
+
+    useEffect(() => {
+        const handlePointerMove = (event: PointerEvent) => {
+            const resizeState = resizeDragStateRef.current
+            if (!resizeState) {
+                return
+            }
+
+            if (resizeState.side === "left") {
+                const nextWidth = clamp(
+                    resizeState.startWidth + (event.clientX - resizeState.startX),
+                    LEFT_SIDEBAR_MIN_WIDTH,
+                    LEFT_SIDEBAR_MAX_WIDTH,
+                )
+                applySidebarWidth("left", nextWidth)
+                return
+            }
+
+            const nextWidth = clamp(
+                resizeState.startWidth - (event.clientX - resizeState.startX),
+                RIGHT_SIDEBAR_MIN_WIDTH,
+                RIGHT_SIDEBAR_MAX_WIDTH,
+            )
+            applySidebarWidth("right", nextWidth)
+        }
+
+        const handlePointerUp = () => {
+            const resizeState = resizeDragStateRef.current
+            if (!resizeState) {
+                return
+            }
+
+            if (resizeState.side === "left") {
+                setLeftSidebarWidth(leftSidebarWidthRef.current)
+            } else {
+                setRightSidebarWidth(rightSidebarWidthRef.current)
+            }
+
+            resizeDragStateRef.current = null
+            document.body.style.removeProperty("cursor")
+            document.body.style.removeProperty("user-select")
+        }
+
+        window.addEventListener("pointermove", handlePointerMove, true)
+        window.addEventListener("pointerup", handlePointerUp, true)
+
+        return () => {
+            window.removeEventListener("pointermove", handlePointerMove, true)
+            window.removeEventListener("pointerup", handlePointerUp, true)
+            document.body.style.removeProperty("cursor")
+            document.body.style.removeProperty("user-select")
+        }
+    }, [])
+
+    /**
+     * React state 与当前 DOM 宽度保持一致。
+     * 业务场景：拖拽结束、主题切换或其他重渲染之后，侧栏宽度不能回弹到旧值。
+     */
+    useEffect(() => {
+        leftSidebarWidthRef.current = leftSidebarWidth
+        if (leftSidebarHostRef.current) {
+            leftSidebarHostRef.current.style.width = `${leftSidebarWidth}px`
+        }
+    }, [leftSidebarWidth])
+
+    useEffect(() => {
+        rightSidebarWidthRef.current = rightSidebarWidth
+        if (rightSidebarHostRef.current) {
+            rightSidebarHostRef.current.style.width = `${rightSidebarWidth}px`
+        }
+    }, [rightSidebarWidth])
+
+    const tldrawLicenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY as string | undefined
+
+    return (
+        <div
+            data-theme={themeMode}
+            className={`h-screen w-screen overflow-hidden bg-zinc-100 text-zinc-900 theme-dark:bg-zinc-950 theme-dark:text-zinc-100 ${themeMode === "dark" ? "dark" : ""
+                }`}
+        >
+            {areSidebarsHidden ? (
+                <div className="pointer-events-none absolute left-4 top-4 z-40">
+                    <div className="pointer-events-auto inline-flex items-center gap-3 rounded-xl border border-border/70 bg-background/92 px-3 py-2 shadow-lg backdrop-blur-md transition-all duration-200">
+                        <div className="max-w-56 truncate text-sm font-medium">{activeThread.title}</div>
+                        <button
+                            type="button"
+                            className="rounded-md p-1.5 text-foreground transition-colors hover:bg-accent"
+                            onClick={() => {
+                                setAreSidebarsHidden(false)
+                            }}
+                            aria-label="显示界面栏"
+                        >
+                            <PanelsToggleIcon className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             ) : null}
 
-            <div className="mx-auto mt-6 flex w-full max-w-xl items-center justify-center gap-4">
-                <input
-                    id="name"
-                    className="h-10 flex-1 rounded-md border border-transparent bg-slate-100 px-3 text-slate-900 outline-none transition focus:border-slate-300 focus:bg-white"
-                    onChange={updateName}
-                    autoComplete="off"
-                    name="input"
-                    type="text"
+            <div className="flex h-full w-full overflow-hidden">
+                {!areSidebarsHidden ? (
+                    <div
+                        ref={leftSidebarHostRef}
+                        className="h-full shrink-0 overflow-hidden"
+                        style={{ width: leftSidebarWidth }}
+                    >
+                        <LeftConversationSidebar
+                            threadTitle={activeThread.title}
+                            cardCount={cards.length}
+                            rootNodeCount={rootNodeCount}
+                            themeMode={themeMode}
+                            onTogglePanels={() => {
+                                setAreSidebarsHidden(true)
+                            }}
+                            onToggleTheme={() => {
+                                setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
+                            }}
+                        />
+                    </div>
+                ) : null}
+
+                {!areSidebarsHidden ? (
+                    <div
+                        className="w-1.5 shrink-0 cursor-col-resize bg-border/80 transition-colors hover:bg-border"
+                        onPointerDown={startResizeLeftSidebar}
+                        role="separator"
+                        aria-label="调整左侧栏宽度"
+                    />
+                ) : null}
+
+                <CanvasWorkspace
+                    onCanvasMount={handleCanvasMount}
+                    onStartLinkDrag={handleLinkHandlePointerDown}
+                    selectedCreationType={selectedCreationType}
+                    onSelectCreationType={setSelectedCreationType}
+                    licenseKey={tldrawLicenseKey}
                 />
-                <button
-                    className="h-10 rounded-md bg-slate-100 px-4 text-sm font-medium text-slate-900 transition hover:bg-white"
-                    onClick={greet}
-                >
-                    Greet
-                </button>
-            </div>
 
-            {/**
-              * 这是阶段 2 的“active 节点编辑验证区”：
-              * - 左列：节点列表（模拟画布选中）
-              * - 右列：按节点类型切换编辑表单（chat 双框 / note 单框）
-              */}
-            <div className="mx-auto mt-8 grid w-full max-w-6xl gap-6 md:grid-cols-[280px_1fr]">
-                <aside className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-slate-200">Nodes</h2>
-                        <div className="flex gap-2">
-                            <button
-                                className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-900 hover:bg-white"
-                                onClick={() => {
-                                    addChatNode()
-                                }}
-                            >
-                                +Chat
-                            </button>
-                            <button
-                                className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-900 hover:bg-white"
-                                onClick={() => {
-                                    addNoteNode()
-                                }}
-                            >
-                                +Note
-                            </button>
-                        </div>
+                {!areSidebarsHidden ? (
+                    <div
+                        className="w-1.5 shrink-0 cursor-col-resize bg-border/80 transition-colors hover:bg-border"
+                        onPointerDown={startResizeRightSidebar}
+                        role="separator"
+                        aria-label="调整右侧栏宽度"
+                    />
+                ) : null}
+
+                {!areSidebarsHidden ? (
+                    <div
+                        ref={rightSidebarHostRef}
+                        className="h-full shrink-0 overflow-hidden"
+                        style={{ width: rightSidebarWidth }}
+                    >
+                        <RightEditorSidebar
+                            activeNode={activeNode}
+                            onUpdateChatPrompt={updateChatPrompt}
+                            onUpdateChatResponse={updateChatResponse}
+                            onUpdateNoteContent={updateNoteContent}
+                        />
                     </div>
-                    <div className="space-y-2">
-                        {cards.map((card) => (
-                            <button
-                                key={card.id}
-                                className={`w-full rounded-md border px-3 py-2 text-left text-xs transition ${activeNodeId === card.id
-                                    ? "border-sky-400 bg-sky-500/20 text-sky-100"
-                                    : "border-slate-700 bg-slate-900/40 text-slate-300 hover:border-slate-500"
-                                    }`}
-                                onClick={() => {
-                                    setActiveNodeId(card.id)
-                                }}
-                            >
-                                <div className="font-semibold uppercase tracking-wide">
-                                    {card.type}
-                                </div>
-                                <div className="mt-1 truncate text-[11px] opacity-80">
-                                    {card.type === "chat"
-                                        ? card.userPrompt || "(empty prompt)"
-                                        : card.noteContent || "(empty note)"}
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </aside>
-
-                <section className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-                    <h2 className="mb-3 text-sm font-semibold text-slate-200">
-                        Active Editor
-                    </h2>
-                    {!activeNode ? (
-                        <div className="rounded-md border border-dashed border-slate-600 px-4 py-8 text-sm text-slate-400">
-                            当前没有选中节点。
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="text-xs text-slate-400">
-                                Type: <span className="font-semibold">{activeNode.type}</span>
-                            </div>
-
-                            {/**
-                              * chat：双编辑区（用户输入 + AI 输出）
-                              * note：单编辑区（noteContent）
-                              *
-                              * 这里先用 CSS transition 做过渡，避免新增依赖。
-                              * 如果你确认安装 motion，下一步可替换成 AnimatePresence。
-                              */}
-                            <div
-                                className={`grid gap-3 transition-all duration-300 ${activeNode.type === "chat" ? "grid-rows-[1fr_1fr]" : "grid-rows-[1fr_0fr]"
-                                    }`}
-                            >
-                                <div className="rounded-md border border-slate-600 bg-slate-900/40 p-3">
-                                    <div className="mb-2 text-xs font-semibold text-slate-300">
-                                        {activeNode.type === "chat" ? "User Prompt (Markdown)" : "Note Content (Markdown)"}
-                                    </div>
-                                    <textarea
-                                        className="h-36 w-full resize-y rounded-md border border-slate-700 bg-slate-950/40 p-2 text-sm text-slate-100 outline-none focus:border-sky-500"
-                                        value={
-                                            activeNode.type === "chat"
-                                                ? activeNode.userPrompt
-                                                : activeNode.noteContent
-                                        }
-                                        onChange={(event) => {
-                                            if (activeNode.type === "chat") {
-                                                updateChatPrompt(activeNode.id, event.target.value)
-                                                return
-                                            }
-
-                                            updateNoteContent(activeNode.id, event.target.value)
-                                        }}
-                                    />
-                                </div>
-
-                                <div
-                                    className={`overflow-hidden rounded-md border border-slate-600 bg-slate-900/40 p-3 transition-all duration-300 ${activeNode.type === "chat"
-                                        ? "max-h-125 opacity-100"
-                                        : "max-h-0 border-transparent p-0 opacity-0"
-                                        }`}
-                                >
-                                    <div className="mb-2 text-xs font-semibold text-slate-300">
-                                        AI Response (Markdown)
-                                    </div>
-                                    <textarea
-                                        className="h-36 w-full resize-y rounded-md border border-slate-700 bg-slate-950/40 p-2 text-sm text-slate-100 outline-none focus:border-sky-500"
-                                        value={activeNode.type === "chat" ? activeNode.aiResponse : ""}
-                                        onChange={(event) => {
-                                            if (activeNode.type !== "chat") {
-                                                return
-                                            }
-                                            updateChatResponse(activeNode.id, event.target.value)
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </section>
+                ) : null}
             </div>
         </div>
     )
