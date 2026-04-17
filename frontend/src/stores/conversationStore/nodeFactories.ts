@@ -12,8 +12,8 @@ import {
 } from "./helpers"
 
 /**
- * 创建 chat 节点。
- * 业务场景：点击“新增对话卡片”或从现有卡片分叉提问时调用。
+ * 创建 chat 节点
+ * 点击“新增对话卡片”或从现有卡片分叉提问时调用
  */
 export function createChatNode(
     input: AddChatNodeInput,
@@ -56,8 +56,7 @@ export function createChatNode(
 }
 
 /**
- * 创建 note 节点。
- * 业务场景：用户在画布上创建“纯笔记卡片”时调用，不依赖 AI 回复。
+ * 创建 note 节点
  */
 export function createNoteNode(
     input: AddNoteNodeInput,

@@ -16,8 +16,9 @@ function isSameAnchor(left: { x: number; y: number }, right: { x: number; y: num
 }
 
 /**
- * 让箭头 terminal 与目标 shape 维持唯一 binding。
- * 业务场景：父子关系和 reference 变化后，箭头仍复用同一个 shapeId，不丢失选中态。
+ * 负责把指定的箭头首尾（start 或 end）精准插到目标卡片的handle上
+ * 复用原来的线（只更新绑定的端点） 防止线被删掉重建导致“高亮选中态”闪烁丢失
+ * 没变就不更新
  */
 export function syncArrowBinding(
     editor: Editor,
@@ -31,6 +32,7 @@ export function syncArrowBinding(
         .filter((binding) => binding.props.terminal === terminal)
 
     if (existingBindings.length > 1) {
+        // 避免出现一个terminal绑定在多个卡片上
         editor.deleteBindings(existingBindings.slice(1))
     }
 
@@ -43,6 +45,7 @@ export function syncArrowBinding(
     }
 
     const currentBinding = existingBindings[0]
+    // 保留的第一个binding若为不存在 说明是新的连线 -> 创建
     if (!currentBinding) {
         editor.createBinding({
             type: "arrow",
@@ -68,22 +71,21 @@ export function syncArrowBinding(
 }
 
 /**
- * 统一删除拖拽过程中产生的临时箭头与幽灵卡片。
- * 业务场景：pointerup 结算后，画布只保留业务投影，不残留一次性交互 shape。
+ * 统一删除拖拽过程中产生的临时箭头与幽灵卡片
+ * pointerup 结算后 画布只保留业务投影 不残留一次性交互 shape
  */
 export function deleteDragPreviewShapes(editor: Editor, session: LinkDragSession) {
     const removableShapeIds = [session.arrowShapeId, session.ghostShapeId].filter((shapeId) =>
-        editor.getShape(shapeId),
+        editor.getShape(shapeId)
     )
-
     if (removableShapeIds.length > 0) {
         editor.deleteShapes(removableShapeIds)
     }
 }
 
 /**
- * 同步一条稳定的业务箭头投影到 tldraw。
- * 业务场景：Store 中 parent/reference 更新后，用此函数把关系重绘到画布。
+ * 同步一条稳定的业务箭头投影到 tldraw
+ * Store 中 parent/reference 更新后 用此函数把关系重绘到画布
  */
 export function syncStableArrowProjection(editor: Editor, projection: StableArrowProjection) {
     const deltaEnd = {
@@ -104,6 +106,7 @@ export function syncStableArrowProjection(editor: Editor, projection: StableArro
         end: deltaEnd,
     }
 
+    // store中存储的 链 在画布上不存在就创建 否则就更新
     if (!arrowShape) {
         editor.createShape({
             id: projection.id,

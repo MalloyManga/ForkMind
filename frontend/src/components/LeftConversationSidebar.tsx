@@ -10,8 +10,7 @@ interface LeftConversationSidebarProps {
 }
 
 /**
- * 左侧会话栏。
- * 业务场景：阶段三先承载当前会话概览与主题切换，后续阶段再接入完整的多会话列表。
+ * 左侧会话栏
  */
 export function LeftConversationSidebar({
     threadTitle,

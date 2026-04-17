@@ -16,8 +16,7 @@ interface HandlePoint {
 const HANDLE_RADIUS = 6
 
 /**
- * 计算卡片四边的触点坐标。
- * 业务场景：用户 hover 到卡片时，从四个边缘直接拖出连线。
+ * 计算卡片四边的触点坐标
  */
 function getEdgeHandlePoints(bounds: Box): HandlePoint[] {
     const centerX = bounds.x + bounds.w / 2
@@ -32,8 +31,7 @@ function getEdgeHandlePoints(bounds: Box): HandlePoint[] {
 }
 
 /**
- * 画布 hover 触点层。
- * 业务场景：只在鼠标停留到业务卡片时显示四向触点，并且支持鼠标顺滑地从卡片移动到 handle。
+ * 卡片四周的Handle
  */
 export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesOverlayProps) {
     const editor = useEditor()
@@ -58,8 +56,9 @@ export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesO
             }
 
             /**
-             * 业务场景：鼠标从卡片边缘滑到 handle 时，hover 会短暂掉到 overlay 自己身上。
-             * 这里锁住当前卡片，避免 handle 因为 hover 抖动而消失。
+             * 体验防抖锁 (Debounce Lock)
+             * 当鼠标从卡片内挪到handle时，tldraw 会触发 "unhover" 认为鼠标离开了卡片。
+             * 此时 isPointerOverHandleRef 这把锁如果为 true 就阻止 React 销毁handle
              */
             if (isPointerOverHandleRef.current) {
                 return
@@ -75,14 +74,14 @@ export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesO
                 syncHoveredNodeShape()
 
                 /**
-                 * 业务场景：触控板滚动/缩放会改变 camera，但 hovered shape 本身不一定变化。
-                 * 这里额外 bump 一个版本号，强制重算 handle 的屏幕坐标。
+                 * 触控板滚动/缩放会改变 camera 但 hovered shape 本身不一定变化
+                 * 这里额外 bump 一个版本号 强制重算 handle 的屏幕坐标
                  */
                 if (hoveredNodeShapeIdRef.current !== null || isPointerOverHandleRef.current) {
                     setOverlayVersion((previousVersion) => previousVersion + 1)
                 }
             },
-            { scope: "all" },
+            { scope: "session" },
         )
 
         return () => {
@@ -97,8 +96,8 @@ export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesO
         }
 
         /**
-         * 业务场景：左右栏拖拽会改变画布容器尺寸与偏移。
-         * 这里监听容器几何变化，确保 handle 坐标基于最新容器边界重算。
+         * 左右栏拖拽会改变画布容器尺寸与偏移
+         * 这里监听容器几何变化，确保 handle 坐标基于最新容器边界重算
          */
         const resizeObserver = new ResizeObserver(() => {
             if (hoveredNodeShapeIdRef.current !== null || isPointerOverHandleRef.current) {
@@ -126,8 +125,10 @@ export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesO
 
         return getEdgeHandlePoints(hoveredBounds).map((handlePoint) => {
             /**
-             * 业务场景：overlay SVG 使用的是画布容器本地坐标。
-             * 所以先把 page 坐标转成 screen 坐标，再减去容器左上角偏移。
+             * 1. handlePoint 是 tldraw 无限画布坐标 (Page)
+             * 2. pageToScreen 把它压成了显示器屏幕的物理像素坐标 (Screen)
+             * 3. 最后减去左侧/右侧面板(Sidebar)挤压导致的 Canvas 容器偏移 (canvasRect.left/top)
+             * 得出这个handle在当前 SVG <g> 标签中的纯洁 DOM 像素位置
              */
             const handleScreenPoint = editor.pageToScreen({
                 x: handlePoint.x,

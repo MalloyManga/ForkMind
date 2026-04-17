@@ -1,15 +1,15 @@
 import { TLShapeId } from "tldraw"
-import type { ConversationCard } from "../domain/conversation/types"
+import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { LinkHandleSide } from "./canvasLinkTypes"
 import {
     type CanvasArrowDescriptor,
     toCanvasParentArrowId,
     toCanvasReferenceArrowId,
-    toCanvasShapeId,
+    toCanvasNodeShapeId,
 } from "./canvasNodeIds"
 
 /**
- * 鼠标交互的位置
+ * 鼠标交互的位置坐标/画布上的具体坐标
  */
 export interface Point {
     x: number
@@ -21,6 +21,9 @@ export interface Anchor {
     y: number
 }
 
+/**
+ * 八个方向的箭头首尾锚点
+ */
 export type AnchorSide =
     | "top"
     | "top-right"
@@ -31,6 +34,9 @@ export type AnchorSide =
     | "left"
     | "top-left"
 
+/**
+ * 用户正在拖拽出的箭头的一切
+ */
 export interface LinkDragSession {
     sourceShapeId: TLShapeId
     sourceNodeId: string
@@ -38,13 +44,16 @@ export interface LinkDragSession {
     startPoint: Point
     arrowShapeId: TLShapeId
     ghostShapeId: TLShapeId
-    ghostCardType: "chat" | "note"
+    ghostCardType: ConversationNodeType
     ghostHeight: number
     snappedTargetShapeId: TLShapeId | null
     snappedTargetNodeId: string | null
     releasePoint: Point
 }
 
+/**
+ * 有关一个稳定箭头的一切
+ */
 export interface StableArrowProjection {
     id: TLShapeId
     kind: CanvasArrowDescriptor["kind"]
@@ -57,6 +66,9 @@ export interface StableArrowProjection {
     bend: number
 }
 
+/**
+ * 箭头首尾位于源node和目标node的锚点对象
+ */
 export interface ArrowAnchorOverride {
     sourceSide: AnchorSide
     targetSide: AnchorSide
@@ -79,8 +91,8 @@ export const GHOST_NODE_OPACITY_VISIBLE = 0.48
 export const GHOST_NODE_OPACITY_HIDDEN = 0
 
 /**
- * 统一计算画布卡片高度。
- * 业务场景：阶段三先落地“固定宽度 + 固定高度上限 + 内部滚动”，避免长 Markdown 把画布排版撑坏。
+ * 统一计算画布卡片高度
+ * 阶段三先落地“固定宽度 + 固定高度上限 + 内部滚动”，避免长 Markdown 把画布排版撑坏
  */
 export function getCardShapeHeight(card: ConversationCard): number {
     const baseHeight = card.type === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
@@ -88,16 +100,15 @@ export function getCardShapeHeight(card: ConversationCard): number {
 }
 
 /**
- * 按创建类型取默认高度。
- * 业务场景：双击空白创建或拖拽幽灵卡片时，需根据当前选择的卡片类型计算初始高度。
+ * 双击空白创建或拖拽幽灵卡片时 根据当前选择的卡片类型计算初始高度
  */
-export function getDefaultHeightByType(cardType: "chat" | "note"): number {
+export function getDefaultHeightByType(cardType: ConversationNodeType): number {
     return cardType === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
 }
 
 /**
  * 比较两个 shapeId 集合是否一致。
- * 业务场景：同步 activeNodeId 到画布选中态时，避免重复 setSelectedShapes 触发无意义刷新。
+ * 同步 activeNodeId 到画布选中态时，避免重复 setSelectedShapes 触发无意义刷新。
  */
 export function areSameShapeIdSet(left: TLShapeId[], right: TLShapeId[]): boolean {
     if (left.length !== right.length) {
@@ -109,8 +120,8 @@ export function areSameShapeIdSet(left: TLShapeId[], right: TLShapeId[]): boolea
 }
 
 /**
- * 判断当前键盘事件是否处于文本输入语境。
- * 业务场景：右侧栏正在编辑 Markdown 时，Backspace 应该删除文本，而不是删除节点或箭头。
+ * 判断当前键盘事件是否处于文本输入语境
+ * 右侧栏正在编辑 Markdown 时，Backspace 应该删除文本，而不是删除节点或箭头
  */
 export function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
     if (!(eventTarget instanceof HTMLElement)) {
@@ -122,8 +133,7 @@ export function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
 }
 
 /**
- * 由四向触点转换为归一化锚点。
- * 业务场景：tldraw 的箭头 binding 需要知道“绑定在卡片边缘的哪个位置”。
+ * 8个锚点的比例坐标
  */
 export function anchorBySide(side: AnchorSide): Anchor {
     switch (side) {
@@ -146,10 +156,14 @@ export function anchorBySide(side: AnchorSide): Anchor {
     }
 }
 
+/**
+ * 箭头绑定卡片时 各个方向的接触点转换为统一的8个锚点
+ */
 export function closestAnchorSideToNormalizedAnchor(anchor: Anchor): AnchorSide {
     let bestSide: AnchorSide = "top"
     let bestDistance = Number.POSITIVE_INFINITY
 
+    // 循环判断触点坐标距离8个锚点更近
     for (const side of ANCHOR_SIDE_ALL) {
         const sideAnchor = anchorBySide(side)
         const deltaX = sideAnchor.x - anchor.x
@@ -165,8 +179,7 @@ export function closestAnchorSideToNormalizedAnchor(anchor: Anchor): AnchorSide 
 }
 
 /**
- * 根据边方向取矩形边缘中心点。
- * 业务场景：不管是稳定业务箭头还是拖拽中的临时箭头，都需要从边缘中心发射。
+ * 根据传入的卡片box信息 以及 箭头引出的锚点 返回箭头的首或尾的精确位置坐标
  */
 export function edgePointBySide(
     bounds: { x: number; y: number; w: number; h: number },
@@ -193,8 +206,8 @@ export function edgePointBySide(
 }
 
 /**
- * 根据目标点判断更适合吸附到目标卡片的哪一边。
- * 业务场景：拖拽连线靠近现有卡片时，箭头终点要“贴边吸附”，而不是随便落在卡片内部。
+ * 根据目标点判断更适合吸附到目标卡片的哪一边
+ * 拖拽连线靠近现有卡片时 计算箭头终点的贴边吸附
  */
 export function closestAnchorSideToPoint(
     point: Point,
@@ -219,8 +232,8 @@ export function closestAnchorSideToPoint(
 }
 
 /**
- * 取对边方向。
- * 业务场景：从源卡片右边拉出新卡片时，幽灵卡片默认应让自己的左边贴住指针。
+ * 取对边方向
+ * 源卡片拉出幽灵卡片时 计算箭头尾的锚点位置
  */
 export function oppositeSide(side: LinkHandleSide): LinkHandleSide {
     switch (side) {
@@ -257,8 +270,7 @@ export function oppositeAnchorSide(side: AnchorSide): AnchorSide {
 }
 
 /**
- * 根据“指针挂载在哪条边”计算幽灵卡片左上角。
- * 业务场景：用户拖线时看到的是“箭头拖着一张半透明卡片走”，而不是只有一根线。
+ * 根据箭头尾部处handle位置计算出幽灵卡片左上角的坐标
  */
 export function ghostPositionByPointer(
     pointerPoint: Point,
@@ -279,16 +291,15 @@ export function ghostPositionByPointer(
 }
 
 /**
- * 追加引用关系并自动去重。
- * 业务场景：拖线连接到已有卡片时，不改主链 parentId，而是补一条 reference 关系。
+ * 追加引用关系并自动去重
+ * 拖线连接到已有卡片时，不改主链 parentId，而是补一条 reference 关系。
  */
 export function appendReferenceId(node: ConversationCard, targetNodeId: string): string[] {
     return Array.from(new Set([...(node.referenceNodeIds ?? []), targetNodeId]))
 }
 
 /**
- * 根据两张卡片的相对位置，推导箭头应该从哪边出、从哪边入。
- * 业务场景：让箭头方向更接近 Figma/FigJam 的自然连线手感。
+ * 根据两张卡片的相对位置 推导箭头的起始锚点
  */
 function deriveLinkSides(sourceCard: ConversationCard, targetCard: ConversationCard): {
     sourceSide: AnchorSide
@@ -340,8 +351,8 @@ function deriveLinkSides(sourceCard: ConversationCard, targetCard: ConversationC
 }
 
 /**
- * 计算弧线箭头的 bend。
- * 业务场景：把默认折线改成更接近 Figma 的弧线关系线。
+ * 计算弧线箭头的 bend
+ * 把默认折线改成更接近 Figma 的弧线关系线
  */
 export function computeArrowBend(sourcePoint: Point, targetPoint: Point): number {
     const deltaX = targetPoint.x - sourcePoint.x
@@ -357,8 +368,8 @@ export function computeArrowBend(sourcePoint: Point, targetPoint: Point): number
 }
 
 /**
- * 从业务数据投影出所有稳定箭头。
- * 业务场景：父子链与引用链都是 Store 的“关系投影”，不是临时画布垃圾数据。
+ * 从业务数据投影出所有稳定箭头
+ * 由父子链与引用链 计算 出所有应该出现的箭头 仅作计算 不做tldraw绘制
  */
 export function createStableArrowProjections(
     cards: ConversationCard[],
@@ -397,8 +408,8 @@ export function createStableArrowProjections(
                 projections.push({
                     id: toCanvasParentArrowId(card.id),
                     kind: "parent",
-                    fromShapeId: toCanvasShapeId(parentCard.id),
-                    toShapeId: toCanvasShapeId(card.id),
+                    fromShapeId: toCanvasNodeShapeId(parentCard.id),
+                    toShapeId: toCanvasNodeShapeId(card.id),
                     sourceSide,
                     targetSide,
                     startPoint,
@@ -441,8 +452,8 @@ export function createStableArrowProjections(
             projections.push({
                 id: referenceArrowId,
                 kind: "reference",
-                fromShapeId: toCanvasShapeId(card.id),
-                toShapeId: toCanvasShapeId(targetCard.id),
+                fromShapeId: toCanvasNodeShapeId(card.id),
+                toShapeId: toCanvasNodeShapeId(targetCard.id),
                 sourceSide,
                 targetSide,
                 startPoint,

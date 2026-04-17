@@ -66,8 +66,8 @@ const markdownComponents = {
 }
 
 /**
- * ForkMind 自定义卡片 shape。
- * 业务场景：画布卡片需要真正渲染 Markdown，而不是继续借用 tldraw 默认 note 的纯文本展示。
+ * ForkMind 自定义卡片 shape
+ * 画布卡片需要真正渲染 Markdown
  */
 export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
     static override type = FORK_MIND_CARD_SHAPE_TYPE

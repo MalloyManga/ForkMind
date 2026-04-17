@@ -1,8 +1,7 @@
-// 用户交互翻译为store语义动作
 import { useEffect, type MutableRefObject } from "react"
 import type { Editor, TLShapeId } from "tldraw"
-import type { ConversationCard } from "../domain/conversation/types"
-import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasShapeId } from "./canvasNodeIds"
+import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
+import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
     type ArrowAnchorOverride,
     closestAnchorSideToNormalizedAnchor,
@@ -12,19 +11,18 @@ import {
     type Point,
 } from "./useCanvasBridge.helpers"
 import { type syncStableArrowProjection as SyncStableArrowProjectionFn } from "./useCanvasBridge.projection"
-import type { CreationNodeType } from "./useCanvasBridge.linkDrag"
 
 interface UseCanvasBridgeInteractionsParams {
     canvasEditor: Editor | null
     isApplyingStoreToCanvasRef: MutableRefObject<boolean> // 是否已经同步
     activeNodeIdRef: MutableRefObject<string | null>
     cardsRef: MutableRefObject<ConversationCard[]>
-    selectedCreationTypeRef: MutableRefObject<CreationNodeType>
+    selectedCreationTypeRef: MutableRefObject<ConversationNodeType>
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     arrowAnchorOverrideByIdRef: MutableRefObject<Map<TLShapeId, ArrowAnchorOverride>>
     clearPointerListeners: () => void
     createNodeByType: (
-        cardType: CreationNodeType,
+        cardType: ConversationNodeType,
         position: Point,
         parentId?: string | null,
     ) => string
@@ -39,8 +37,9 @@ interface UseCanvasBridgeInteractionsParams {
 }
 
 /**
- * Canvas 交互副作用层。
- * 业务场景：集中收口“用户输入事件 -> Store 语义动作”映射，避免主 bridge 文件堆叠大量 effect。
+ * Canvas 交互适配器（交互事件 -> 业务动作的翻译层）
+ * 监听画布内部的碎片化操作（按键、拖拽松手、tldraw 默认事件）
+ * 翻译为领域限界内的原子型业务动作，并通过依赖注入（传入的回调函数）向上层触发处理
  */
 export function useCanvasBridgeInteractions({
     canvasEditor,
@@ -100,9 +99,10 @@ export function useCanvasBridgeInteractions({
         return () => {
             unregister()
         }
-    }, [canvasEditor, createNodeByType, selectedCreationTypeRef, setActiveNodeId])
+    }, [canvasEditor, selectedCreationTypeRef, createNodeByType, setActiveNodeId])
 
     // 画布选中态 -> Store activeNodeId 同步
+    // 设置activeNodeId分为两种 点击/框选 映射回store需要做处理
     useEffect(() => {
         if (!canvasEditor) {
             return
@@ -114,10 +114,12 @@ export function useCanvasBridgeInteractions({
                     return
                 }
 
+                // 获取选中/框选的nodes 同时根据框选的nodes 设置activeNodeId = node[0]
                 const selectedNodeIds = canvasEditor
                     .getSelectedShapeIds()
                     .map((shapeId) => parseNodeIdFromShapeId(shapeId))
                     .filter((nodeId): nodeId is string => nodeId !== null)
+                const nextActiveNodeId = selectedNodeIds[0]
 
                 if (selectedNodeIds.length === 0) {
                     if (activeNodeIdRef.current !== null) {
@@ -126,12 +128,11 @@ export function useCanvasBridgeInteractions({
                     return
                 }
 
-                const nextActiveNodeId = selectedNodeIds[0]
                 if (activeNodeIdRef.current !== nextActiveNodeId) {
                     setActiveNodeId(nextActiveNodeId)
                 }
             },
-            { source: "user", scope: "all" },
+            { source: "user", scope: "session" },
         )
 
         return () => {
@@ -139,9 +140,7 @@ export function useCanvasBridgeInteractions({
         }
     }, [activeNodeIdRef, canvasEditor, isApplyingStoreToCanvasRef, setActiveNodeId])
 
-    /**
-     * Backspace 删除语义动作映射。
-     */
+    // Backspace 删除语义动作映射
     useEffect(() => {
         if (!canvasEditor) {
             return
@@ -151,12 +150,12 @@ export function useCanvasBridgeInteractions({
             if (event.key !== "Backspace") {
                 return
             }
-
             if (isTextEditingTarget(event.target)) {
                 return
             }
 
             const selectedShapeIds = canvasEditor.getSelectedShapeIds()
+            // 从 getSelectedShapeIds 中过滤出卡片node
             const selectedNodeIds = selectedShapeIds
                 .map((shapeId) => parseNodeIdFromShapeId(shapeId))
                 .filter((nodeId): nodeId is string => nodeId !== null)
@@ -172,10 +171,12 @@ export function useCanvasBridgeInteractions({
             event.preventDefault()
             event.stopPropagation()
 
+            // 执行删除
             if (selectedNodeIds.length > 0) {
                 deleteNodes(selectedNodeIds)
             }
 
+            // 重新判断父链 reference 链 关系
             for (const arrowDescriptor of selectedArrowDescriptors) {
                 if (arrowDescriptor.kind === "parent") {
                     setNodeParent(arrowDescriptor.childNodeId, null)
@@ -197,6 +198,7 @@ export function useCanvasBridgeInteractions({
                 )
             }
 
+            // 选中 的nodes里包含activeNode 去除active
             if (
                 activeNodeIdRef.current !== null &&
                 selectedNodeIds.includes(activeNodeIdRef.current)
@@ -220,8 +222,8 @@ export function useCanvasBridgeInteractions({
     ])
 
     /**
-     * Ctrl/Cmd + Z / Y 快捷键统一路由到 Store 历史栈。
-     * 业务场景：避免 tldraw 内部历史与业务历史双写冲突，保证撤回语义由业务层单点主导。
+     * Ctrl/Cmd + Z / Y 快捷键统一路由到 Store 历史栈
+     * 避免 tldraw 内部历史与业务历史双写冲突，保证撤回语义由业务层单点主导
      */
     useEffect(() => {
         const handleHistoryKeyDown = (event: KeyboardEvent) => {
@@ -248,17 +250,17 @@ export function useCanvasBridgeInteractions({
 
             /**
              * Store 已经是唯一历史源。
-             * 业务场景：用户拖拽/创建节点后，tldraw 内部仍可能累积自己的编辑历史；
-             * 在真正执行业务 undo/redo 前先清空它，避免再次出现双历史栈错位。
+             * 用户拖拽/创建节点后，tldraw 内部仍可能累积自己的编辑历史；
+             * 在真正执行业务 undo/redo 前先清空它，避免再次出现双历史栈错位
              */
             canvasEditor?.clearHistory()
 
             if (isUndoShortcut) {
                 undo()
-                return
             }
-
-            redo()
+            else {
+                redo()
+            }
         }
 
         window.addEventListener("keydown", handleHistoryKeyDown, true)
@@ -268,7 +270,7 @@ export function useCanvasBridgeInteractions({
     }, [canvasEditor, redo, undo])
 
     /**
-     * 节点拖拽结束后写回 Store 坐标。
+     * 节点拖拽结束 pointerup 时 新坐标写回 Store
      */
     useEffect(() => {
         if (!canvasEditor) {
@@ -286,7 +288,7 @@ export function useCanvasBridgeInteractions({
                 .filter((nodeId): nodeId is string => nodeId !== null)
 
             for (const selectedNodeId of selectedNodeIds) {
-                const selectedShape = canvasEditor.getShape(toCanvasShapeId(selectedNodeId))
+                const selectedShape = canvasEditor.getShape(toCanvasNodeShapeId(selectedNodeId))
                 const sourceNode = cardsRef.current.find((card) => card.id === selectedNodeId)
 
                 if (!selectedShape || !sourceNode) {
@@ -314,7 +316,7 @@ export function useCanvasBridgeInteractions({
     }, [canvasEditor, cardsRef, isApplyingStoreToCanvasRef, moveNode])
 
     /**
-     * 箭头端点拖拽后，量化到 8 锚点并回投影。
+     * 拖拽已经存在的箭头端点之后 吸附到8个锚点上 并进行存储记录用户自定的连接锚点
      */
     useEffect(() => {
         if (!canvasEditor) {
@@ -328,7 +330,9 @@ export function useCanvasBridgeInteractions({
 
             const selectedArrowIds = canvasEditor
                 .getSelectedShapeIds()
-                .filter((shapeId) => parseCanvasArrowDescriptor(shapeId) !== null)
+                .filter(
+                    (shapeId): shapeId is TLShapeId => parseCanvasArrowDescriptor(shapeId) !== null,
+                )
 
             if (selectedArrowIds.length === 0) {
                 return
@@ -350,8 +354,10 @@ export function useCanvasBridgeInteractions({
                 })
             }
 
+            // 存储用户移动之后的锚点
             arrowAnchorOverrideByIdRef.current = nextOverrideById
 
+            // 计算出所有应该绘制的箭头
             const projectionById = new Map(
                 createStableArrowProjections(
                     cardsRef.current,
@@ -359,6 +365,7 @@ export function useCanvasBridgeInteractions({
                 ).map((projection) => [projection.id, projection]),
             )
 
+            // 使用计算出的箭头projection进行绘制
             canvasEditor.run(() => {
                 for (const selectedArrowId of selectedArrowIds) {
                     const projection = projectionById.get(selectedArrowId)
@@ -382,7 +389,7 @@ export function useCanvasBridgeInteractions({
     ])
 
     /**
-     * 组件卸载时清理运行时资源。
+     * 组件卸载时清理运行时资源
      */
     useEffect(() => {
         return () => {

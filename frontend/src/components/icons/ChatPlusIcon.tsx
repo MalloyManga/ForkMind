@@ -3,8 +3,7 @@
 }
 
 /**
- * 创建 Chat 节点图标。
- * 业务场景：底部悬浮工具条“新增 Chat”按钮。
+ * 创建 Chat 节点图标
  */
 export function ChatPlusIcon({ className }: IconProps) {
     return (

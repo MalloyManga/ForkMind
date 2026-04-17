@@ -3,8 +3,8 @@ import type { ConversationCard, ConversationThread } from "../../domain/conversa
 import { createDefaultSize } from "./helpers"
 
 /**
- * 阶段二演示用初始数据。
- * 业务场景：项目启动后用于验证“chat + note 混合节点”的编辑链路。
+ * 阶段二演示用初始数据
+ * 项目启动后用于验证“chat + note 混合节点”的编辑链路
  */
 const initialCards: ConversationCard[] = [
     {

@@ -1,25 +1,24 @@
 ﻿import { useMemo } from "react"
 import { Editor, Tldraw, type TLComponents } from "tldraw"
 import "tldraw/tldraw.css"
+import type { ConversationNodeType } from "../domain/conversation/types"
 import { StartLinkDragInput } from "../hooks/canvasLinkTypes"
 import { ForkMindArrowShapeUtil } from "../lib/forkMindArrowShape"
 import { ForkMindCardShapeUtil } from "../lib/forkMindCardShape"
-import { CanvasCreationModeBar, type CanvasCreationType } from "./CanvasCreationModeBar"
+import { CanvasCreationModeBar } from "./CanvasCreationModeBar"
 import { CanvasLinkHandlesOverlay } from "./CanvasLinkHandlesOverlay"
-
-export type { CanvasCreationType } from "./CanvasCreationModeBar"
 
 interface CanvasWorkspaceProps {
     onCanvasMount: (editor: Editor) => void
     onStartLinkDrag: (input: StartLinkDragInput) => void
-    selectedCreationType: CanvasCreationType
-    onSelectCreationType: (creationType: CanvasCreationType) => void
+    selectedCreationType: ConversationNodeType
+    onSelectCreationType: (creationType: ConversationNodeType) => void
     licenseKey?: string
 }
 
 /**
- * 中间无限画布区。
- * 业务场景：承载 tldraw 画布、hover 连线触点与底部创建节点工具条。
+ * 中间无限画布区
+ * 承载 tldraw 画布、hover 连线触点与底部创建节点工具条
  */
 export function CanvasWorkspace({
     onCanvasMount,

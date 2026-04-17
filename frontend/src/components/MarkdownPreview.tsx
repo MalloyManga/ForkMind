@@ -9,8 +9,8 @@ interface MarkdownPreviewProps {
 }
 
 /**
- * Markdown 预览组件。
- * 业务场景：右栏编辑时提供实时预览，方便用户确认排版与语义。
+ * Markdown 预览组件
+ * 右栏编辑时提供实时预览，方便用户确认排版与语义
  */
 export function MarkdownPreview({ title, markdown }: MarkdownPreviewProps) {
     return (

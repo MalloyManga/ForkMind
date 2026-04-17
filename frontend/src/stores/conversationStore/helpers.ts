@@ -14,8 +14,8 @@ import type {
 import type { ConversationSnapshot } from "./contracts"
 
 /**
- * 统一生成更新时间戳。
- * 业务场景：所有写操作都用同一时间源，避免时间语义不一致。
+ * 统一生成更新时间戳
+ * 所有写操作都用同一时间源，避免时间语义不一致
  */
 export function createTimestamp(): string {
     return new Date().toISOString()
@@ -44,8 +44,8 @@ export function createDefaultSize(partial?: Partial<ConversationCardSize>): Conv
 }
 
 /**
- * 深拷贝单个节点。
- * 业务场景：历史快照、导入替换、撤销重做都不能共享引用。
+ * 深拷贝单个节点
+ * 历史快照、导入替换、撤销重做都不能共享引用
  */
 export function cloneNode(node: ConversationCard): ConversationCard {
     const base: BaseNode = {
@@ -112,7 +112,7 @@ export function findNodeById(
  * 规范化 parentId：
  * - 未传或不存在时统一返回 null
  * - 存在时返回合法 parent id
- * 业务场景：导入 JSON 被手改、拖拽改父节点传入失效 id 时，保证结构稳定。
+ * 导入 JSON 被手改、拖拽改父节点传入失效 id 时，保证结构稳定
  */
 export function normalizeParentId(
     nodes: readonly ConversationCard[],

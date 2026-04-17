@@ -1,5 +1,6 @@
 ﻿import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react"
-import { CanvasCreationType, CanvasWorkspace } from "./components/CanvasWorkspace"
+import { CanvasWorkspace } from "./components/CanvasWorkspace"
+import type { ConversationNodeType } from "./domain/conversation/types"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
 import { RightEditorSidebar } from "./components/RightEditorSidebar"
 import { PanelsToggleIcon } from "./components/icons/PanelsToggleIcon"
@@ -29,18 +30,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function App() {
-    /**
-     * UI 壳层状态：主题模式 + 左右栏整体隐藏开关。
-     * 业务场景：用户点击左上角 SVG 按钮后，左右栏一起收起，只保留左上角悬浮控制条。
-     */
     const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
     const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
-    const [selectedCreationType, setSelectedCreationType] = useState<CanvasCreationType>("chat")
+    const [selectedCreationType, setSelectedCreationType] = useState<ConversationNodeType>("chat")
 
-    /**
-     * Figma 风格边栏宽度。
-     * 业务场景：用户可以拖拽分隔线，按自己习惯调整左右栏信息密度。
-     */
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(288)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(420)
 
@@ -73,10 +66,7 @@ function App() {
         [cards],
     )
 
-    /**
-     * 直接把宽度推到 DOM。
-     * 业务场景：侧栏拖拽属于高频指针更新，不能每一帧都让整个 App 重渲染，否则会出现明显拖拽延迟。
-     */
+
     const applySidebarWidth = (side: ResizeDragState["side"], nextWidth: number) => {
         if (side === "left") {
             leftSidebarWidthRef.current = nextWidth
@@ -109,7 +99,6 @@ function App() {
 
     /**
      * 拖拽缩放左侧栏。
-     * 业务场景：用户希望快速查看更多会话信息时，直接拖宽左栏。
      */
     const startResizeLeftSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
         event.preventDefault()
@@ -126,7 +115,6 @@ function App() {
 
     /**
      * 拖拽缩放右侧栏。
-     * 业务场景：编辑 Markdown 时，用户会把右栏拉宽以获得更好的编辑体验。
      */
     const startResizeRightSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
         event.preventDefault()
@@ -194,10 +182,6 @@ function App() {
         }
     }, [])
 
-    /**
-     * React state 与当前 DOM 宽度保持一致。
-     * 业务场景：拖拽结束、主题切换或其他重渲染之后，侧栏宽度不能回弹到旧值。
-     */
     useEffect(() => {
         leftSidebarWidthRef.current = leftSidebarWidth
         if (leftSidebarHostRef.current) {

@@ -3,8 +3,8 @@
 }
 
 /**
- * 左侧面板折叠箭头。
- * 业务场景：侧栏标题行的折叠按钮图标。
+ * 左侧面板折叠箭头
+ * 侧栏标题行的折叠按钮图标
  */
 export function ChevronLeftIcon({ className }: IconProps) {
     return (

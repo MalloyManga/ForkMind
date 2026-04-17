@@ -3,8 +3,8 @@
 }
 
 /**
- * 创建 Note 节点图标。
- * 业务场景：底部悬浮工具条“新增 Note”按钮。
+ * 创建 Note 节点图标
+ * 底部悬浮工具条“新增 Note”按钮
  */
 export function NotePlusIcon({ className }: IconProps) {
     return (

@@ -46,8 +46,7 @@ export interface ForkChatNodeInput {
 }
 
 /**
- * 从现有节点 Fork 新 note 节点的入参。
- * 业务场景：用户从某张卡片分叉出“补充笔记”分支，而不是 AI 对话分支。
+ * 从现有节点 Fork 新 note 节点的入参
  */
 export interface ForkNoteNodeInput {
     sourceNodeId: string

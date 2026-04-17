@@ -214,8 +214,8 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 从指定源节点 Fork 一个新的 note 节点。
-     * 业务场景：从任意讨论节点旁边快速拉出“人工补充笔记”分支。
+     * 从指定源节点 Fork 一个新的 note 节点
+     * 从任意讨论节点旁边快速拉出“人工补充笔记”分支
      */
     forkNoteNode: (input) => {
         let createdNodeId: string | null = null

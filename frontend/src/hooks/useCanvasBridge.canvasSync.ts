@@ -2,7 +2,7 @@ import { useEffect, type MutableRefObject } from "react"
 import { type Editor, type TLShapeId } from "tldraw"
 import type { ConversationCard } from "../domain/conversation/types"
 import { type ForkMindCardShape, FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
-import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasShapeId } from "./canvasNodeIds"
+import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
     type ArrowAnchorOverride,
     areSameShapeIdSet,
@@ -27,8 +27,8 @@ interface UseCanvasBridgeCanvasSyncParams {
 }
 
 /**
- * Store -> Canvas 投影同步层。
- * 业务场景：把 Store 作为唯一事实源，持续投影成 tldraw 的节点形状和关系箭头。
+ * Store -> Canvas 投影同步层
+ * 把 Store 作为唯一事实源 持续投影成 tldraw 的节点形状和关系箭头
  */
 export function useCanvasBridgeCanvasSync({
     canvasEditor,
@@ -48,6 +48,7 @@ export function useCanvasBridgeCanvasSync({
 
         try {
             canvasEditor.run(() => {
+                // 1：拉取 tldraw 画布当前的真实图形状态
                 const currentPageShapes = canvasEditor.getCurrentPageShapes()
                 const nodeShapeMap = new Map<string, TLShapeId>()
                 const descriptorArrowIds = new Set<TLShapeId>()
@@ -75,7 +76,7 @@ export function useCanvasBridgeCanvasSync({
                             currentShapeId === currentSession.ghostShapeId)
 
                     /**
-                     * 业务场景：旧版本残留或第三方生成的非业务 shape 不应长期存在画布。
+                     * 旧版本残留或第三方生成的非业务 shape 不应长期存在画布
                      */
                     if (
                         !isCurrentDragShape &&
@@ -87,6 +88,7 @@ export function useCanvasBridgeCanvasSync({
                     }
                 }
 
+                // 2: 拉取 Zustand cards 对 Node 进行全量 Diff 计算
                 const currentNodeIdSet = new Set(cards.map((card) => card.id))
                 const createNodePayload: Array<{
                     id: TLShapeId
@@ -98,7 +100,7 @@ export function useCanvasBridgeCanvasSync({
                 const updateNodePayload: ForkMindCardShapePartial[] = []
 
                 for (const card of cards) {
-                    const nextShapeId = toCanvasShapeId(card.id)
+                    const nextShapeId = toCanvasNodeShapeId(card.id)
                     const nextHeight = card.type === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
                     const nextProps: ForkMindCardShape["props"] = {
                         w: card.size.width,
@@ -130,6 +132,7 @@ export function useCanvasBridgeCanvasSync({
                     })
                 }
 
+                //  3：结算 Diff，批量提交 Node（卡片）的增、删、改
                 const removeNodeShapeIds = Array.from(nodeShapeMap.entries())
                     .filter(([nodeId]) => !currentNodeIdSet.has(nodeId))
                     .map(([, shapeId]) => shapeId)
@@ -151,6 +154,7 @@ export function useCanvasBridgeCanvasSync({
                     canvasEditor.deleteShapes(transientShapeIds)
                 }
 
+                // 4：计算 Arrow（连线）的 Diff，并呼叫 projection 层兜底更新
                 const stableArrowProjections = createStableArrowProjections(
                     cards,
                     arrowAnchorOverrideByIdRef.current,
@@ -173,13 +177,13 @@ export function useCanvasBridgeCanvasSync({
                 }
 
                 for (const projection of stableArrowProjections) {
-                    syncStableArrowProjection(canvasEditor, projection)
+                    syncStableArrowProjection(canvasEditor, projection) // 执行更新s
                 }
 
-                const nextSelectedNodeShapeIds = activeNodeId ? [toCanvasShapeId(activeNodeId)] : []
+                const nextSelectedNodeShapeIds = activeNodeId ? [toCanvasNodeShapeId(activeNodeId)] : []
                 const currentSelectedNodeShapeIds = canvasEditor
                     .getSelectedShapeIds()
-                    .filter((shapeId) => parseNodeIdFromShapeId(shapeId) !== null)
+                    .filter((shapeId): shapeId is TLShapeId => parseNodeIdFromShapeId(shapeId) !== null)
 
                 if (!areSameShapeIdSet(currentSelectedNodeShapeIds, nextSelectedNodeShapeIds)) {
                     canvasEditor.setSelectedShapes(nextSelectedNodeShapeIds)
