@@ -101,6 +101,40 @@ export function useCanvasBridgeInteractions({
         }
     }, [canvasEditor, selectedCreationTypeRef, createNodeByType, setActiveNodeId])
 
+    /**
+     * 禁止用户直接拖动/改写业务箭头（包括移动箭头本体与拖端点）
+     * 当前阶段箭头只作为关系投影，用户可选中删除，但不能直接拖动编辑。
+     * 注意：Store -> Canvas 的系统投影同步仍需放行（isApplyingStoreToCanvasRef=true）。
+     */
+    useEffect(() => {
+        if (!canvasEditor) {
+            return
+        }
+
+        const unregister = canvasEditor.sideEffects.registerBeforeChangeHandler(
+            "shape",
+            (previousShape, nextShape, source) => {
+                if (isApplyingStoreToCanvasRef.current) {
+                    return nextShape
+                }
+
+                if (source !== "user") {
+                    return nextShape
+                }
+
+                if (previousShape.type === "arrow" && nextShape.type === "arrow") {
+                    return previousShape
+                }
+
+                return nextShape
+            },
+        )
+
+        return () => {
+            unregister()
+        }
+    }, [canvasEditor, isApplyingStoreToCanvasRef])
+
     // 画布选中态 -> Store activeNodeId 同步
     // 设置activeNodeId分为两种 点击/框选 映射回store需要做处理
     useEffect(() => {
