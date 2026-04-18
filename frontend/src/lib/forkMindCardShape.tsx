@@ -120,7 +120,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         return (
             <HTMLContainer
                 id={shape.id}
-                className="pointer-events-auto h-full w-full overflow-hidden rounded-2xl border border-zinc-300/80 bg-card shadow-sm theme-dark:border-zinc-700/80"
+                className="fm-card pointer-events-auto h-full w-full overflow-hidden rounded-2xl border border-zinc-300/80 bg-card shadow-sm theme-dark:border-zinc-700/80"
             >
                 <div className="flex h-full w-full flex-col overflow-hidden">
                     {shape.props.cardType === "chat" ? (
@@ -129,7 +129,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                                     Prompt
                                 </div>
-                                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                                <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
                                     <ReactMarkdown
                                         components={markdownComponents}
                                         remarkPlugins={[remarkGfm]}
@@ -144,7 +144,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                                     AI
                                 </div>
-                                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                                <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
                                     <ReactMarkdown
                                         components={markdownComponents}
                                         remarkPlugins={[remarkGfm]}
@@ -157,7 +157,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                         </>
                     ) : (
                         <section className="flex min-h-0 flex-1 flex-col px-4 py-3">
-                            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                            <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
                                 <ReactMarkdown
                                     components={markdownComponents}
                                     remarkPlugins={[remarkGfm]}

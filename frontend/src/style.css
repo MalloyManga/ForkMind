@@ -281,14 +281,18 @@ html {
   background-color: var(--fm-scrollbar-thumb-hover) !important;
 }
 
-/* 卡片内滚动区再加一层高优先级规则，确保 tldraw 容器内也能显示 */
+.tl-html-container.fm-card {
+  pointer-events: auto !important;
+}
+
 .fm-card-scroll {
   scrollbar-width: thin !important;
   scrollbar-color: transparent transparent !important;
   scrollbar-gutter: stable both-edges;
+  overflow-x: hidden !important;
 }
 
-.fm-card:hover .fm-card-scroll,
+.tl-html-container.fm-card:hover .fm-card-scroll,
 .fm-card-scroll:hover,
 .fm-card-scroll:focus-within {
   scrollbar-color: var(--fm-scrollbar-thumb) transparent !important;
@@ -299,17 +303,21 @@ html {
   height: 6px !important;
 }
 
+.fm-card-scroll::-webkit-scrollbar:horizontal {
+  height: 0 !important;
+}
+
 .fm-card-scroll::-webkit-scrollbar-thumb {
   background-color: transparent !important;
   border-radius: 9999px;
 }
 
-.fm-card:hover .fm-card-scroll::-webkit-scrollbar-thumb,
+.tl-html-container.fm-card:hover .fm-card-scroll::-webkit-scrollbar-thumb,
 .fm-card-scroll:hover::-webkit-scrollbar-thumb,
 .fm-card-scroll:focus-within::-webkit-scrollbar-thumb {
   background-color: var(--fm-scrollbar-thumb) !important;
 }
 
-.fm-card:hover .fm-card-scroll::-webkit-scrollbar-thumb:hover {
+.tl-html-container.fm-card:hover .fm-card-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--fm-scrollbar-thumb-hover) !important;
 }
