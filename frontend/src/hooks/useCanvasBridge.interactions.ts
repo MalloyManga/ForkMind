@@ -15,6 +15,7 @@ import { type syncStableArrowProjection as SyncStableArrowProjectionFn } from ".
 interface UseCanvasBridgeInteractionsParams {
     canvasEditor: Editor | null
     isApplyingStoreToCanvasRef: MutableRefObject<boolean> // 是否已经同步
+    isUserMultiSelectionRef: MutableRefObject<boolean>
     activeNodeIdRef: MutableRefObject<string | null>
     cardsRef: MutableRefObject<ConversationCard[]>
     selectedCreationTypeRef: MutableRefObject<ConversationNodeType>
@@ -44,6 +45,7 @@ interface UseCanvasBridgeInteractionsParams {
 export function useCanvasBridgeInteractions({
     canvasEditor,
     isApplyingStoreToCanvasRef,
+    isUserMultiSelectionRef,
     activeNodeIdRef,
     cardsRef,
     selectedCreationTypeRef,
@@ -156,12 +158,32 @@ export function useCanvasBridgeInteractions({
                 const nextActiveNodeId = selectedNodeIds[0]
 
                 if (selectedNodeIds.length === 0) {
+                    isUserMultiSelectionRef.current = false
                     if (activeNodeIdRef.current !== null) {
                         setActiveNodeId(null)
                     }
                     return
                 }
 
+                if (selectedNodeIds.length > 1) {
+                    // 框选/全选多节点时，交互层标记“多选态”供同步层读取。
+                    isUserMultiSelectionRef.current = true
+
+                    // 多选时尽量保留当前 active，只有不在当前选择集时才切到第一个。
+                    if (
+                        activeNodeIdRef.current !== null &&
+                        selectedNodeIds.includes(activeNodeIdRef.current)
+                    ) {
+                        return
+                    }
+
+                    if (activeNodeIdRef.current !== nextActiveNodeId) {
+                        setActiveNodeId(nextActiveNodeId)
+                    }
+                    return
+                }
+
+                isUserMultiSelectionRef.current = false
                 if (activeNodeIdRef.current !== nextActiveNodeId) {
                     setActiveNodeId(nextActiveNodeId)
                 }
@@ -172,7 +194,7 @@ export function useCanvasBridgeInteractions({
         return () => {
             unlisten()
         }
-    }, [activeNodeIdRef, canvasEditor, isApplyingStoreToCanvasRef, setActiveNodeId])
+    }, [activeNodeIdRef, canvasEditor, isApplyingStoreToCanvasRef, isUserMultiSelectionRef, setActiveNodeId])
 
     // Backspace 删除语义动作映射
     useEffect(() => {
@@ -302,6 +324,49 @@ export function useCanvasBridgeInteractions({
             window.removeEventListener("keydown", handleHistoryKeyDown, true)
         }
     }, [canvasEditor, redo, undo])
+
+    // Ctrl/Cmd + A 全选画布业务图形（节点 + 关系箭头）
+    useEffect(() => {
+        if (!canvasEditor) {
+            return
+        }
+
+        const handleSelectAllKeyDown = (event: KeyboardEvent) => {
+            const isMetaPressed = event.metaKey || event.ctrlKey
+            if (!isMetaPressed) {
+                return
+            }
+
+            if (event.key.toLowerCase() !== "a") {
+                return
+            }
+
+            if (isTextEditingTarget(event.target)) {
+                return
+            }
+
+            event.preventDefault()
+            event.stopPropagation()
+
+            // Ctrl/Cmd + A 明确进入多选态，避免后续被单选回写覆盖。
+            isUserMultiSelectionRef.current = true
+            const selectableShapeIds = canvasEditor
+                .getCurrentPageShapes()
+                .map((shape) => shape.id as TLShapeId)
+                .filter(
+                    (shapeId) =>
+                        parseNodeIdFromShapeId(shapeId) !== null ||
+                        parseCanvasArrowDescriptor(shapeId) !== null,
+                )
+
+            canvasEditor.setSelectedShapes(selectableShapeIds)
+        }
+
+        window.addEventListener("keydown", handleSelectAllKeyDown, true)
+        return () => {
+            window.removeEventListener("keydown", handleSelectAllKeyDown, true)
+        }
+    }, [canvasEditor, isUserMultiSelectionRef])
 
     /**
      * 节点拖拽结束 pointerup 时 新坐标写回 Store

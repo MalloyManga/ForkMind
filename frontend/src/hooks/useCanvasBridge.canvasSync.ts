@@ -22,6 +22,7 @@ interface UseCanvasBridgeCanvasSyncParams {
     activeNodeId: string | null
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     isApplyingStoreToCanvasRef: MutableRefObject<boolean>
+    isUserMultiSelectionRef: MutableRefObject<boolean>
     arrowAnchorOverrideByIdRef: MutableRefObject<Map<TLShapeId, ArrowAnchorOverride>>
     syncStableArrowProjection: typeof SyncStableArrowProjectionFn
 }
@@ -36,6 +37,7 @@ export function useCanvasBridgeCanvasSync({
     activeNodeId,
     linkDragSessionRef,
     isApplyingStoreToCanvasRef,
+    isUserMultiSelectionRef,
     arrowAnchorOverrideByIdRef,
     syncStableArrowProjection,
 }: UseCanvasBridgeCanvasSyncParams) {
@@ -185,6 +187,14 @@ export function useCanvasBridgeCanvasSync({
                     .getSelectedShapeIds()
                     .filter((shapeId): shapeId is TLShapeId => parseNodeIdFromShapeId(shapeId) !== null)
 
+                /**
+                 * 多选态由 interactions 层判定并维护。
+                 * 同步层只读取这个状态：多选期间不执行“active -> 单选”覆盖。
+                 */
+                if (isUserMultiSelectionRef.current && currentSelectedNodeShapeIds.length > 1) {
+                    return
+                }
+
                 if (!areSameShapeIdSet(currentSelectedNodeShapeIds, nextSelectedNodeShapeIds)) {
                     canvasEditor.setSelectedShapes(nextSelectedNodeShapeIds)
                 }
@@ -198,6 +208,7 @@ export function useCanvasBridgeCanvasSync({
         canvasEditor,
         cards,
         isApplyingStoreToCanvasRef,
+        isUserMultiSelectionRef,
         linkDragSessionRef,
         syncStableArrowProjection,
     ])

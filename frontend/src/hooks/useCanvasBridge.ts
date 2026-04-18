@@ -62,6 +62,7 @@ export function useCanvasBridge({
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
 
     const isApplyingStoreToCanvasRef = useRef(false)
+    const isUserMultiSelectionRef = useRef(false)
     const activeNodeIdRef = useRef<string | null>(null)
     const cardsRef = useRef<ConversationCard[]>(cards)
     const selectedCreationTypeRef = useRef<ConversationNodeType>(selectedCreationType)
@@ -154,6 +155,7 @@ export function useCanvasBridge({
         activeNodeId,
         linkDragSessionRef,
         isApplyingStoreToCanvasRef,
+        isUserMultiSelectionRef,
         arrowAnchorOverrideByIdRef,
         syncStableArrowProjection, // <=== 秘密就在这里！依赖注入！
     })
@@ -165,6 +167,7 @@ export function useCanvasBridge({
     useCanvasBridgeInteractions({
         canvasEditor,
         isApplyingStoreToCanvasRef,
+        isUserMultiSelectionRef,
         activeNodeIdRef,
         cardsRef,
         selectedCreationTypeRef,
