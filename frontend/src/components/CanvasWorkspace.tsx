@@ -38,13 +38,19 @@ export function CanvasWorkspace({
              * 关闭 tldraw 默认 Handles，避免与我们自定义 hover 四向触点重叠。
              */
             Handles: null,
+            ContextMenu: null,
             InFrontOfTheCanvas: () => <CanvasLinkHandlesOverlay onStartLinkDrag={onStartLinkDrag} />,
         }),
         [onStartLinkDrag],
     )
 
     return (
-        <main className="relative flex-1 bg-zinc-50 theme-dark:bg-zinc-900">
+        <main
+            className="relative flex-1 bg-zinc-50 theme-dark:bg-zinc-900"
+            onContextMenu={(event) => {
+                event.preventDefault()
+            }}
+        >
             <div className="absolute inset-0">
                 <Tldraw
                     hideUi
