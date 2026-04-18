@@ -1,5 +1,7 @@
 # 🌿 ForkMind (分叉思维)
 
+![ForkMind Banner](./banner.png)
+
 > **Break free from linear chats. Fork your thoughts.**
 > 摆脱线性对话的束缚，让你的 AI 灵感在无限画布上自由分叉。
 
