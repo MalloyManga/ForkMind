@@ -2,6 +2,8 @@ import { useEffect, type MutableRefObject } from "react"
 import type { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
+import type { CanvasTool } from "./canvasToolTypes"
+import { isCreationCanvasTool } from "./canvasToolTypes"
 import {
     type ArrowAnchorOverride,
     closestAnchorSideToNormalizedAnchor,
@@ -18,7 +20,7 @@ interface UseCanvasBridgeInteractionsParams {
     isUserMultiSelectionRef: MutableRefObject<boolean>
     activeNodeIdRef: MutableRefObject<string | null>
     cardsRef: MutableRefObject<ConversationCard[]>
-    selectedCreationTypeRef: MutableRefObject<ConversationNodeType>
+    currentCanvasToolRef: MutableRefObject<CanvasTool>
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     arrowAnchorOverrideByIdRef: MutableRefObject<Map<TLShapeId, ArrowAnchorOverride>>
     clearPointerListeners: () => void
@@ -48,7 +50,7 @@ export function useCanvasBridgeInteractions({
     isUserMultiSelectionRef,
     activeNodeIdRef,
     cardsRef,
-    selectedCreationTypeRef,
+    currentCanvasToolRef,
     linkDragSessionRef,
     arrowAnchorOverrideByIdRef,
     clearPointerListeners,
@@ -79,9 +81,22 @@ export function useCanvasBridgeInteractions({
                     return
                 }
 
+                const currentCanvasTool = currentCanvasToolRef.current
+                if (!isCreationCanvasTool(currentCanvasTool)) {
+                    canvasEditor.run(() => {
+                        if (canvasEditor.getEditingShapeId() === shape.id) {
+                            canvasEditor.setEditingShape(null)
+                        }
+                        if (canvasEditor.getShape(shape.id)) {
+                            canvasEditor.deleteShapes([shape.id])
+                        }
+                    }, { history: "ignore" })
+                    return
+                }
+
                 const textShapeId = shape.id
                 const createdNodeId = createNodeByType(
-                    selectedCreationTypeRef.current,
+                    currentCanvasTool,
                     { x: shape.x, y: shape.y },
                     null,
                 )
@@ -101,7 +116,7 @@ export function useCanvasBridgeInteractions({
         return () => {
             unregister()
         }
-    }, [canvasEditor, selectedCreationTypeRef, createNodeByType, setActiveNodeId])
+    }, [canvasEditor, currentCanvasToolRef, createNodeByType, setActiveNodeId])
 
     /**
      * 禁止用户直接拖动/改写业务箭头（包括移动箭头本体与拖端点）

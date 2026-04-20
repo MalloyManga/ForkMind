@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import type { ConversationNodeType } from "../domain/conversation/types"
+import type { CanvasTool } from "../hooks/canvasToolTypes"
 import { CANVAS_CREATION_REGISTRY } from "./canvasCreationRegistry"
 import { ChevronDownIcon } from "./icons/ChevronDownIcon"
 import { MousePointerIcon } from "./icons/MousePointerIcon"
 import { MoveHandleIcon } from "./icons/MoveHandleIcon"
 
 interface CanvasCreationModeBarProps {
-    selectedCreationType: ConversationNodeType
-    onSelectCreationType: (creationType: ConversationNodeType) => void
+    currentCanvasTool: CanvasTool
+    onSelectCanvasTool: (canvasTool: CanvasTool) => void
 }
 
-type ToolbarToolId = ConversationNodeType | "move" | "hand-tool" | "tool-variants"
+type ToolbarToolId = CanvasTool | "tool-variants"
 
 interface FloatingToolHintProps {
     label: string
@@ -88,12 +88,22 @@ function ToolButtonShell({
  * 画布底部创建模式条
  */
 export function CanvasCreationModeBar({
-    selectedCreationType,
-    onSelectCreationType,
+    currentCanvasTool,
+    onSelectCanvasTool,
 }: CanvasCreationModeBarProps) {
     const tooltipDelayTimerRef = useRef<number | null>(null)
-    const [isMoveHandlePreview, setIsMoveHandlePreview] = useState(false)
+    const [isMoveHandlePreview, setIsMoveHandlePreview] = useState(currentCanvasTool === "hand-tool")
     const [visibleTooltipTool, setVisibleTooltipTool] = useState<ToolbarToolId | null>(null)
+
+    useEffect(() => {
+        if (currentCanvasTool === "move") {
+            setIsMoveHandlePreview(false)
+        }
+
+        if (currentCanvasTool === "hand-tool") {
+            setIsMoveHandlePreview(true)
+        }
+    }, [currentCanvasTool])
 
     const clearTooltipDelayTimer = () => {
         if (tooltipDelayTimerRef.current !== null) {
@@ -138,11 +148,19 @@ export function CanvasCreationModeBar({
                         isTooltipVisible={visibleTooltipTool === (isMoveHandlePreview ? "hand-tool" : "move")}
                         tooltipLabel={isMoveHandlePreview ? "Hand tool" : "Move"}
                         tooltipShortcut="X"
+                        onClick={() => {
+                            dismissTooltipImmediately()
+                            onSelectCanvasTool(isMoveHandlePreview ? "hand-tool" : "move")
+                        }}
                         onTooltipIntentStart={() => {
                             startTooltipIntent(isMoveHandlePreview ? "hand-tool" : "move")
                         }}
                         onTooltipIntentEnd={endTooltipIntent}
-                        buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-zinc-700 transition-all hover:bg-white hover:text-zinc-950 theme-dark:text-zinc-200 theme-dark:hover:bg-zinc-700 theme-dark:hover:text-zinc-50"
+                        buttonClassName={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] transition-all ${
+                            currentCanvasTool === "move" || currentCanvasTool === "hand-tool"
+                                ? "bg-sky-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(14,165,233,0.32)] theme-dark:bg-sky-500 theme-dark:text-white"
+                                : "text-zinc-700 hover:bg-white hover:text-zinc-950 theme-dark:text-zinc-200 theme-dark:hover:bg-zinc-700 theme-dark:hover:text-zinc-50"
+                        }`}
                     >
                         {isMoveHandlePreview ? (
                             <MoveHandleIcon className="size-4.5" />
@@ -157,7 +175,11 @@ export function CanvasCreationModeBar({
                         tooltipShortcut={undefined}
                         onClick={() => {
                             dismissTooltipImmediately()
-                            setIsMoveHandlePreview((currentPreviewState) => !currentPreviewState)
+                            setIsMoveHandlePreview((currentPreviewState) => {
+                                const nextPreviewState = !currentPreviewState
+                                onSelectCanvasTool(nextPreviewState ? "hand-tool" : "move")
+                                return nextPreviewState
+                            })
                         }}
                         onTooltipIntentStart={() => {
                             startTooltipIntent("tool-variants")
@@ -172,9 +194,9 @@ export function CanvasCreationModeBar({
                 <div className="mx-1 h-6 w-px bg-zinc-200 theme-dark:bg-zinc-700" />
 
                 {(Object.entries(CANVAS_CREATION_REGISTRY) as Array<
-                    [ConversationNodeType, (typeof CANVAS_CREATION_REGISTRY)[ConversationNodeType]]
+                    [keyof typeof CANVAS_CREATION_REGISTRY, (typeof CANVAS_CREATION_REGISTRY)[keyof typeof CANVAS_CREATION_REGISTRY]]
                 >).map(([nodeType, nodeDefinition]) => {
-                    const isSelected = selectedCreationType === nodeType
+                    const isSelected = currentCanvasTool === nodeType
 
                     return (
                         <ToolButtonShell
@@ -184,7 +206,7 @@ export function CanvasCreationModeBar({
                             tooltipShortcut="X"
                             onClick={() => {
                                 dismissTooltipImmediately()
-                                onSelectCreationType(nodeType)
+                                onSelectCanvasTool(nodeType)
                             }}
                             onTooltipIntentStart={() => {
                                 startTooltipIntent(nodeType)

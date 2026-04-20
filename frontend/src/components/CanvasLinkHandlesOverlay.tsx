@@ -5,6 +5,7 @@ import { parseNodeIdFromShapeId } from "../hooks/canvasNodeIds"
 
 interface CanvasLinkHandlesOverlayProps {
     onStartLinkDrag: (input: StartLinkDragInput) => void
+    isVisible: boolean
 }
 
 interface HandlePoint {
@@ -33,7 +34,10 @@ function getEdgeHandlePoints(bounds: Box): HandlePoint[] {
 /**
  * 卡片四周的Handle
  */
-export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesOverlayProps) {
+export function CanvasLinkHandlesOverlay({
+    onStartLinkDrag,
+    isVisible,
+}: CanvasLinkHandlesOverlayProps) {
     const editor = useEditor()
     const [hoveredNodeShapeId, setHoveredNodeShapeId] = useState<TLShapeId | null>(null)
     const [overlayVersion, setOverlayVersion] = useState(0)
@@ -143,7 +147,7 @@ export function CanvasLinkHandlesOverlay({ onStartLinkDrag }: CanvasLinkHandlesO
         })
     }, [editor, hoveredNodeShapeId, overlayVersion])
 
-    if (!hoveredNodeShapeId || edgeHandlePoints.length === 0) {
+    if (!isVisible || !hoveredNodeShapeId || edgeHandlePoints.length === 0) {
         return null
     }
 

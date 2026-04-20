@@ -1,9 +1,9 @@
 ﻿import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react"
 import { CanvasWorkspace } from "./components/CanvasWorkspace"
-import type { ConversationNodeType } from "./domain/conversation/types"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
 import { RightEditorSidebar } from "./components/RightEditorSidebar"
 import { PanelsToggleIcon } from "./components/icons/PanelsToggleIcon"
+import type { CanvasTool } from "./hooks/canvasToolTypes"
 import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import {
     selectActiveNode,
@@ -32,7 +32,7 @@ function clamp(value: number, min: number, max: number): number {
 function App() {
     const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
     const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
-    const [selectedCreationType, setSelectedCreationType] = useState<ConversationNodeType>("chat")
+    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("chat")
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(288)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(420)
@@ -86,7 +86,7 @@ function App() {
         cards,
         activeNodeId,
         setActiveNodeId,
-        selectedCreationType,
+        currentCanvasTool,
         addChatNode,
         addNoteNode,
         moveNode,
@@ -256,8 +256,8 @@ function App() {
                 <CanvasWorkspace
                     onCanvasMount={handleCanvasMount}
                     onStartLinkDrag={handleLinkHandlePointerDown}
-                    selectedCreationType={selectedCreationType}
-                    onSelectCreationType={setSelectedCreationType}
+                    currentCanvasTool={currentCanvasTool}
+                    onSelectCanvasTool={setCurrentCanvasTool}
                     licenseKey={tldrawLicenseKey}
                 />
 

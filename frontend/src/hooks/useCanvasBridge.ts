@@ -2,6 +2,7 @@
 import { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { StartLinkDragInput } from "./canvasLinkTypes"
+import type { CanvasTool } from "./canvasToolTypes"
 import { type ArrowAnchorOverride, type LinkDragSession, type Point } from "./useCanvasBridge.helpers"
 import { syncStableArrowProjection } from "./useCanvasBridge.projection"
 import { useCanvasBridgeCanvasSync } from "./useCanvasBridge.canvasSync"
@@ -15,7 +16,7 @@ function assertNeverCreationType(value: never): never {
 interface UseCanvasBridgeParams {
     cards: ConversationCard[]
     activeNodeId: string | null
-    selectedCreationType: ConversationNodeType
+    currentCanvasTool: CanvasTool
     setActiveNodeId: (nodeId: string | null) => void
     addChatNode: (input?: {
         parentId?: string | null
@@ -47,7 +48,7 @@ interface UseCanvasBridgeResult {
 export function useCanvasBridge({
     cards,
     activeNodeId,
-    selectedCreationType,
+    currentCanvasTool,
     setActiveNodeId,
     addChatNode,
     addNoteNode,
@@ -65,7 +66,7 @@ export function useCanvasBridge({
     const isUserMultiSelectionRef = useRef(false)
     const activeNodeIdRef = useRef<string | null>(null)
     const cardsRef = useRef<ConversationCard[]>(cards)
-    const selectedCreationTypeRef = useRef<ConversationNodeType>(selectedCreationType)
+    const currentCanvasToolRef = useRef<CanvasTool>(currentCanvasTool)
     const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点 覆盖在自动生成的
 
     /**
@@ -83,8 +84,17 @@ export function useCanvasBridge({
     }, [cards])
 
     useEffect(() => {
-        selectedCreationTypeRef.current = selectedCreationType
-    }, [selectedCreationType])
+        currentCanvasToolRef.current = currentCanvasTool
+
+        /**
+         * 统一把画布工具状态映射到 tldraw 内部工具
+         */
+        if (!canvasEditor) {
+            return
+        }
+
+        canvasEditor.setCurrentTool(currentCanvasTool === "hand-tool" ? "hand" : "select")
+    }, [canvasEditor, currentCanvasTool])
 
     /**
      * 根据当前创建模式创建节点
@@ -135,7 +145,7 @@ export function useCanvasBridge({
     const { handleLinkHandlePointerDown } = useCanvasBridgeLinkDrag({
         canvasEditor,
         cardsRef,
-        selectedCreationTypeRef,
+        currentCanvasToolRef,
         linkDragSessionRef,
         removePointerListenersRef,
         clearPointerListeners,
@@ -170,7 +180,7 @@ export function useCanvasBridge({
         isUserMultiSelectionRef,
         activeNodeIdRef,
         cardsRef,
-        selectedCreationTypeRef,
+        currentCanvasToolRef,
         linkDragSessionRef,
         arrowAnchorOverrideByIdRef,
         clearPointerListeners,
@@ -196,8 +206,8 @@ export function useCanvasBridge({
             areKeyboardShortcutsEnabled: false, // 关闭tldraw默认的快捷键
         })
         editor.clearHistory() // 清零画布历史
-        editor.setCurrentTool("select") // 强制当前工具为光标
-    }, [])
+        editor.setCurrentTool(currentCanvasToolRef.current === "hand-tool" ? "hand" : "select")
+    }, [currentCanvasToolRef])
 
     return {
         handleCanvasMount,

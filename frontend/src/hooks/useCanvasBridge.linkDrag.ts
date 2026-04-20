@@ -4,6 +4,8 @@ import { DEFAULT_CARD_MIN_HEIGHT, DEFAULT_CARD_WIDTH } from "../domain/conversat
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { type ForkMindCardShape, FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
 import { type StartLinkDragInput } from "./canvasLinkTypes"
+import type { CanvasTool } from "./canvasToolTypes"
+import { isCreationCanvasTool } from "./canvasToolTypes"
 import { parseNodeIdFromShapeId } from "./canvasNodeIds"
 import {
     anchorBySide,
@@ -28,7 +30,7 @@ import {
 interface UseCanvasBridgeLinkDragParams {
     canvasEditor: Editor | null
     cardsRef: MutableRefObject<ConversationCard[]>
-    selectedCreationTypeRef: MutableRefObject<ConversationNodeType>
+    currentCanvasToolRef: MutableRefObject<CanvasTool>
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     removePointerListenersRef: MutableRefObject<(() => void) | null>
     clearPointerListeners: () => void
@@ -52,7 +54,7 @@ interface UseCanvasBridgeLinkDragResult {
 export function useCanvasBridgeLinkDrag({
     canvasEditor,
     cardsRef,
-    selectedCreationTypeRef,
+    currentCanvasToolRef,
     linkDragSessionRef,
     removePointerListenersRef,
     clearPointerListeners,
@@ -332,7 +334,12 @@ export function useCanvasBridgeLinkDrag({
             return
         }
 
-        const currentCreationType = selectedCreationTypeRef.current
+        const currentCanvasTool = currentCanvasToolRef.current
+        if (!isCreationCanvasTool(currentCanvasTool)) {
+            return
+        }
+
+        const currentCreationType = currentCanvasTool
         const currentGhostHeight = getDefaultHeightByType(currentCreationType)
 
         const startPoint = edgePointBySide(sourceBounds, input.side)
@@ -458,7 +465,7 @@ export function useCanvasBridgeLinkDrag({
         linkDragSessionRef,
         removePointerListenersRef,
         resolveLinkDrag,
-        selectedCreationTypeRef,
+        currentCanvasToolRef,
         updateLinkDragPreview,
     ])
 

@@ -1,8 +1,8 @@
 ﻿import { useMemo } from "react"
 import { Editor, Tldraw, type TLComponents } from "tldraw"
 import "tldraw/tldraw.css"
-import type { ConversationNodeType } from "../domain/conversation/types"
 import { StartLinkDragInput } from "../hooks/canvasLinkTypes"
+import type { CanvasTool } from "../hooks/canvasToolTypes"
 import { ForkMindArrowShapeUtil } from "../lib/forkMindArrowShape"
 import { ForkMindCardShapeUtil } from "../lib/forkMindCardShape"
 import { CanvasCreationModeBar } from "./CanvasCreationModeBar"
@@ -11,8 +11,8 @@ import { CanvasLinkHandlesOverlay } from "./CanvasLinkHandlesOverlay"
 interface CanvasWorkspaceProps {
     onCanvasMount: (editor: Editor) => void
     onStartLinkDrag: (input: StartLinkDragInput) => void
-    selectedCreationType: ConversationNodeType
-    onSelectCreationType: (creationType: ConversationNodeType) => void
+    currentCanvasTool: CanvasTool
+    onSelectCanvasTool: (canvasTool: CanvasTool) => void
     licenseKey?: string
 }
 
@@ -23,8 +23,8 @@ interface CanvasWorkspaceProps {
 export function CanvasWorkspace({
     onCanvasMount,
     onStartLinkDrag,
-    selectedCreationType,
-    onSelectCreationType,
+    currentCanvasTool,
+    onSelectCanvasTool,
     licenseKey,
 }: CanvasWorkspaceProps) {
     const canvasShapeUtils = useMemo(
@@ -39,9 +39,14 @@ export function CanvasWorkspace({
              */
             Handles: null,
             ContextMenu: null,
-            InFrontOfTheCanvas: () => <CanvasLinkHandlesOverlay onStartLinkDrag={onStartLinkDrag} />,
+            InFrontOfTheCanvas: () => (
+                <CanvasLinkHandlesOverlay
+                    onStartLinkDrag={onStartLinkDrag}
+                    isVisible={currentCanvasTool === "chat" || currentCanvasTool === "note"}
+                />
+            ),
         }),
-        [onStartLinkDrag],
+        [currentCanvasTool, onStartLinkDrag],
     )
 
     return (
@@ -61,8 +66,8 @@ export function CanvasWorkspace({
                 />
             </div>
             <CanvasCreationModeBar
-                selectedCreationType={selectedCreationType}
-                onSelectCreationType={onSelectCreationType}
+                currentCanvasTool={currentCanvasTool}
+                onSelectCanvasTool={onSelectCanvasTool}
             />
         </main>
     )
