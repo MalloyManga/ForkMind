@@ -28,8 +28,8 @@ interface UseCanvasBridgeCanvasSyncParams {
 }
 
 /**
- * Store -> Canvas 投影同步层
- * 把 Store 作为唯一事实源 持续投影成 tldraw 的节点形状和关系箭头
+ * Store 为唯一事实源 持续投影成 tldraw 的节点形状和关系箭头
+ * 仅作 store canvas 的状态对比diff计算 真正执行绘制渲染由syncStableArrowProjection负责
  */
 export function useCanvasBridgeCanvasSync({
     canvasEditor,
@@ -179,7 +179,7 @@ export function useCanvasBridgeCanvasSync({
                 }
 
                 for (const projection of stableArrowProjections) {
-                    syncStableArrowProjection(canvasEditor, projection) // 执行更新s
+                    syncStableArrowProjection(canvasEditor, projection) // 执行更新
                 }
 
                 const nextSelectedNodeShapeIds = activeNodeId ? [toCanvasNodeShapeId(activeNodeId)] : []

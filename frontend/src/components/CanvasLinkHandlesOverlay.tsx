@@ -5,7 +5,7 @@ import { parseNodeIdFromShapeId } from "../hooks/canvasNodeIds"
 
 interface CanvasLinkHandlesOverlayProps {
     onStartLinkDrag: (input: StartLinkDragInput) => void
-    isVisible: boolean
+    isVisible: boolean // 只有创建类工具下才显示 handle move / hand-tool 时直接隐藏
 }
 
 interface HandlePoint {
@@ -39,10 +39,10 @@ export function CanvasLinkHandlesOverlay({
     isVisible,
 }: CanvasLinkHandlesOverlayProps) {
     const editor = useEditor()
-    const [hoveredNodeShapeId, setHoveredNodeShapeId] = useState<TLShapeId | null>(null)
-    const [overlayVersion, setOverlayVersion] = useState(0)
+    const [hoveredNodeShapeId, setHoveredNodeShapeId] = useState<TLShapeId | null>(null) // 当前被鼠标悬浮到的卡片 shape id。
+    const [overlayVersion, setOverlayVersion] = useState(0) // 强制重新计算 overlay 坐标用的版本号。
     const hoveredNodeShapeIdRef = useRef<TLShapeId | null>(null)
-    const isPointerOverHandleRef = useRef(false)
+    const isPointerOverHandleRef = useRef(false) // 防抖锁：鼠标从卡片 body 移到 handle 时，不要瞬间把 handle 隐掉。
 
     useEffect(() => {
         hoveredNodeShapeIdRef.current = hoveredNodeShapeId
@@ -156,6 +156,7 @@ export function CanvasLinkHandlesOverlay({
             {edgeHandlePoints.map((handlePoint) => (
                 <g
                     key={handlePoint.side}
+                    data-fm-link-handle="true" // 让创建拖拽状态机能识别 这是不是 link handle 本身
                     className="pointer-events-auto cursor-crosshair"
                     onPointerEnter={() => {
                         isPointerOverHandleRef.current = true
@@ -175,6 +176,7 @@ export function CanvasLinkHandlesOverlay({
                         })
                     }}
                     onPointerDown={(event) => {
+                        // 这次 pointerdown 必须交给 linkDrag 状态机 不能继续让 tldraw 默认处理
                         event.preventDefault()
                         event.stopPropagation()
 

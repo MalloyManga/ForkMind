@@ -5,14 +5,24 @@ import { StartLinkDragInput } from "../hooks/canvasLinkTypes"
 import type { CanvasTool } from "../hooks/canvasToolTypes"
 import { ForkMindArrowShapeUtil } from "../lib/forkMindArrowShape"
 import { ForkMindCardShapeUtil } from "../lib/forkMindCardShape"
+import { CanvasCreationDragOverlay } from "./CanvasCreationDragOverlay"
 import { CanvasCreationModeBar } from "./CanvasCreationModeBar"
 import { CanvasLinkHandlesOverlay } from "./CanvasLinkHandlesOverlay"
 
 interface CanvasWorkspaceProps {
+    // tldraw 挂载完成后，把 editor 实例经由Apptsx交回桥接层canvasBridge处理
     onCanvasMount: (editor: Editor) => void
     onStartLinkDrag: (input: StartLinkDragInput) => void
-    currentCanvasTool: CanvasTool
+    currentCanvasTool: CanvasTool // 当前底部工具条选中的工具
+    // 底部工具条切换工具时，回写到 App
     onSelectCanvasTool: (canvasTool: CanvasTool) => void
+    // 创建工具拖拽中的蓝色预创建框
+    creationPreviewRect: {
+        x: number
+        y: number
+        width: number
+        height: number
+    } | null
     licenseKey?: string
 }
 
@@ -25,6 +35,7 @@ export function CanvasWorkspace({
     onStartLinkDrag,
     currentCanvasTool,
     onSelectCanvasTool,
+    creationPreviewRect,
     licenseKey,
 }: CanvasWorkspaceProps) {
     const canvasShapeUtils = useMemo(
@@ -35,10 +46,12 @@ export function CanvasWorkspace({
     const canvasComponents = useMemo<TLComponents>(
         () => ({
             /**
-             * 关闭 tldraw 默认 Handles，避免与我们自定义 hover 四向触点重叠。
+             * 关闭 tldraw 默认 Handles 避免与我们自定义 hover 四向触点重叠
              */
             Handles: null,
             ContextMenu: null,
+            // 把四向连线 handle 叠到画布最前层
+            // 只有 chat / note 工具下才显示，因为 move / hand-tool 不应进入创建语义
             InFrontOfTheCanvas: () => (
                 <CanvasLinkHandlesOverlay
                     onStartLinkDrag={onStartLinkDrag}
@@ -59,14 +72,18 @@ export function CanvasWorkspace({
             <div className="absolute inset-0">
                 <Tldraw
                     hideUi
+                    // onMount 挂载整个 tldraw editor 实例
+                    // 后续所有 canvas 级事件监听都依赖这个对象
                     onMount={(editor) => { onCanvasMount(editor) }}
                     licenseKey={licenseKey}
                     shapeUtils={canvasShapeUtils}
                     components={canvasComponents}
                 />
             </div>
+            {/* 蓝色预创建框是我们自己的 overlay，不属于 tldraw 默认图形 */}
+            <CanvasCreationDragOverlay previewRect={creationPreviewRect} />
             <CanvasCreationModeBar
-                currentCanvasTool={currentCanvasTool}
+                currentCanvasTool={currentCanvasTool} // 
                 onSelectCanvasTool={onSelectCanvasTool}
             />
         </main>

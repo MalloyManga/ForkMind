@@ -3,30 +3,35 @@ import { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { StartLinkDragInput } from "./canvasLinkTypes"
 import type { CanvasTool } from "./canvasToolTypes"
-import { type ArrowAnchorOverride, type LinkDragSession, type Point } from "./useCanvasBridge.helpers"
+import {
+    assertNeverCreationType,
+    type ArrowAnchorOverride,
+    type LinkDragSession,
+    type Point,
+} from "./useCanvasBridge.helpers"
 import { syncStableArrowProjection } from "./useCanvasBridge.projection"
+import { useCanvasBridgeCreation } from "./useCanvasBridge.creation"
 import { useCanvasBridgeCanvasSync } from "./useCanvasBridge.canvasSync"
 import { useCanvasBridgeLinkDrag } from "./useCanvasBridge.linkDrag"
 import { useCanvasBridgeInteractions } from "./useCanvasBridge.interactions"
-
-function assertNeverCreationType(value: never): never {
-    throw new Error(`Unsupported creation node type: ${String(value)}`)
-}
 
 interface UseCanvasBridgeParams {
     cards: ConversationCard[]
     activeNodeId: string | null
     currentCanvasTool: CanvasTool
     setActiveNodeId: (nodeId: string | null) => void
+    setCurrentCanvasTool: (canvasTool: CanvasTool) => void // 真正修改 App 当前工具状态的 React setState
     addChatNode: (input?: {
         parentId?: string | null
         position?: { x: number; y: number }
+        size?: { width?: number; minHeight?: number }
         userPrompt?: string
         aiResponse?: string
     }) => string
     addNoteNode: (input?: {
         parentId?: string | null
         position?: { x: number; y: number }
+        size?: { width?: number; minHeight?: number }
         noteContent?: string
     }) => string
     moveNode: (nodeId: string, nextPosition: { x: number; y: number }) => void
@@ -40,16 +45,23 @@ interface UseCanvasBridgeParams {
 interface UseCanvasBridgeResult {
     handleCanvasMount: (editor: Editor) => void
     handleLinkHandlePointerDown: (input: StartLinkDragInput) => void
+    creationPreviewRect: { // 蓝色预创建框的几何信息，只给 overlay 用
+        x: number
+        y: number
+        width: number
+        height: number
+    } | null
 }
 
 /**
- * 统一编排三层模块：linkDrag（高频拖拽）、canvasSync（Store 投影）、interactions（用户语义动作）
+ * 统一编排四层模块：linkDrag（高频拖拽）、canvasSync（Store 投影）、interactions（用户语义动作）、Creation（创建状态机）
  */
 export function useCanvasBridge({
     cards,
     activeNodeId,
     currentCanvasTool,
     setActiveNodeId,
+    setCurrentCanvasTool,
     addChatNode,
     addNoteNode,
     moveNode,
@@ -59,18 +71,19 @@ export function useCanvasBridge({
     undo,
     redo,
 }: UseCanvasBridgeParams): UseCanvasBridgeResult {
-    // 全局canvas editor变量
-    const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
+    const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null) // // 全局 canvas editor 变量
 
+    // 以下ref为桥接层的“运行时缓存” 让高频画布事件能读到最新状态而不必反复重渲染
     const isApplyingStoreToCanvasRef = useRef(false)
     const isUserMultiSelectionRef = useRef(false)
     const activeNodeIdRef = useRef<string | null>(null)
     const cardsRef = useRef<ConversationCard[]>(cards)
     const currentCanvasToolRef = useRef<CanvasTool>(currentCanvasTool)
-    const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点 覆盖在自动生成的
+
+    const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点 覆盖自动生成的
 
     /**
-     * 连线拖拽运行时状态（只存在于 tldraw 交互期间）。
+     * handle拖拽运行时状态（只存在于 tldraw 交互期间）
      */
     const linkDragSessionRef = useRef<LinkDragSession | null>(null)
     const removePointerListenersRef = useRef<(() => void) | null>(null)
@@ -87,7 +100,9 @@ export function useCanvasBridge({
         currentCanvasToolRef.current = currentCanvasTool
 
         /**
+         * 侦听currentCanvasTool
          * 统一把画布工具状态映射到 tldraw 内部工具
+         * chat / note 不是 tldraw 原生工具 当前先映射到 select，再由 creation hook 在 capture 阶段接管创建事件
          */
         if (!canvasEditor) {
             return
@@ -98,7 +113,10 @@ export function useCanvasBridge({
 
     /**
      * 根据当前创建模式创建节点
-     * 白区创建与 handle 拖拽创建都统一走此入口，保证产品语义一致
+     * cardType 决定创建 chat 还是 note
+     * position 是新卡片左上角在画布坐标系中的位置；
+     * parentId 只有“从某张卡片继续分叉创建”时才会传
+     * 空白区创建与 handle 拖拽创建都统一走此入口
      */
     const createNodeByType = useCallback(
         (
@@ -129,7 +147,7 @@ export function useCanvasBridge({
 
     /**
      * 清理全局 pointer 监听
-     * 每次拖拽结束或组件卸载都必须解绑，避免重复触发与内存泄漏
+     * 每次拖拽结束或组件卸载都必须解绑 避免重复触发与内存泄漏
      */
     const clearPointerListeners = useCallback(() => {
         if (removePointerListenersRef.current) {
@@ -139,8 +157,8 @@ export function useCanvasBridge({
     }, [])
 
     /**
-     * 1. 挂载【临时拖拽交互部】
-     * 职责：接管用户拉动箭头那一瞬间的高频拖拽动作，它只需要 cardsRef 查户口，不需要画图工具。
+     * 1. 挂载 幽灵卡片状态处理
+     * 接管用户拉动箭头那一瞬间的高频拖拽动作，它只需要 cardsRef 查户口，不需要画图工具
      */
     const { handleLinkHandlePointerDown } = useCanvasBridgeLinkDrag({
         canvasEditor,
@@ -155,9 +173,21 @@ export function useCanvasBridge({
     })
 
     /**
-     * 2. 挂载【内阁 / VDOM Diff 同步部】
-     * 核心解答：看最后一行！总司令从 projection 引入了 `syncStableArrowProjection`（画线工具），
-     * 作为“尚方宝剑”作为参数传给了 canvasSync。这样 sync 算完 Diff 就能直接拿它画线，无需双向 import！
+     * 1.5 挂载 创建拖拽状态机
+     * 在 Chat / Note 工具下接管空白画布拖拽
+     * 产出蓝色预创建框，并在松手时提交真实业务卡片
+     */
+    const { creationPreviewRect } = useCanvasBridgeCreation({
+        canvasEditor,
+        currentCanvasToolRef,
+        setCurrentCanvasTool,
+        addChatNode,
+        addNoteNode,
+        setActiveNodeId,
+    })
+
+    /**
+     * 2. 挂载 VDOM Diff 同步
      */
     useCanvasBridgeCanvasSync({
         canvasEditor,
@@ -167,12 +197,12 @@ export function useCanvasBridge({
         isApplyingStoreToCanvasRef,
         isUserMultiSelectionRef,
         arrowAnchorOverrideByIdRef,
-        syncStableArrowProjection, // <=== 秘密就在这里！依赖注入！
+        syncStableArrowProjection,
     })
 
     /**
-     * 3. 挂载【外交部 / 画布原生事件交互部】
-     * 职责：监听画布上的原生移动节点、删除、修改连线、撤销重做等动作，翻译后提交给 Zustand。
+     * 3. 监听用户手势操作
+     * 监听画布上的原生移动节点、删除、修改连线、撤销重做等动作，翻译后提交给 Zustand
      */
     useCanvasBridgeInteractions({
         canvasEditor,
@@ -180,11 +210,9 @@ export function useCanvasBridge({
         isUserMultiSelectionRef,
         activeNodeIdRef,
         cardsRef,
-        currentCanvasToolRef,
         linkDragSessionRef,
         arrowAnchorOverrideByIdRef,
         clearPointerListeners,
-        createNodeByType,
         setActiveNodeId,
         moveNode,
         setNodeParent,
@@ -192,13 +220,13 @@ export function useCanvasBridge({
         deleteNodes,
         undo,
         redo,
-        syncStableArrowProjection, // 同样的，交互层在用户手动改连线时也需要画图工具，总司令也给它发了一把。
+        syncStableArrowProjection,
     })
 
     /**
-     * tldraw 挂载回调。
-     * 拿到 editor 实例后，三层子模块才能开始工作。
-     * 显式关闭 tldraw 自带快捷键 清空旧历史，确保撤回/重做只由 Store 单历史栈主导。
+     * tldraw 挂载回调
+     * 拿到 editor 后，桥接层的所有子模块才能真正开始工作
+     * 显式关闭 tldraw 自带快捷键，确保撤回/重做只由 Store 单历史栈主导
      */
     const handleCanvasMount = useCallback((editor: Editor) => {
         setCanvasEditor(editor)
@@ -212,5 +240,6 @@ export function useCanvasBridge({
     return {
         handleCanvasMount,
         handleLinkHandlePointerDown,
+        creationPreviewRect,
     }
 }

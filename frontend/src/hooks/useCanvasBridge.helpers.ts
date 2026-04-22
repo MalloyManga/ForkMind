@@ -91,6 +91,13 @@ export const GHOST_NODE_OPACITY_VISIBLE = 0.48
 export const GHOST_NODE_OPACITY_HIDDEN = 0
 
 /**
+ * switch类型收窄兜底
+ */
+export function assertNeverCreationType(cardType: never): never {
+    throw new Error(`Unsupported creation node type: ${String(cardType)}`)
+}
+
+/**
  * 统一计算画布卡片高度
  * 阶段三先落地“固定宽度 + 固定高度上限 + 内部滚动”，避免长 Markdown 把画布排版撑坏
  */

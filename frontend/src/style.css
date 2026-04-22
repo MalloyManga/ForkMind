@@ -318,6 +318,7 @@ html {
   background-color: var(--fm-scrollbar-thumb) !important;
 }
 
-.tl-html-container.fm-card:hover .fm-card-scroll::-webkit-scrollbar-thumb:hover {
+.tl-html-container.fm-card:hover
+  .fm-card-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--fm-scrollbar-thumb-hover) !important;
 }

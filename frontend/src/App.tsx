@@ -32,7 +32,7 @@ function clamp(value: number, min: number, max: number): number {
 function App() {
     const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
     const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
-    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("chat")
+    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局canvas工具唯一状态源
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(288)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(420)
@@ -82,11 +82,13 @@ function App() {
         }
     }
 
-    const { handleCanvasMount, handleLinkHandlePointerDown } = useCanvasBridge({
+    // 挂载hook层业务
+    const { handleCanvasMount, handleLinkHandlePointerDown, creationPreviewRect } = useCanvasBridge({
         cards,
         activeNodeId,
         setActiveNodeId,
-        currentCanvasTool,
+        currentCanvasTool,  // 当前的canvasTool传递给桥接层
+        setCurrentCanvasTool,
         addChatNode,
         addNoteNode,
         moveNode,
@@ -98,7 +100,7 @@ function App() {
     })
 
     /**
-     * 拖拽缩放左侧栏。
+     * 拖拽缩放左侧栏
      */
     const startResizeLeftSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
         event.preventDefault()
@@ -114,7 +116,7 @@ function App() {
     }
 
     /**
-     * 拖拽缩放右侧栏。
+     * 拖拽缩放右侧栏
      */
     const startResizeRightSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
         event.preventDefault()
@@ -256,8 +258,10 @@ function App() {
                 <CanvasWorkspace
                     onCanvasMount={handleCanvasMount}
                     onStartLinkDrag={handleLinkHandlePointerDown}
-                    currentCanvasTool={currentCanvasTool}
-                    onSelectCanvasTool={setCurrentCanvasTool}
+                    currentCanvasTool={currentCanvasTool} // 目前的canvastool
+                    onSelectCanvasTool={setCurrentCanvasTool} // 修改canvasTool的工具
+                    // 蓝色预创建框的数据来自桥接层的创建状态机
+                    creationPreviewRect={creationPreviewRect}
                     licenseKey={tldrawLicenseKey}
                 />
 

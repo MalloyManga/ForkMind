@@ -19,6 +19,7 @@ function isSameAnchor(left: { x: number; y: number }, right: { x: number; y: num
  * 负责把指定的箭头首尾（start 或 end）精准插到目标卡片的handle上
  * 复用原来的线（只更新绑定的端点） 防止线被删掉重建导致“高亮选中态”闪烁丢失
  * 没变就不更新
+ * 执行绘制
  */
 export function syncArrowBinding(
     editor: Editor,
