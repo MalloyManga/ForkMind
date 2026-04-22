@@ -3,6 +3,14 @@ import { CanvasWorkspace } from "./components/CanvasWorkspace"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
 import { RightEditorSidebar } from "./components/RightEditorSidebar"
 import { PanelsToggleIcon } from "./components/icons/PanelsToggleIcon"
+import {
+    DEFAULT_LEFT_SIDEBAR_WIDTH,
+    DEFAULT_RIGHT_SIDEBAR_WIDTH,
+    LEFT_SIDEBAR_MAX_WIDTH,
+    LEFT_SIDEBAR_MIN_WIDTH,
+    RIGHT_SIDEBAR_MAX_WIDTH,
+    RIGHT_SIDEBAR_MIN_WIDTH,
+} from "./constants/layout"
 import type { CanvasTool } from "./hooks/canvasToolTypes"
 import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import {
@@ -20,11 +28,6 @@ interface ResizeDragState {
     startWidth: number
 }
 
-const LEFT_SIDEBAR_MIN_WIDTH = 240
-const LEFT_SIDEBAR_MAX_WIDTH = 420
-const RIGHT_SIDEBAR_MIN_WIDTH = 320
-const RIGHT_SIDEBAR_MAX_WIDTH = 620
-
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
@@ -34,8 +37,8 @@ function App() {
     const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
     const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局canvas工具唯一状态源
 
-    const [leftSidebarWidth, setLeftSidebarWidth] = useState(288)
-    const [rightSidebarWidth, setRightSidebarWidth] = useState(420)
+    const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
+    const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH)
 
     const resizeDragStateRef = useRef<ResizeDragState | null>(null)
     const leftSidebarHostRef = useRef<HTMLDivElement | null>(null)

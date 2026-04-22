@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { Textarea } from "@/components/ui/textarea"
+import {
+    CHAT_PROMPT_MAX_RATIO,
+    CHAT_PROMPT_MIN_RATIO,
+    DEFAULT_CHAT_PROMPT_RATIO,
+} from "../constants/layout"
 import type { ConversationCard } from "../domain/conversation/types"
 
 interface RightEditorSidebarProps {
@@ -14,9 +19,6 @@ interface ChatEditorResizeState {
     startPromptRatio: number
 }
 
-const CHAT_PROMPT_MIN_RATIO = 0.2
-const CHAT_PROMPT_MAX_RATIO = 0.8
-
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
@@ -30,7 +32,7 @@ export function RightEditorSidebar({
     onUpdateChatResponse,
     onUpdateNoteContent,
 }: RightEditorSidebarProps) {
-    const [chatPromptRatio, setChatPromptRatio] = useState(0.5)
+    const [chatPromptRatio, setChatPromptRatio] = useState(DEFAULT_CHAT_PROMPT_RATIO)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
     const chatResizeStateRef = useRef<ChatEditorResizeState | null>(null)
 
