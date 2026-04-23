@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import type { CanvasTool } from "../hooks/canvasToolTypes"
+import { CANVAS_TOOL_SHORTCUTS, type CanvasTool } from "../hooks/canvasToolTypes"
 import { CANVAS_CREATION_REGISTRY } from "./canvasCreationRegistry"
 import { ChevronDownIcon } from "./icons/ChevronDownIcon"
 import { MousePointerIcon } from "./icons/MousePointerIcon"
@@ -147,7 +147,9 @@ export function CanvasCreationModeBar({
                     <ToolButtonShell
                         isTooltipVisible={visibleTooltipTool === (isMoveHandlePreview ? "hand-tool" : "move")}
                         tooltipLabel={isMoveHandlePreview ? "Hand tool" : "Move"}
-                        tooltipShortcut="X"
+                        tooltipShortcut={isMoveHandlePreview
+                            ? CANVAS_TOOL_SHORTCUTS["hand-tool"].toUpperCase()
+                            : CANVAS_TOOL_SHORTCUTS.move.toUpperCase()}
                         onClick={() => {
                             dismissTooltipImmediately()
                             onSelectCanvasTool(isMoveHandlePreview ? "hand-tool" : "move")
@@ -156,11 +158,10 @@ export function CanvasCreationModeBar({
                             startTooltipIntent(isMoveHandlePreview ? "hand-tool" : "move")
                         }}
                         onTooltipIntentEnd={endTooltipIntent}
-                        buttonClassName={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] transition-all ${
-                            currentCanvasTool === "move" || currentCanvasTool === "hand-tool"
+                        buttonClassName={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] transition-all ${currentCanvasTool === "move" || currentCanvasTool === "hand-tool"
                                 ? "bg-sky-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(14,165,233,0.32)] theme-dark:bg-sky-500 theme-dark:text-white"
                                 : "text-zinc-700 hover:bg-white hover:text-zinc-950 theme-dark:text-zinc-200 theme-dark:hover:bg-zinc-700 theme-dark:hover:text-zinc-50"
-                        }`}
+                            }`}
                     >
                         {isMoveHandlePreview ? (
                             <MoveHandleIcon className="size-4.5" />
@@ -193,6 +194,7 @@ export function CanvasCreationModeBar({
 
                 <div className="mx-1 h-6 w-px bg-zinc-200 theme-dark:bg-zinc-700" />
 
+                {/* 循环渲染cardTool图标 */}
                 {(Object.entries(CANVAS_CREATION_REGISTRY) as Array<
                     [keyof typeof CANVAS_CREATION_REGISTRY, (typeof CANVAS_CREATION_REGISTRY)[keyof typeof CANVAS_CREATION_REGISTRY]]
                 >).map(([nodeType, nodeDefinition]) => {
@@ -203,7 +205,7 @@ export function CanvasCreationModeBar({
                             key={nodeType}
                             isTooltipVisible={visibleTooltipTool === nodeType}
                             tooltipLabel={nodeDefinition.tooltip}
-                            tooltipShortcut="X"
+                            tooltipShortcut={nodeDefinition.shortcut.toUpperCase()}
                             onClick={() => {
                                 dismissTooltipImmediately()
                                 onSelectCanvasTool(nodeType)
@@ -213,8 +215,8 @@ export function CanvasCreationModeBar({
                             }}
                             onTooltipIntentEnd={endTooltipIntent}
                             buttonClassName={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-xs font-medium transition-all ${isSelected
-                                    ? "bg-sky-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(14,165,233,0.32)] theme-dark:bg-sky-500 theme-dark:text-white"
-                                    : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 theme-dark:text-zinc-200 theme-dark:hover:bg-zinc-800 theme-dark:hover:text-zinc-50"
+                                ? "bg-sky-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(14,165,233,0.32)] theme-dark:bg-sky-500 theme-dark:text-white"
+                                : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 theme-dark:text-zinc-200 theme-dark:hover:bg-zinc-800 theme-dark:hover:text-zinc-50"
                                 }`}
                         >
                             <nodeDefinition.Icon className="h-4 w-4" />

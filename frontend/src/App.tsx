@@ -11,7 +11,10 @@ import {
     RIGHT_SIDEBAR_MAX_WIDTH,
     RIGHT_SIDEBAR_MIN_WIDTH,
 } from "./constants/layout"
-import type { CanvasTool } from "./hooks/canvasToolTypes"
+import {
+    resolveCanvasToolByShortcut,
+    type CanvasTool,
+} from "./hooks/canvasToolTypes"
 import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import {
     selectActiveNode,
@@ -30,6 +33,15 @@ interface ResizeDragState {
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
+}
+
+function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
+    if (!(eventTarget instanceof HTMLElement)) {
+        return false
+    }
+
+    const tagName = eventTarget.tagName.toLowerCase()
+    return tagName === "textarea" || tagName === "input" || eventTarget.isContentEditable
 }
 
 function App() {
@@ -200,6 +212,35 @@ function App() {
             rightSidebarHostRef.current.style.width = `${rightSidebarWidth}px`
         }
     }, [rightSidebarWidth])
+
+    useEffect(() => {
+        const handleToolShortcutKeyDown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented || event.isComposing) {
+                return
+            }
+
+            if (event.metaKey || event.ctrlKey || event.altKey) {
+                return
+            }
+
+            if (isTextEditingTarget(event.target)) {
+                return
+            }
+
+            const nextCanvasTool = resolveCanvasToolByShortcut(event.key)
+            if (!nextCanvasTool) {
+                return
+            }
+
+            event.preventDefault()
+            setCurrentCanvasTool(nextCanvasTool)
+        }
+
+        window.addEventListener("keydown", handleToolShortcutKeyDown, true)
+        return () => {
+            window.removeEventListener("keydown", handleToolShortcutKeyDown, true)
+        }
+    }, [])
 
     const tldrawLicenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY as string | undefined
 
