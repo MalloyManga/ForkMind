@@ -1,10 +1,10 @@
-import type { Editor } from 'tldraw'
+﻿import type { Editor } from "tldraw"
 import { useEffect, useRef, useState, type MutableRefObject } from "react"
 import { DEFAULT_CARD_MIN_HEIGHT, DEFAULT_CARD_WIDTH } from "../domain/conversation/constants"
 import type { ConversationNodeType } from "../domain/conversation/types"
 import type { CanvasTool } from "./canvasToolTypes"
 import { isCreationCanvasTool } from "./canvasToolTypes"
-import { assertNeverCreationType, type Point } from "./useCanvasBridge.helpers"
+import type { Point } from "./useCanvasBridge.helpers"
 
 const CREATION_DRAG_THRESHOLD = 6
 const MIN_CREATED_CARD_WIDTH = 200
@@ -27,22 +27,13 @@ interface CreationDragSession {
 
 interface UseCanvasBridgeCreationParams {
     canvasEditor: Editor | null
-    currentCanvasToolRef: MutableRefObject<CanvasTool> // 当前工具的 ref 镜像
-    setCurrentCanvasTool: (canvasTool: CanvasTool) => void
-    addChatNode: (input?: {
+    currentCanvasToolRef: MutableRefObject<CanvasTool>
+    commitNodeCreation: (input: {
+        cardType: ConversationNodeType
+        position: Point
         parentId?: string | null
-        position?: { x: number; y: number }
         size?: { width?: number; minHeight?: number }
-        userPrompt?: string
-        aiResponse?: string
     }) => string
-    addNoteNode: (input?: {
-        parentId?: string | null
-        position?: { x: number; y: number }
-        size?: { width?: number; minHeight?: number }
-        noteContent?: string
-    }) => string
-    setActiveNodeId: (nodeId: string | null) => void // 创建成功后，把新卡片设为 active，驱动右侧编辑栏切换
 }
 
 /**
@@ -84,11 +75,8 @@ function getDragDistance(startClientPoint: Point, latestClientPoint: Point): num
  */
 export function useCanvasBridgeCreation({
     canvasEditor,
-    currentCanvasToolRef, // App 当前选中的底部工具
-    setCurrentCanvasTool,
-    addChatNode,
-    addNoteNode,
-    setActiveNodeId,
+    currentCanvasToolRef,
+    commitNodeCreation,
 }: UseCanvasBridgeCreationParams) {
     /**
      * 一次拖拽创建会话的运行时缓存 鼠标起始位置对象 null代表当前没有正在创建卡片
@@ -125,36 +113,13 @@ export function useCanvasBridgeCreation({
                     minHeight: DEFAULT_CARD_MIN_HEIGHT,
                 }
 
-            let createdNodeId: string
-            switch (nextTool) {
-                case "chat":
-                    createdNodeId = addChatNode({
-                        position: nextPosition,
-                        size: nextSize,
-                        userPrompt: "",
-                        aiResponse: "",
-                    })
-                    break
-                case "note":
-                    createdNodeId = addNoteNode({
-                        position: nextPosition,
-                        size: nextSize,
-                        noteContent: "",
-                    })
-                    break
-                default:
-                    return assertNeverCreationType(nextTool)
-            }
-
-            // 创建成功后立刻设为 active，让右侧编辑栏直接切到新卡片
-            setActiveNodeId(createdNodeId)
-            setCurrentCanvasTool("move") // 创建成功之后将canvasTool回退到Move
+            commitNodeCreation({
+                cardType: nextTool,
+                position: nextPosition,
+                size: nextSize,
+            })
         }
 
-        /**
-         * 一次创建流程的统一收尾
-         * 成功创建和中途终止 最后都要把 session 与蓝框一起清掉
-         */
         const endCreationDrag = () => {
             creationDragSessionRef.current = null
             setCreationPreviewRect(null)
@@ -225,7 +190,7 @@ export function useCanvasBridgeCreation({
             const pageWidth = Math.abs(endPagePoint.x - startPagePoint.x)
             const pageHeight = Math.abs(endPagePoint.y - startPagePoint.y)
 
-            // 拖拽距离足够大，就按用户画出来的矩形尺寸创建卡片。
+            // 拖拽距离足够大 就按用户画出来的矩形尺寸创建卡片
             commitCreatedNode(
                 currentCanvasTool,
                 { x: pageLeft, y: pageTop },
@@ -298,7 +263,7 @@ export function useCanvasBridgeCreation({
             creationDragSessionRef.current = null
             setCreationPreviewRect(null)
         }
-    }, [addChatNode, addNoteNode, canvasEditor, currentCanvasToolRef, setActiveNodeId, setCurrentCanvasTool])
+    }, [canvasEditor, commitNodeCreation, currentCanvasToolRef])
 
     return {
         // 只给蓝色预创建框 overlay 使用

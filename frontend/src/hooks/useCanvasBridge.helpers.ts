@@ -44,8 +44,8 @@ export interface LinkDragSession {
     startPoint: Point
     arrowShapeId: TLShapeId
     ghostShapeId: TLShapeId
-    ghostCardType: ConversationNodeType
-    ghostHeight: number
+    ghostCardType: ConversationNodeType | null
+    ghostHeight: number | null
     snappedTargetShapeId: TLShapeId | null
     snappedTargetNodeId: string | null
     releasePoint: Point

@@ -1,4 +1,4 @@
-import { useCallback, type MutableRefObject } from "react"
+﻿import { useCallback, type MutableRefObject } from "react"
 import { Editor, TLShapeId, createShapeId } from "tldraw"
 import { DEFAULT_CARD_MIN_HEIGHT, DEFAULT_CARD_WIDTH } from "../domain/conversation/constants"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
@@ -34,12 +34,12 @@ interface UseCanvasBridgeLinkDragParams {
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     removePointerListenersRef: MutableRefObject<(() => void) | null>
     clearPointerListeners: () => void
-    createNodeByType: (
-        cardType: ConversationNodeType,
-        position: Point,
-        parentId?: string | null,
-    ) => string
-    setActiveNodeId: (nodeId: string | null) => void
+    commitNodeCreation: (input: {
+        cardType: ConversationNodeType
+        position: Point
+        parentId?: string | null
+        size?: { width?: number; minHeight?: number }
+    }) => string
     setNodeReferences: (nodeId: string, referenceNodeIds: string[]) => void
 }
 
@@ -58,8 +58,7 @@ export function useCanvasBridgeLinkDrag({
     linkDragSessionRef,
     removePointerListenersRef,
     clearPointerListeners,
-    createNodeByType,
-    setActiveNodeId,
+    commitNodeCreation,
     setNodeReferences,
 }: UseCanvasBridgeLinkDragParams): UseCanvasBridgeLinkDragResult {
 
@@ -88,6 +87,10 @@ export function useCanvasBridgeLinkDrag({
      * 3. 鼠标在空白画布上：显示/更新幽灵卡片，使其始终跟随鼠标移动，箭头顺延到鼠标。
      */
     const updateLinkDragPreview = useCallback((editor: Editor, pointerPoint: Point) => {
+        /**
+         * 当前正在拖拽出的箭头都对象的快照
+         * 仅服务于这一次拖拽 拖拽结束之后就消失
+         */
         const session = linkDragSessionRef.current
         if (!session) {
             return
@@ -192,8 +195,33 @@ export function useCanvasBridgeLinkDrag({
         session.snappedTargetShapeId = null
         session.snappedTargetNodeId = null
 
-        // 推理幽灵卡片该跟随鼠标的哪个方位
+        if (!session.ghostCardType || session.ghostHeight === null) {
+            const arrowUpdate: ArrowShapePreviewPartial = {
+                id: session.arrowShapeId,
+                type: "arrow",
+                props: {
+                    end: {
+                        x: pointerPoint.x - session.startPoint.x,
+                        y: pointerPoint.y - session.startPoint.y,
+                    },
+                    bend: computeArrowBend(session.startPoint, pointerPoint),
+                },
+            }
+
+            editor.run(() => {
+                if (editor.getShape(session.ghostShapeId)) {
+                    editor.deleteShapes([session.ghostShapeId])
+                }
+                const previewUpdates = [arrowUpdate] as unknown as Parameters<Editor["updateShapes"]>[0]
+                editor.updateShapes(previewUpdates)
+            }, { history: "ignore" })
+            return
+        }
+
         const ghostAttachSide = oppositeSide(session.sourceSide)
+        /**
+         * 高频计算出的幽灵卡片左上角位置
+         */
         const ghostPosition = ghostPositionByPointer(
             pointerPoint,
             ghostAttachSide,
@@ -206,7 +234,7 @@ export function useCanvasBridgeLinkDrag({
             type: "arrow",
             props: {
                 end: {
-                    x: pointerPoint.x - session.startPoint.x, // 箭头终止点直接跟随当前的绝对鼠标落点
+                    x: pointerPoint.x - session.startPoint.x,
                     y: pointerPoint.y - session.startPoint.y,
                 },
                 bend: computeArrowBend(session.startPoint, pointerPoint),
@@ -233,6 +261,7 @@ export function useCanvasBridgeLinkDrag({
                 } as unknown as Parameters<Editor["createShape"]>[0]
                 editor.createShape(ghostShape)
             } else {
+                // 这里高频更新幽灵卡片位置
                 // 如果幽灵卡片一直在存活，我们只修改它的XY坐标让他跟随鼠标跑路做位移
                 const ghostUpdate: ForkMindCardShapePartial = {
                     id: session.ghostShapeId,
@@ -242,9 +271,7 @@ export function useCanvasBridgeLinkDrag({
                     opacity: GHOST_NODE_OPACITY_VISIBLE,
                 }
 
-                const previewUpdates = [arrowUpdate, ghostUpdate] as unknown as Parameters<
-                    Editor["updateShapes"]
-                >[0]
+                const previewUpdates = [arrowUpdate, ghostUpdate] as unknown as Parameters<Editor["updateShapes"]>[0]
                 editor.updateShapes(previewUpdates)
                 return // 提前 return 避免下方重复执行 updateShapes
             }
@@ -277,8 +304,15 @@ export function useCanvasBridgeLinkDrag({
                 )
             }
 
-            setActiveNodeId(session.snappedTargetNodeId)
+            editor.run(() => {
+                deleteDragPreviewShapes(editor, session)
+            }, { history: "ignore" })
 
+            linkDragSessionRef.current = null
+            return
+        }
+
+        if (!session.ghostCardType || session.ghostHeight === null) {
             editor.run(() => {
                 deleteDragPreviewShapes(editor, session)
             }, { history: "ignore" })
@@ -295,19 +329,23 @@ export function useCanvasBridgeLinkDrag({
                 y: session.releasePoint.y - DEFAULT_CARD_MIN_HEIGHT / 2,
             }
 
-        const createdNodeId = createNodeByType(
-            session.ghostCardType,
-            newNodePosition,
-            session.sourceNodeId,
-        )
-        setActiveNodeId(createdNodeId)
+        // 正式创建卡片
+        commitNodeCreation({
+            cardType: session.ghostCardType,
+            position: newNodePosition,
+            parentId: session.sourceNodeId,
+            size: {
+                width: DEFAULT_CARD_WIDTH,
+                minHeight: session.ghostHeight,
+            },
+        })
 
         editor.run(() => {
             deleteDragPreviewShapes(editor, session)
         }, { history: "ignore" })
 
         linkDragSessionRef.current = null
-    }, [cardsRef, createNodeByType, linkDragSessionRef, setActiveNodeId, setNodeReferences])
+    }, [cardsRef, commitNodeCreation, linkDragSessionRef, setNodeReferences])
 
     /**
      * 从 hover 触点开始拖拽连线
@@ -335,12 +373,12 @@ export function useCanvasBridgeLinkDrag({
         }
 
         const currentCanvasTool = currentCanvasToolRef.current
-        if (!isCreationCanvasTool(currentCanvasTool)) {
+        if (currentCanvasTool === "hand-tool") {
             return
         }
 
-        const currentCreationType = currentCanvasTool
-        const currentGhostHeight = getDefaultHeightByType(currentCreationType)
+        const currentCreationType = isCreationCanvasTool(currentCanvasTool) ? currentCanvasTool : null
+        const currentGhostHeight = currentCreationType ? getDefaultHeightByType(currentCreationType) : null
 
         const startPoint = edgePointBySide(sourceBounds, input.side)
         const initialPointerPoint = canvasEditor.screenToPage({ // 计算出画布page上的绝对坐标
@@ -348,12 +386,17 @@ export function useCanvasBridgeLinkDrag({
             y: input.clientY,
         })
         const ghostAttachSide = oppositeSide(input.side)
-        const initialGhostPosition = ghostPositionByPointer(
-            initialPointerPoint,
-            ghostAttachSide,
-            DEFAULT_CARD_WIDTH,
-            currentGhostHeight,
-        )
+        /**
+         * 当前的幽灵卡片存在高度时获取左上角的位置坐标
+         */
+        const initialGhostPosition = currentGhostHeight === null
+            ? null
+            : ghostPositionByPointer(
+                initialPointerPoint,
+                ghostAttachSide,
+                DEFAULT_CARD_WIDTH,
+                currentGhostHeight,
+            )
 
         // 创建出幽灵箭头与幽灵卡片
         const arrowShapeId = createShapeId()
@@ -389,23 +432,27 @@ export function useCanvasBridgeLinkDrag({
                 anchorBySide(input.side),
             )
 
-            const ghostShape = {
-                id: ghostShapeId,
-                type: FORK_MIND_CARD_SHAPE_TYPE,
-                x: initialGhostPosition.x,
-                y: initialGhostPosition.y,
-                opacity: GHOST_NODE_OPACITY_VISIBLE,
-                props: {
-                    w: DEFAULT_CARD_WIDTH,
-                    h: currentGhostHeight,
-                    cardType: currentCreationType,
-                    userPrompt: "",
-                    aiResponse: "",
-                    noteContent: "",
-                },
-            } as unknown as Parameters<Editor["createShape"]>[0]
+            // 创建ghostShape 
+            if (currentCreationType && currentGhostHeight !== null && initialGhostPosition) {
+                const ghostShape = {
+                    id: ghostShapeId,
+                    type: FORK_MIND_CARD_SHAPE_TYPE,
+                    x: initialGhostPosition.x,
+                    y: initialGhostPosition.y,
+                    opacity: GHOST_NODE_OPACITY_VISIBLE,
+                    props: {
+                        w: DEFAULT_CARD_WIDTH,
+                        h: currentGhostHeight,
+                        cardType: currentCreationType,
+                        userPrompt: "",
+                        aiResponse: "",
+                        noteContent: "",
+                    },
+                } as unknown as Parameters<Editor["createShape"]>[0]
 
-            canvasEditor.createShape(ghostShape)
+                canvasEditor.createShape(ghostShape)
+            }
+
             canvasEditor.setSelectedShapes([])
         }, { history: "ignore" })
 
@@ -462,10 +509,11 @@ export function useCanvasBridgeLinkDrag({
         canvasEditor,
         cancelLinkDrag,
         clearPointerListeners,
+        commitNodeCreation,
+        currentCanvasToolRef,
         linkDragSessionRef,
         removePointerListenersRef,
         resolveLinkDrag,
-        currentCanvasToolRef,
         updateLinkDragPreview,
     ])
 

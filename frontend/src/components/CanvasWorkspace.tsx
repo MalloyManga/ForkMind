@@ -51,11 +51,11 @@ export function CanvasWorkspace({
             Handles: null,
             ContextMenu: null,
             // 把四向连线 handle 叠到画布最前层
-            // 只有 chat / note 工具下才显示，因为 move / hand-tool 不应进入创建语义
+            // hand-tool 下不显示 其余工具都允许进入节点关系或子卡片创建语义
             InFrontOfTheCanvas: () => (
                 <CanvasLinkHandlesOverlay
                     onStartLinkDrag={onStartLinkDrag}
-                    isVisible={currentCanvasTool === "chat" || currentCanvasTool === "note"}
+                    isVisible={currentCanvasTool !== "hand-tool"}
                 />
             ),
         }),

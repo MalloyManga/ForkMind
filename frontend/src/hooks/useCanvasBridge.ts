@@ -42,6 +42,19 @@ interface UseCanvasBridgeParams {
     redo: () => void
 }
 
+/**
+ * node创建入参
+ */
+interface CommitNodeCreationInput {
+    cardType: ConversationNodeType
+    position: Point
+    parentId?: string | null
+    size?: {
+        width?: number
+        minHeight?: number
+    }
+}
+
 interface UseCanvasBridgeResult {
     handleCanvasMount: (editor: Editor) => void
     handleLinkHandlePointerDown: (input: StartLinkDragInput) => void
@@ -83,7 +96,7 @@ export function useCanvasBridge({
     const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点 覆盖自动生成的
 
     /**
-     * handle拖拽运行时状态（只存在于 tldraw 交互期间）
+     * 当前正在拖拽出的箭头都对象的快照
      */
     const linkDragSessionRef = useRef<LinkDragSession | null>(null)
     const removePointerListenersRef = useRef<(() => void) | null>(null)
@@ -146,6 +159,53 @@ export function useCanvasBridge({
     )
 
     /**
+     * 接收cardType创建卡片类型 position卡片位置 父nodeId(直接创建时为null)
+     * 返回创建成功之后的NodeId
+     */
+    const commitNodeCreation = useCallback(
+        ({
+            cardType,
+            position,
+            parentId = null,
+            size,
+        }: CommitNodeCreationInput): string => {
+            let createdNodeId: string
+
+            if (!size) {
+                createdNodeId = createNodeByType(cardType, position, parentId)
+            }
+            else {
+                switch (cardType) {
+                    case "chat":
+                        createdNodeId = addChatNode({
+                            parentId,
+                            position,
+                            size,
+                            userPrompt: "",
+                            aiResponse: "",
+                        })
+                        break
+                    case "note":
+                        createdNodeId = addNoteNode({
+                            parentId,
+                            position,
+                            size,
+                            noteContent: "",
+                        })
+                        break
+                    default:
+                        return assertNeverCreationType(cardType)
+                }
+            }
+
+            setActiveNodeId(createdNodeId)
+            setCurrentCanvasTool("move") // 创建成功之后都回退到Move
+            return createdNodeId
+        },
+        [addChatNode, addNoteNode, createNodeByType, setActiveNodeId, setCurrentCanvasTool],
+    )
+
+    /**
      * 清理全局 pointer 监听
      * 每次拖拽结束或组件卸载都必须解绑 避免重复触发与内存泄漏
      */
@@ -167,8 +227,7 @@ export function useCanvasBridge({
         linkDragSessionRef,
         removePointerListenersRef,
         clearPointerListeners,
-        createNodeByType,
-        setActiveNodeId,
+        commitNodeCreation,
         setNodeReferences,
     })
 
@@ -180,10 +239,7 @@ export function useCanvasBridge({
     const { creationPreviewRect } = useCanvasBridgeCreation({
         canvasEditor,
         currentCanvasToolRef,
-        setCurrentCanvasTool,
-        addChatNode,
-        addNoteNode,
-        setActiveNodeId,
+        commitNodeCreation,
     })
 
     /**

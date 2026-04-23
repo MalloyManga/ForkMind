@@ -105,6 +105,19 @@ export function useCanvasBridgeInteractions({
                 }
 
                 if (previousShape.type === "arrow" && nextShape.type === "arrow") {
+                    /**
+                     * handle 拖拽期间 预览箭头也会通过 editor.updateShapes 高频改坐标
+                     * 禁止用户直接拖拽已经存在的业务箭头 允许高频更新幽灵卡片的箭头
+                     */
+                    const currentLinkDragSession = linkDragSessionRef.current
+                    const isCurrentPreviewArrow =
+                        currentLinkDragSession !== null &&
+                        previousShape.id === currentLinkDragSession.arrowShapeId
+
+                    if (isCurrentPreviewArrow) {
+                        return nextShape
+                    }
+
                     return previousShape
                 }
 
