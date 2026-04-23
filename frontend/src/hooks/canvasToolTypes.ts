@@ -10,7 +10,7 @@ export const CANVAS_TOOL_SHORTCUTS = {
     "hand-tool": "h",
     chat: "c",
     note: "n",
-} as const
+} as const satisfies Record<CanvasTool, string>
 
 /**
  * 根据键盘字母反推应该切换到哪个画布工具

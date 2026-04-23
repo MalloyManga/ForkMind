@@ -10,6 +10,9 @@ interface CanvasCreationModeBarProps {
     onSelectCanvasTool: (canvasTool: CanvasTool) => void
 }
 
+/**
+ * canvasTool显示的Id与提示信息
+ */
 type ToolbarToolId = CanvasTool | "tool-variants"
 
 interface FloatingToolHintProps {
@@ -199,13 +202,14 @@ export function CanvasCreationModeBar({
                     [keyof typeof CANVAS_CREATION_REGISTRY, (typeof CANVAS_CREATION_REGISTRY)[keyof typeof CANVAS_CREATION_REGISTRY]]
                 >).map(([nodeType, nodeDefinition]) => {
                     const isSelected = currentCanvasTool === nodeType
+                    const toolShortcut = CANVAS_TOOL_SHORTCUTS[nodeType].toUpperCase()
 
                     return (
                         <ToolButtonShell
                             key={nodeType}
                             isTooltipVisible={visibleTooltipTool === nodeType}
                             tooltipLabel={nodeDefinition.tooltip}
-                            tooltipShortcut={nodeDefinition.shortcut.toUpperCase()}
+                            tooltipShortcut={toolShortcut}
                             onClick={() => {
                                 dismissTooltipImmediately()
                                 onSelectCanvasTool(nodeType)
