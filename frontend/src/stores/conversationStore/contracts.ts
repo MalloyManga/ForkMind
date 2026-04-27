@@ -1,42 +1,73 @@
-import type {
+﻿import type {
     ConversationCard,
     ConversationCardPosition,
     ConversationCardSize,
-    ConversationNodeStatus,
+    ConversationNodeType,
     ConversationThread,
 } from "../../domain/conversation/types"
 
 /**
- * 新增节点的公共入参
+ * 按节点 type 从 ConversationCard 联合类型中取出具体节点 接口对象
+ * NodeByType<"note">
  */
-export interface AddNodeBaseInput {
-    parentId?: string | null
-    referenceNodeIds?: string[]
-    position?: Partial<ConversationCardPosition>
-    size?: Partial<ConversationCardSize>
-    status?: ConversationNodeStatus
-}
+type NodeByType<T extends ConversationNodeType> = Extract<ConversationCard, { type: T }>
 
 /**
- * 新增 chat 节点入参。
- * userPrompt/aiResponse 都是可选，便于先创建空节点再逐步编辑。
+ * 创建节点时由 Store 负责生成的身份字段
+ * copy paste fork 手动创建都不能复用旧节点 id 和时间戳
  */
-export interface AddChatNodeInput extends AddNodeBaseInput {
-    userPrompt?: string
-    aiResponse?: string
-}
+type StoreGeneratedNodeKeys = "id" | "createdAt" | "updatedAt"
 
 /**
- * 新增 note 节点入参。
- * noteContent 可空，支持创建后再输入内容。
+ * 对联合类型逐个成员执行 Omit
+ * K 必须为合法的对象 key
+ * T extends unknown 自动遍历 T(联合类型) 同时永远为 true
+ * 从 T 接口当中删去 K(key) 字段
  */
-export interface AddNoteNodeInput extends AddNodeBaseInput {
-    noteContent?: string
-}
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, Extract<keyof T, K>> : never
 
 /**
- * 从现有节点 Fork 新 chat 节点的入参。
- * sourceNodeId 必填，用于确定父节点与默认偏移位置。
+ * 单独一种 Node 类型的完整新增节点入参
+ * 去除 ConversationCard 对应类型 当中的 StoreGeneratedNodeKeys 字段
+ */
+export type AddNodeInput<T extends ConversationNodeType> = Omit<NodeByType<T>, StoreGeneratedNodeKeys>
+
+/**
+ * 所有 Node 类型的完整新增入参联合
+ */
+export type AddConversationNodeInput = {
+    // 借用泛型 T 及 in 的遍历 得到 AddNodeInput<...ConversationNodeType> 的联合类型
+    [T in ConversationNodeType]: AddNodeInput<T>
+}[ConversationNodeType]
+
+/**
+ * 单独一种新增 Node 的草稿入参(UI 提供部分字段)
+ * 其余字段由 Store 默认值补齐
+ */
+export type AddNodeDraftInput<T extends ConversationNodeType> =
+    Partial<Omit<AddNodeInput<T>, "position" | "size">> & {
+        position?: Partial<ConversationCardPosition>
+        size?: Partial<ConversationCardSize>
+    }
+
+/**
+ * 所有 Node 类型的草稿新增入参联合
+ */
+export type AddConversationNodeDraftInput = {
+    [T in ConversationNodeType]: AddNodeDraftInput<T> & { type: T }
+}[ConversationNodeType]
+
+/**
+ * 剪贴板里存放的节点内容快照
+ * copy paste 和 paste to replace 保存旧节点内容和关系 但粘贴时必须重新计算 position
+ * parentId 先保留 后续粘贴时由业务逻辑判断目标画布是否存在该父节点
+ * ConversationCard 的所有类型删去 StoreGeneratedNodeKeys | "position" 再联合
+ */
+export type ClipboardNodeInput = DistributiveOmit<ConversationCard, StoreGeneratedNodeKeys | "position">
+
+/**
+ * 从现有节点 Fork 新 chat 节点的入参
+ * sourceNodeId 必填 用于确定父节点和默认偏移位置
  */
 export interface ForkChatNodeInput {
     sourceNodeId: string
@@ -55,8 +86,8 @@ export interface ForkNoteNodeInput {
 }
 
 /**
- * 历史快照：用于 undo/redo。
- * 注意这里同时保存 thread + activeNodeId，避免“内容回滚了但选中态没回滚”的不一致。
+ * 历史快照 用于 undo redo
+ * 同时保存 thread 和 activeNodeId 避免回滚后内容变了 但右侧编辑目标没跟着回滚
  */
 export interface ConversationSnapshot {
     thread: ConversationThread
@@ -65,7 +96,7 @@ export interface ConversationSnapshot {
 
 /**
  * Store 状态与行为定义
- * 这里是阶段二核心契约，组件层只依赖这些语义化方法。
+ * 组件层应只依赖这些语义化方法 不直接拼装底层节点数组
  */
 export interface ConversationStoreState {
     activeThread: ConversationThread
@@ -77,14 +108,16 @@ export interface ConversationStoreState {
     setActiveNodeId: (nodeId: string | null) => void
     setActiveThreadCards: (cards: ConversationCard[]) => void
 
-    addChatNode: (input?: AddChatNodeInput) => string
-    addNoteNode: (input?: AddNoteNodeInput) => string
+    addNode: (input: AddConversationNodeDraftInput) => string
+    addChatNode: (input?: AddNodeDraftInput<"chat">) => string
+    addNoteNode: (input?: AddNodeDraftInput<"note">) => string
     forkChatNode: (input: ForkChatNodeInput) => string | null
     forkNoteNode: (input: ForkNoteNodeInput) => string | null
 
     updateChatPrompt: (nodeId: string, userPrompt: string) => void
     updateChatResponse: (nodeId: string, aiResponse: string) => void
     updateNoteContent: (nodeId: string, noteContent: string) => void
+    replaceNodeFromClipboard: (nodeId: string, clipboardNode: ClipboardNodeInput) => void
 
     moveNode: (nodeId: string, nextPosition: ConversationCardPosition) => void
     setNodeParent: (nodeId: string, parentId: string | null) => void

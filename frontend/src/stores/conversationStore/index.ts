@@ -1,7 +1,9 @@
 export type {
-    AddChatNodeInput,
-    AddNodeBaseInput,
-    AddNoteNodeInput,
+    AddConversationNodeDraftInput,
+    AddConversationNodeInput,
+    AddNodeDraftInput,
+    AddNodeInput,
+    ClipboardNodeInput,
     ConversationSnapshot,
     ConversationStoreState,
     ForkChatNodeInput,

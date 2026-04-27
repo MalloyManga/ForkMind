@@ -1,4 +1,14 @@
-﻿import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react"
+﻿import {
+    type PointerEvent as ReactPointerEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react"
+import type { Editor } from "tldraw"
+import { CanvasContextMenu } from "./components/CanvasContextMenu"
+import type { ClipboardNodeInput } from "./stores/conversationStore"
 import { CanvasWorkspace } from "./components/CanvasWorkspace"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
 import { RightEditorSidebar } from "./components/RightEditorSidebar"
@@ -12,10 +22,17 @@ import {
     RIGHT_SIDEBAR_MIN_WIDTH,
 } from "./constants/layout"
 import {
-    resolveCanvasToolByShortcut,
-    type CanvasTool,
-} from "./hooks/canvasToolTypes"
+    resolveCanvasCommandByKeyboardEvent,
+    resolveCanvasToolByCommand,
+} from "./hooks/canvasCommands"
+import type {
+    CanvasContextMenuContext,
+    CanvasContextMenuItem,
+} from "./hooks/canvasContextMenuTypes"
 import { useCanvasBridge } from "./hooks/useCanvasBridge"
+import { useCanvasContextMenuExecutor } from "./hooks/useCanvasContextMenuExecutor"
+import { useCanvasContextMenuResolver } from "./hooks/useCanvasContextMenuResolver"
+import { type CanvasTool } from "./hooks/canvasToolTypes"
 import {
     selectActiveNode,
     selectActiveNodeId,
@@ -29,6 +46,11 @@ interface ResizeDragState {
     side: "left" | "right"
     startX: number
     startWidth: number
+}
+
+interface CanvasContextMenuState {
+    context: CanvasContextMenuContext
+    items: CanvasContextMenuItem[]
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -47,7 +69,11 @@ function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
 function App() {
     const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
     const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
-    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局canvas工具唯一状态源
+    const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
+    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvas 工具唯一状态源
+    const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
+    const [clipboardCard, setClipboardCard] = useState<ClipboardNodeInput | null>(null) // 全局剪切板 Node 合集
+    const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH)
@@ -64,6 +90,7 @@ function App() {
     const activeNode = useConversationStore(selectActiveNode)
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
+    const addNode = useConversationStore((state) => state.addNode)
     const addChatNode = useConversationStore((state) => state.addChatNode)
     const addNoteNode = useConversationStore((state) => state.addNoteNode)
     const deleteNodes = useConversationStore((state) => state.deleteNodes)
@@ -73,14 +100,15 @@ function App() {
     const updateChatPrompt = useConversationStore((state) => state.updateChatPrompt)
     const updateChatResponse = useConversationStore((state) => state.updateChatResponse)
     const updateNoteContent = useConversationStore((state) => state.updateNoteContent)
+    const replaceNodeFromClipboard = useConversationStore((state) => state.replaceNodeFromClipboard)
     const undo = useConversationStore((state) => state.undo)
     const redo = useConversationStore((state) => state.redo)
 
     const rootNodeCount = useMemo(
+        // 左侧栏的根节点统计和提醒都依赖这里的结果
         () => cards.filter((card) => card.parentId === null).length,
         [cards],
     )
-
 
     const applySidebarWidth = (side: ResizeDragState["side"], nextWidth: number) => {
         if (side === "left") {
@@ -97,12 +125,16 @@ function App() {
         }
     }
 
-    // 挂载hook层业务
-    const { handleCanvasMount, handleLinkHandlePointerDown, creationPreviewRect } = useCanvasBridge({
+    // 挂载 bridge 层业务 这一层负责 store 和 tldraw 的双向翻译
+    const {
+        handleCanvasMount: handleBridgeCanvasMount,
+        handleLinkHandlePointerDown,
+        creationPreviewRect,
+    } = useCanvasBridge({
         cards,
         activeNodeId,
         setActiveNodeId,
-        currentCanvasTool,  // 当前的canvasTool传递给桥接层
+        currentCanvasTool,
         setCurrentCanvasTool,
         addChatNode,
         addNoteNode,
@@ -113,6 +145,47 @@ function App() {
         undo,
         redo,
     })
+
+    // resolver 只负责根据上下文算菜单内容 不做真正业务写入
+    const { resolveContextMenuItems } = useCanvasContextMenuResolver({
+        clipboardCard,
+        isCanvasUiHidden,
+    })
+
+    // executor 负责真正执行业务命令 键盘和右键菜单最终都汇合到这里
+    const { executeCanvasCommand } = useCanvasContextMenuExecutor({
+        canvasEditor,
+        activeNodeId,
+        clipboardCard,
+        setClipboardCard,
+        setIsCanvasUiHidden,
+        cards,
+        addNode,
+        replaceNodeFromClipboard,
+        setActiveNodeId,
+    })
+
+    const closeContextMenu = useCallback(() => {
+        setContextMenuState(null)
+    }, [])
+
+    const handleAppCanvasMount = useCallback((editor: Editor) => {
+        // App 自己留 editor 是为了给右键菜单 executor 提供视口中心和 page 坐标能力
+        setCanvasEditor(editor)
+        handleBridgeCanvasMount(editor)
+    }, [handleBridgeCanvasMount])
+
+    const handleOpenContextMenu = useCallback((context: CanvasContextMenuContext) => {
+        // 右键命中卡片时 先把 active 切到这张卡片 这样 Copy 和 Paste to replace 都有稳定目标
+        if (context.kind === "node") {
+            setActiveNodeId(context.nodeId)
+        }
+
+        setContextMenuState({
+            context,
+            items: resolveContextMenuItems(context),
+        })
+    }, [resolveContextMenuItems, setActiveNodeId])
 
     /**
      * 拖拽缩放左侧栏
@@ -214,43 +287,47 @@ function App() {
     }, [rightSidebarWidth])
 
     useEffect(() => {
-        const handleToolShortcutKeyDown = (event: KeyboardEvent) => {
+        const handleCanvasCommandKeyDown = (event: KeyboardEvent) => {
             if (event.defaultPrevented || event.isComposing) {
                 return
             }
 
-            if (event.metaKey || event.ctrlKey || event.altKey) {
-                return
-            }
-
+            // 正在输入文本时 不要抢快捷键 否则用户在右侧编辑栏输入 C V N 这类字符会误触发命令
             if (isTextEditingTarget(event.target)) {
                 return
             }
 
-            const nextCanvasTool = resolveCanvasToolByShortcut(event.key)
-            if (!nextCanvasTool) {
+            const commandId = resolveCanvasCommandByKeyboardEvent(event)
+            if (!commandId) {
                 return
             }
 
+            const nextCanvasTool = resolveCanvasToolByCommand(commandId)
             event.preventDefault()
-            setCurrentCanvasTool(nextCanvasTool)
+            closeContextMenu()
+
+            if (nextCanvasTool) {
+                // 工具类命令和普通业务命令在这里分流
+                setCurrentCanvasTool(nextCanvasTool)
+                return
+            }
+
+            executeCanvasCommand(commandId)
         }
 
-        window.addEventListener("keydown", handleToolShortcutKeyDown, true)
+        window.addEventListener("keydown", handleCanvasCommandKeyDown, true)
         return () => {
-            window.removeEventListener("keydown", handleToolShortcutKeyDown, true)
+            window.removeEventListener("keydown", handleCanvasCommandKeyDown, true)
         }
-    }, [])
+    }, [closeContextMenu, executeCanvasCommand])
 
     const tldrawLicenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY as string | undefined
 
     return (
         <div
             data-theme={themeMode}
-            className={`h-screen w-screen overflow-hidden bg-zinc-100 text-zinc-900 theme-dark:bg-zinc-950 theme-dark:text-zinc-100 ${themeMode === "dark" ? "dark" : ""
-                }`}
-        >
-            {areSidebarsHidden ? (
+            className={`h-screen w-screen overflow-hidden bg-zinc-100 text-zinc-900 theme-dark:bg-zinc-950 theme-dark:text-zinc-100 ${themeMode === "dark" ? "dark" : ""}`}>
+            {areSidebarsHidden && !isCanvasUiHidden ? (
                 <div className="pointer-events-none absolute left-4 top-4 z-40">
                     <div className="pointer-events-auto inline-flex items-center gap-3 rounded-xl border border-border/70 bg-background/92 px-3 py-2 shadow-lg backdrop-blur-md transition-all duration-200">
                         <div className="max-w-56 truncate text-sm font-medium">{activeThread.title}</div>
@@ -269,7 +346,7 @@ function App() {
             ) : null}
 
             <div className="flex h-full w-full overflow-hidden">
-                {!areSidebarsHidden ? (
+                {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
                         ref={leftSidebarHostRef}
                         className="h-full shrink-0 overflow-hidden"
@@ -290,7 +367,7 @@ function App() {
                     </div>
                 ) : null}
 
-                {!areSidebarsHidden ? (
+                {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
                         className="w-1.5 shrink-0 cursor-col-resize bg-border/80 transition-colors hover:bg-border"
                         onPointerDown={startResizeLeftSidebar}
@@ -300,16 +377,19 @@ function App() {
                 ) : null}
 
                 <CanvasWorkspace
-                    onCanvasMount={handleCanvasMount}
+                    onCanvasMount={handleAppCanvasMount}
                     onStartLinkDrag={handleLinkHandlePointerDown}
-                    currentCanvasTool={currentCanvasTool} // 目前的canvastool
-                    onSelectCanvasTool={setCurrentCanvasTool} // 修改canvasTool的工具
-                    // 蓝色预创建框的数据来自桥接层的创建状态机
+                    onOpenContextMenu={handleOpenContextMenu}
+                    currentCanvasTool={currentCanvasTool}
+                    onSelectCanvasTool={setCurrentCanvasTool}
+                    // UI 全隐藏时 画布内部的 hover handle 和 mode bar 也要一起隐藏
+                    isCanvasUiVisible={!isCanvasUiHidden}
+                    isContextMenuOpen={contextMenuState !== null}
                     creationPreviewRect={creationPreviewRect}
                     licenseKey={tldrawLicenseKey}
                 />
 
-                {!areSidebarsHidden ? (
+                {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
                         className="w-1.5 shrink-0 cursor-col-resize bg-border/80 transition-colors hover:bg-border"
                         onPointerDown={startResizeRightSidebar}
@@ -318,7 +398,7 @@ function App() {
                     />
                 ) : null}
 
-                {!areSidebarsHidden ? (
+                {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
                         ref={rightSidebarHostRef}
                         className="h-full shrink-0 overflow-hidden"
@@ -333,6 +413,19 @@ function App() {
                     </div>
                 ) : null}
             </div>
+
+            {contextMenuState ? (
+                <CanvasContextMenu
+                    items={contextMenuState.items}
+                    position={contextMenuState.context.screenPoint}
+                    onClose={closeContextMenu}
+                    onSelect={(item) => {
+                        // 右键菜单按钮只负责把命令抛给 executor 自己不直接碰 store
+                        executeCanvasCommand(item.commandId, contextMenuState.context)
+                        closeContextMenu()
+                    }}
+                />
+            ) : null}
         </div>
     )
 }

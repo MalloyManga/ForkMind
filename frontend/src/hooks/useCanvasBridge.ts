@@ -4,7 +4,6 @@ import type { ConversationCard, ConversationNodeType } from "../domain/conversat
 import { StartLinkDragInput } from "./canvasLinkTypes"
 import type { CanvasTool } from "./canvasToolTypes"
 import {
-    assertNeverCreationType,
     type ArrowAnchorOverride,
     type LinkDragSession,
     type Point,
@@ -14,6 +13,7 @@ import { useCanvasBridgeCreation } from "./useCanvasBridge.creation"
 import { useCanvasBridgeCanvasSync } from "./useCanvasBridge.canvasSync"
 import { useCanvasBridgeLinkDrag } from "./useCanvasBridge.linkDrag"
 import { useCanvasBridgeInteractions } from "./useCanvasBridge.interactions"
+import { assertNever } from "@/lib/utils.ts"
 
 interface UseCanvasBridgeParams {
     cards: ConversationCard[]
@@ -152,8 +152,7 @@ export function useCanvasBridge({
                         noteContent: "",
                     })
             }
-
-            return assertNeverCreationType(cardType)
+            return assertNever(cardType)
         },
         [addChatNode, addNoteNode],
     )
@@ -194,7 +193,7 @@ export function useCanvasBridge({
                         })
                         break
                     default:
-                        return assertNeverCreationType(cardType)
+                        return assertNever(cardType)
                 }
             }
 

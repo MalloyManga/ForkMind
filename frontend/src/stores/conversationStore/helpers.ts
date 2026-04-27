@@ -1,3 +1,4 @@
+import { assertNever } from "@/lib/utils.ts"
 import {
     CARD_FORK_OFFSET_X,
     CARD_FORK_OFFSET_Y,
@@ -45,7 +46,7 @@ export function createDefaultSize(partial?: Partial<ConversationCardSize>): Conv
 
 /**
  * 深拷贝单个节点
- * 历史快照、导入替换、撤销重做都不能共享引用
+ * 历史快照 导入替换 撤销重做都不能共享引用
  */
 export function cloneNode(node: ConversationCard): ConversationCard {
     const base: BaseNode = {
@@ -71,11 +72,7 @@ export function cloneNode(node: ConversationCard): ConversationCard {
             }
     }
 
-    // 编译期穷尽检查：新增节点类型但漏写分支时，TS 会在这里报错。
-    const exhaustiveNode: never = node
-    throw new Error(
-        `Unsupported node type: ${String((exhaustiveNode as { type?: unknown }).type)}`,
-    )
+    return assertNever(node)
 }
 
 /**
@@ -99,7 +96,7 @@ export function cloneSnapshot(snapshot: ConversationSnapshot): ConversationSnaps
 }
 
 /**
- * 按 id 查找节点。
+ * 按 id 查找节点
  */
 export function findNodeById(
     nodes: readonly ConversationCard[],

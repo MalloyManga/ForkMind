@@ -8,6 +8,11 @@ import {
     toCanvasNodeShapeId,
 } from "./canvasNodeIds"
 
+export const CHAT_CARD_HEIGHT = 280
+export const NOTE_CARD_HEIGHT = 220
+export const GHOST_NODE_OPACITY_VISIBLE = 0.48
+export const GHOST_NODE_OPACITY_HIDDEN = 0
+
 /**
  * 鼠标交互的位置坐标/画布上的具体坐标
  */
@@ -84,18 +89,6 @@ const ANCHOR_SIDE_ALL: AnchorSide[] = [
     "left",
     "top-left",
 ]
-
-export const CHAT_CARD_HEIGHT = 280
-export const NOTE_CARD_HEIGHT = 220
-export const GHOST_NODE_OPACITY_VISIBLE = 0.48
-export const GHOST_NODE_OPACITY_HIDDEN = 0
-
-/**
- * switch类型收窄兜底
- */
-export function assertNeverCreationType(cardType: never): never {
-    throw new Error(`Unsupported creation node type: ${String(cardType)}`)
-}
 
 /**
  * 统一计算画布卡片高度

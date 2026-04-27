@@ -19,24 +19,37 @@ export interface ConversationCardPosition {
 }
 
 /**
- * 卡片尺寸策略：
- * - auto: 高度随 Markdown 内容增长，宽度使用预设值。
- * - fixed: 用户手动调整宽高（后续阶段可接入）。
+ * 卡片尺寸策略
+ * - auto: 高度随 Markdown 内容增长 宽度使用预设值
+ * - fixed: 手动调整宽高
  */
 export type ConversationCardSizingMode = "auto" | "fixed"
 
+/**
+ * 卡片宽高
+ */
 export interface ConversationCardSize {
     mode: ConversationCardSizingMode
     width: number
     minHeight: number
 }
 
-// NodeType节点类型：目前支持 chat / note，后续可扩展 image / file / code。
-export type ConversationNodeType = "chat" | "note"
+/**
+ * 全局唯一卡片类型源
+ * key->NodeType value: Node obj interface
+ */
+interface CardNodeRegistry {
+    "chat": ChatNode
+    "note": NoteNode
+}
 
 /**
- * BaseNode：所有节点共享字段。
- * 这里是扩展的核心锚点，后续新类型节点统一从这里继承。
+ * NodeType节点类型
+ */
+export type ConversationNodeType = keyof CardNodeRegistry
+
+/**
+ * BaseNode 所有节点共享字段
  */
 export interface BaseNode {
     id: string
@@ -57,8 +70,7 @@ export interface BaseNode {
 }
 
 /**
- * ChatNode：AI 对话节点。
- * 右侧栏表现为“上输入、下输出”双 Markdown 编辑区。
+ * ChatNode AI 对话节点
  */
 export interface ChatNode extends BaseNode {
     type: "chat"
@@ -67,16 +79,17 @@ export interface ChatNode extends BaseNode {
 }
 
 /**
- * NoteNode：纯笔记节点。
- * 右侧栏只展示一个 Markdown 编辑区。
+ * NoteNode：纯笔记节点
  */
 export interface NoteNode extends BaseNode {
     type: "note"
     noteContent: string
 }
 
-// 兼容已有命名：ConversationCard 现在是可扩展联合类型。
-export type ConversationCard = ChatNode | NoteNode
+/**
+ * 节点类型接口对象集合
+ */
+export type ConversationCard = CardNodeRegistry[ConversationNodeType]
 
 // 一个对话(画布) 内部持有多张卡片
 export interface ConversationThread {

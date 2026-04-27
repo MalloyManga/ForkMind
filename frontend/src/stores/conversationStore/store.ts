@@ -1,4 +1,5 @@
-import { create } from "zustand"
+﻿import { create } from "zustand"
+import { assertNever } from "@/lib/utils"
 import { HISTORY_LIMIT } from "../../domain/conversation/constants"
 import type { ConversationThread } from "../../domain/conversation/types"
 import type { ConversationSnapshot, ConversationStoreState } from "./contracts"
@@ -29,8 +30,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     futureSnapshots: [],
 
     /**
-     * 切换到指定线程。
-     * 语义：会话切换属于“上下文切换”，默认重置历史栈。
+     * 切换到指定线程
      */
     setActiveThread: (thread) => {
         const nextThread = cloneThread(thread)
@@ -43,8 +43,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 设置当前选中节点。
-     * 场景：用户点击画布节点后，右侧编辑栏切换到对应内容。
+     * 设置当前选中节点
      */
     setActiveNodeId: (nodeId) => {
         set((state) => {
@@ -63,20 +62,20 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 批量替换当前线程节点。
-     * 主要用于导入/恢复，不建议组件层当作常规业务写接口使用。
+     * 批量替换当前线程节点
+     * 主要用于导入/恢复
      */
     setActiveThreadCards: (cards) => {
         set((state) => {
-            // 场景：导入会话 JSON 后，先把外部节点深拷贝进 store，隔离引用副作用。
+            // 导入会话 JSON 后 先把外部节点深拷贝进 store 隔离引用副作用
             const nextThread: ConversationThread = {
                 ...state.activeThread,
                 cards: cards.map((node) => cloneNode(node)),
             }
 
-            // 如果原 active 节点已不存在（例如导入内容里没有它），就降级到第一个节点。
+            // 如果原 active 节点已不存在（例如导入内容里没有它） 就降级到第一个节点
             /**
-             * 导入后 active 选择策略：
+             * 导入后 active 选择策略
              * - 若当前就是失焦态（null），继续保持 null
              * - 若当前有 active 且导入后仍存在，保持该 active
              * - 若当前有 active 但导入后丢失，降级为 null（不强制抢焦到第一张）
@@ -106,7 +105,22 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 新增 chat 节点，并将其设为 active。
+     * 统一新增节点入口 调用层无需判断 NoteType
+     * inout 为草稿入参
+     */
+    addNode: (input) => {
+        switch (input.type) {
+            case "chat":
+                return get().addChatNode(input)
+            case "note":
+                return get().addNoteNode(input)
+        }
+
+        return assertNever(input)
+    },
+
+    /**
+     * 新增 chat 节点 并将其设为 active
      */
     addChatNode: (input = {}) => {
         let createdNodeId = ""
@@ -137,7 +151,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 新增 note 节点，并将其设为 active。
+     * 新增 note 节点 并将其设为 active
      */
     addNoteNode: (input = {}) => {
         let createdNodeId = ""
@@ -168,7 +182,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 从指定源节点 Fork 一个新的 chat 节点。
+     * 从指定源节点 Fork 一个新的 chat 节点
      */
     forkChatNode: (input) => {
         let createdNodeId: string | null = null
@@ -215,7 +229,6 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
 
     /**
      * 从指定源节点 Fork 一个新的 note 节点
-     * 从任意讨论节点旁边快速拉出“人工补充笔记”分支
      */
     forkNoteNode: (input) => {
         let createdNodeId: string | null = null
@@ -260,7 +273,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 更新 chat 节点的用户输入内容。
+     * 更新 chat 节点的用户输入内容
      */
     updateChatPrompt: (nodeId, userPrompt) => {
         set((state) => {
@@ -296,12 +309,12 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 更新 chat 节点的 AI 输出内容。
+     * 更新 chat 节点的 AI 输出内容
      */
     updateChatResponse: (nodeId, aiResponse) => {
         set((state) => {
             const targetNode = findNodeById(state.activeThread.cards, nodeId)
-            if (!targetNode || targetNode.type !== "chat" || targetNode.aiResponse === aiResponse) {
+            if (!targetNode || targetNode.type !== "chat" || targetNode.aiResponse === aiResponse || targetNode) {
                 return {}
             }
 
@@ -332,7 +345,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 更新 note 节点内容。
+     * 更新 note 节点内容
      */
     updateNoteContent: (nodeId, noteContent) => {
         set((state) => {
@@ -368,8 +381,69 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 移动节点位置。
-     * 语义：仅更新 position，不改 parent/reference 等结构关系。
+     * paste to replace 粘贴替换节点
+     */
+    replaceNodeFromClipboard: (nodeId, clipboardNode) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (!targetNode) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const nextCards = state.activeThread.cards.map((node) => {
+                if (node.id !== nodeId) {
+                    return node
+                }
+
+                // 保留当前节点身份相关字段 替换 type status 内容 
+                const nextBaseNode = {
+                    id: node.id,
+                    parentId: node.parentId,
+                    referenceNodeIds: node.referenceNodeIds,
+                    position: node.position,
+                    size: node.size,
+                    createdAt: node.createdAt,
+                    updatedAt: now,
+                }
+
+                switch (clipboardNode.type) {
+                    case "chat":
+                        return {
+                            ...nextBaseNode,
+                            type: "chat" as const,
+                            status: clipboardNode.status,
+                            userPrompt: clipboardNode.userPrompt,
+                            aiResponse: clipboardNode.aiResponse,
+                        }
+                    case "note":
+                        return {
+                            ...nextBaseNode,
+                            type: "note" as const,
+                            status: clipboardNode.status,
+                            noteContent: clipboardNode.noteContent,
+                        }
+                }
+
+                return assertNever(clipboardNode)
+            })
+
+            const snapshot: ConversationSnapshot = {
+                thread: cloneThread(state.activeThread),
+                activeNodeId: state.activeNodeId,
+            }
+
+            return {
+                activeThread: { ...state.activeThread, cards: nextCards },
+                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
+                futureSnapshots: [],
+            }
+        })
+    },
+
+    /**
+     * 移动节点位置
+     * 仅更新 position 不改 parent/reference 等结构关系
      */
     moveNode: (nodeId, nextPosition) => {
         set((state) => {

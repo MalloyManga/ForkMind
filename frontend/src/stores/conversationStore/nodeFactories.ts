@@ -1,6 +1,6 @@
 import { NODE_STATUS_DONE, NODE_STATUS_IDLE } from "../../domain/conversation/constants"
 import type { ConversationCard, ChatNode, NoteNode } from "../../domain/conversation/types"
-import type { AddChatNodeInput, AddNoteNodeInput } from "./contracts"
+import type { AddNodeDraftInput } from "./contracts"
 import {
     createDefaultSize,
     createForkPosition,
@@ -16,7 +16,7 @@ import {
  * 点击“新增对话卡片”或从现有卡片分叉提问时调用
  */
 export function createChatNode(
-    input: AddChatNodeInput,
+    input: AddNodeDraftInput<"chat">,
     nodes: readonly ConversationCard[],
 ): ChatNode {
     // 统一节点创建时间，保证 createdAt/updatedAt 在首次创建时一致。
@@ -59,7 +59,7 @@ export function createChatNode(
  * 创建 note 节点
  */
 export function createNoteNode(
-    input: AddNoteNodeInput,
+    input: AddNodeDraftInput<"note">,
     nodes: readonly ConversationCard[],
 ): NoteNode {
     // note 节点与 chat 节点使用同一套父子/布局规则。
