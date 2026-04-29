@@ -3,7 +3,7 @@ import { Editor, TLShapeId, createShapeId } from "tldraw"
 import { DEFAULT_CARD_MIN_HEIGHT, DEFAULT_CARD_WIDTH } from "../domain/conversation/constants"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { type ForkMindCardShape, FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
-import { type StartLinkDragInput } from "./canvasLinkTypes"
+import { type LinkDragRelationKind, type StartLinkDragInput } from "./canvasLinkTypes"
 import type { CanvasTool } from "./canvasToolTypes"
 import { isCreationCanvasTool } from "./canvasToolTypes"
 import { parseNodeIdFromShapeId } from "./canvasNodeIds"
@@ -30,7 +30,7 @@ import {
 interface UseCanvasBridgeLinkDragParams {
     canvasEditor: Editor | null
     cardsRef: MutableRefObject<ConversationCard[]>
-    currentCanvasToolRef: MutableRefObject<CanvasTool>
+    currentCanvasToolRef: MutableRefObject<CanvasTool> // 当前的 canvasTool 状态
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     removePointerListenersRef: MutableRefObject<(() => void) | null>
     clearPointerListeners: () => void
@@ -40,12 +40,25 @@ interface UseCanvasBridgeLinkDragParams {
         parentId?: string | null
         size?: { width?: number; minHeight?: number }
     }) => string
+    setNodeParent: (nodeId: string, parentId: string | null) => void
     setNodeReferences: (nodeId: string, referenceNodeIds: string[]) => void
 }
 
 interface UseCanvasBridgeLinkDragResult {
     handleLinkHandlePointerDown: (input: StartLinkDragInput) => void
     cancelLinkDrag: (editor: Editor) => void
+}
+
+/**
+ * 根据 LinkKind 获取到对应的 style
+ */
+function createPreviewArrowStyle(relationKind: LinkDragRelationKind): {
+    color: "blue" | "grey"
+    dash: "solid" | "dashed"
+} {
+    return relationKind === "parent"
+        ? { color: "blue", dash: "solid" }
+        : { color: "grey", dash: "dashed" }
 }
 
 /**
@@ -59,6 +72,7 @@ export function useCanvasBridgeLinkDrag({
     removePointerListenersRef,
     clearPointerListeners,
     commitNodeCreation,
+    setNodeParent,
     setNodeReferences,
 }: UseCanvasBridgeLinkDragParams): UseCanvasBridgeLinkDragResult {
 
@@ -88,7 +102,7 @@ export function useCanvasBridgeLinkDrag({
      */
     const updateLinkDragPreview = useCallback((editor: Editor, pointerPoint: Point) => {
         /**
-         * 当前正在拖拽出的箭头都对象的快照
+         * 当前正在拖拽出的箭头对象的快照
          * 仅服务于这一次拖拽 拖拽结束之后就消失
          */
         const session = linkDragSessionRef.current
@@ -98,6 +112,11 @@ export function useCanvasBridgeLinkDrag({
 
         // 高频更新最终释放点 供松开鼠标后的 mouseup 结算阶段使用
         session.releasePoint = pointerPoint
+        /**
+         * session 里取出 pointerdown 时写入的 relationKind
+         * 生成对应的 style
+         */
+        const previewArrowStyle = createPreviewArrowStyle(session.relationKind)
 
         // 1：利用 tldraw 提供的物理射线检测 (Raycasting)
         // 找出鼠标当前位置下，除了[起点本身]、[当前箭头]、[当前幽灵卡片]之外的第一个合法业务节点
@@ -135,6 +154,7 @@ export function useCanvasBridgeLinkDrag({
                 id: session.arrowShapeId,
                 type: "arrow",
                 props: {
+                    ...previewArrowStyle,
                     end: { x: 0, y: 0 }, // 长短归零（注意 tldraw 的 end 是相对起点的坐标偏差）
                     bend: 0, // 取消曲线的弯曲度
                 },
@@ -172,6 +192,7 @@ export function useCanvasBridgeLinkDrag({
                 id: session.arrowShapeId,
                 type: "arrow",
                 props: {
+                    ...previewArrowStyle,
                     end: {
                         x: targetPoint.x - session.startPoint.x, // 更新箭头终止点的相对坐标
                         y: targetPoint.y - session.startPoint.y,
@@ -200,6 +221,7 @@ export function useCanvasBridgeLinkDrag({
                 id: session.arrowShapeId,
                 type: "arrow",
                 props: {
+                    ...previewArrowStyle,
                     end: {
                         x: pointerPoint.x - session.startPoint.x,
                         y: pointerPoint.y - session.startPoint.y,
@@ -233,6 +255,7 @@ export function useCanvasBridgeLinkDrag({
             id: session.arrowShapeId,
             type: "arrow",
             props: {
+                ...previewArrowStyle,
                 end: {
                     x: pointerPoint.x - session.startPoint.x,
                     y: pointerPoint.y - session.startPoint.y,
@@ -296,12 +319,16 @@ export function useCanvasBridgeLinkDrag({
         }
 
         if (session.snappedTargetNodeId) {
-            const sourceNode = cardsRef.current.find((node) => node.id === session.sourceNodeId)
-            if (sourceNode) {
-                setNodeReferences(
-                    session.sourceNodeId,
-                    appendReferenceId(sourceNode, session.snappedTargetNodeId),
-                )
+            if (session.relationKind === "parent") {
+                setNodeParent(session.snappedTargetNodeId, session.sourceNodeId)
+            } else {
+                const sourceNode = cardsRef.current.find((node) => node.id === session.sourceNodeId)
+                if (sourceNode) {
+                    setNodeReferences(
+                        session.sourceNodeId,
+                        appendReferenceId(sourceNode, session.snappedTargetNodeId),
+                    )
+                }
             }
 
             editor.run(() => {
@@ -312,7 +339,12 @@ export function useCanvasBridgeLinkDrag({
             return
         }
 
-        if (!session.ghostCardType || session.ghostHeight === null) {
+        if (
+            // reference 拖拽到空白处并不创建卡片 直接 delete 幽灵卡片 parent 不经过这里 先创建卡片之后再 delete
+            session.relationKind === "reference" ||
+            !session.ghostCardType ||
+            session.ghostHeight === null
+        ) {
             editor.run(() => {
                 deleteDragPreviewShapes(editor, session)
             }, { history: "ignore" })
@@ -345,7 +377,7 @@ export function useCanvasBridgeLinkDrag({
         }, { history: "ignore" })
 
         linkDragSessionRef.current = null
-    }, [cardsRef, commitNodeCreation, linkDragSessionRef, setNodeReferences])
+    }, [cardsRef, commitNodeCreation, linkDragSessionRef, setNodeParent, setNodeReferences])
 
     /**
      * 从 hover 触点开始拖拽连线
@@ -378,6 +410,7 @@ export function useCanvasBridgeLinkDrag({
         }
 
         const currentCreationType = isCreationCanvasTool(currentCanvasTool) ? currentCanvasTool : null
+        const relationKind: LinkDragRelationKind = currentCreationType ? "parent" : "reference"
         const currentGhostHeight = currentCreationType ? getDefaultHeightByType(currentCreationType) : null
 
         const startPoint = edgePointBySide(sourceBounds, input.side)
@@ -401,6 +434,7 @@ export function useCanvasBridgeLinkDrag({
         // 创建出幽灵箭头与幽灵卡片
         const arrowShapeId = createShapeId()
         const ghostShapeId = createShapeId()
+        const previewArrowStyle = createPreviewArrowStyle(relationKind)
 
         canvasEditor.run(() => {
             canvasEditor.createShape({
@@ -410,8 +444,7 @@ export function useCanvasBridgeLinkDrag({
                 y: startPoint.y,
                 props: {
                     kind: "arc",
-                    color: "blue",
-                    dash: "solid",
+                    ...previewArrowStyle, // 根据当前的 canvasTool 来对应不同的 arrow UI
                     size: "m",
                     arrowheadStart: "none",
                     arrowheadEnd: "triangle",
@@ -463,6 +496,7 @@ export function useCanvasBridgeLinkDrag({
             startPoint,
             arrowShapeId,
             ghostShapeId,
+            relationKind, // pointerdown 时写入 relationKind 高频更新与 pointerUp 结算时使用
             ghostCardType: currentCreationType,
             ghostHeight: currentGhostHeight,
             snappedTargetShapeId: null,

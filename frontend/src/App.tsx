@@ -70,7 +70,7 @@ function App() {
     const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
     const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
     const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
-    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvas 工具唯一状态源
+    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvasTool 唯一状态源
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
     const [clipboardCard, setClipboardCard] = useState<ClipboardNodeInput | null>(null) // 全局剪切板 Node 合集
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)

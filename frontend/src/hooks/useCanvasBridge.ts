@@ -227,6 +227,7 @@ export function useCanvasBridge({
         removePointerListenersRef,
         clearPointerListeners,
         commitNodeCreation,
+        setNodeParent,
         setNodeReferences,
     })
 

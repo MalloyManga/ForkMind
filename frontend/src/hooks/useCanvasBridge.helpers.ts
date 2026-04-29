@@ -1,8 +1,11 @@
 import { TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
-import { LinkHandleSide } from "./canvasLinkTypes"
 import {
     type CanvasArrowDescriptor,
+    LinkHandleSide,
+    type LinkDragRelationKind,
+} from "./canvasLinkTypes"
+import {
     toCanvasParentArrowId,
     toCanvasReferenceArrowId,
     toCanvasNodeShapeId,
@@ -43,6 +46,7 @@ export type AnchorSide =
  * 用户正在拖拽出的箭头的一切
  */
 export interface LinkDragSession {
+    relationKind: LinkDragRelationKind // 箭头类型
     sourceShapeId: TLShapeId
     sourceNodeId: string
     sourceSide: LinkHandleSide

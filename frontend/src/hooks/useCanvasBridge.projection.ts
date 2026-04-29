@@ -143,6 +143,9 @@ export function syncStableArrowProjection(editor: Editor, projection: StableArro
     )
 }
 
+/**
+ * 幽灵卡片信息
+ */
 export type ForkMindCardShapePartial = {
     id: TLShapeId
     type: typeof FORK_MIND_CARD_SHAPE_TYPE
@@ -152,6 +155,9 @@ export type ForkMindCardShapePartial = {
     props?: Partial<ForkMindCardShape["props"]>
 }
 
+/**
+ * 鼠标拖拽时的幽灵卡片的箭头
+ */
 export type ArrowShapePreviewPartial = {
     id: TLShapeId
     type: "arrow"

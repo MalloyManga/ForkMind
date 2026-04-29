@@ -362,7 +362,7 @@ export function useCanvasBridgeInteractions({
     }, [canvasEditor, isUserMultiSelectionRef])
 
     /**
-     * 业务场景 节点拖拽结束后 把新坐标提交回 Store
+     * 节点拖拽结束后 把新坐标提交回 Store
      */
     useEffect(() => {
         if (!canvasEditor) {
