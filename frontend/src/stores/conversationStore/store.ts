@@ -1,8 +1,18 @@
 ﻿import { create } from "zustand"
 import { assertNever } from "@/lib/utils"
 import { HISTORY_LIMIT } from "../../domain/conversation/constants"
-import type { BaseNode, ConversationCard, ConversationThread } from "../../domain/conversation/types"
-import type { ConversationSnapshot, ConversationStoreState } from "./contracts"
+import type {
+    BaseNode,
+    ConversationCard,
+    ConversationCardPosition,
+    ConversationThread,
+} from "../../domain/conversation/types"
+import type {
+    CanvasClipboardPayload,
+    ClipboardNodeSnapshot,
+    ConversationSnapshot,
+    ConversationStoreState,
+} from "./contracts"
 import { initialThread } from "./initialData"
 import {
     cloneNode,
@@ -17,6 +27,134 @@ import {
     willCreateParentCycle,
 } from "./helpers"
 import { createChatNode, createNoteNode } from "./nodeFactories"
+
+interface RemappedClipboardRelations {
+    parentId: string | null
+    referenceNodeIds?: string[]
+}
+
+interface CreatePastedNodesResult {
+    pastedNodeIds: string[]
+    pastedNodes: ConversationCard[]
+}
+
+/**
+ * 计算一组卡片的左上角坐标
+ */
+function getCardsTopLeft(cards: ConversationCard[]): ConversationCardPosition {
+    if (cards.length === 0) {
+        throw new Error("Cannot calculate top left point from empty cards")
+    }
+
+    return cards.reduce(
+        (currentTopLeft, card) => ({
+            x: Math.min(currentTopLeft.x, card.position.x),
+            y: Math.min(currentTopLeft.y, card.position.y),
+        }),
+        { x: cards[0].position.x, y: cards[0].position.y },
+    )
+}
+
+/**
+ * 从 old node id 映射表读取新 node id
+ * originalNodeId 来自剪贴板快照
+ * 找不到说明 payload 或映射表已经损坏 直接抛错比静默丢关系更安全
+ */
+function getRequiredPastedNodeId(
+    originalNodeId: string,
+    pastedIdByOriginalId: Map<string, string>,
+): string {
+    const pastedNodeId = pastedIdByOriginalId.get(originalNodeId)
+    if (!pastedNodeId) {
+        throw new Error(`Missing pasted node id for ${originalNodeId}`)
+    }
+
+    return pastedNodeId
+}
+
+/**
+ * 重建剪贴板节点内部关系
+ * 只保留复制集合内部的 parent/reference 避免新节点指向未复制的旧外部节点
+ */
+function remapClipboardRelations(
+    clipboardNode: ClipboardNodeSnapshot,
+    copiedOriginalIdSet: Set<string>,
+    pastedIdByOriginalId: Map<string, string>,
+): RemappedClipboardRelations {
+    const parentId =
+        clipboardNode.parentId && copiedOriginalIdSet.has(clipboardNode.parentId)
+            ? getRequiredPastedNodeId(clipboardNode.parentId, pastedIdByOriginalId)
+            : null
+
+    const referenceNodeIds = clipboardNode.referenceNodeIds
+        ?.filter((referenceNodeId) => copiedOriginalIdSet.has(referenceNodeId))
+        .map((referenceNodeId) => getRequiredPastedNodeId(referenceNodeId, pastedIdByOriginalId))
+
+    return {
+        parentId,
+        referenceNodeIds: referenceNodeIds && referenceNodeIds.length > 0 ? referenceNodeIds : undefined,
+    }
+}
+
+/**
+ * 从剪贴板 payload 创建真正写入 Store 的新节点
+ */
+function createPastedNodesFromPayload(
+    payload: CanvasClipboardPayload,
+    pastePoint: ConversationCardPosition,
+    now: string,
+): CreatePastedNodesResult {
+    const copiedOriginalIdSet = new Set(payload.nodes.map((clipboardNode) => clipboardNode.originalNodeId))
+    const pastedIdByOriginalId = new Map(
+        payload.nodes.map((clipboardNode) => [clipboardNode.originalNodeId, createNodeId()] as const),
+    )
+
+    const pastedNodeIds: string[] = []
+    const pastedNodes = payload.nodes.map((clipboardNode): ConversationCard => {
+        const nextNodeId = getRequiredPastedNodeId(clipboardNode.originalNodeId, pastedIdByOriginalId)
+        const nextRelations = remapClipboardRelations(clipboardNode, copiedOriginalIdSet, pastedIdByOriginalId)
+
+        pastedNodeIds.push(nextNodeId)
+
+        const pastedBaseNode: BaseNode = {
+            id: nextNodeId,
+            type: clipboardNode.type,
+            parentId: nextRelations.parentId,
+            referenceNodeIds: nextRelations.referenceNodeIds,
+            position: {
+                x: pastePoint.x + (clipboardNode.position.x - payload.sourceTopLeft.x),
+                y: pastePoint.y + (clipboardNode.position.y - payload.sourceTopLeft.y),
+            },
+            size: { ...clipboardNode.size },
+            status: clipboardNode.status,
+            createdAt: now,
+            updatedAt: now,
+        }
+
+        switch (clipboardNode.type) {
+            case "chat":
+                return {
+                    ...pastedBaseNode,
+                    type: "chat",
+                    userPrompt: clipboardNode.userPrompt,
+                    aiResponse: clipboardNode.aiResponse,
+                }
+            case "note":
+                return {
+                    ...pastedBaseNode,
+                    type: "note",
+                    noteContent: clipboardNode.noteContent,
+                }
+        }
+
+        return assertNever(clipboardNode)
+    })
+
+    return {
+        pastedNodeIds,
+        pastedNodes,
+    }
+}
 
 /**
  * Zustand Store（可类比 Nuxt composable 组织方式）：
@@ -394,65 +532,12 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
 
         set((state) => {
             const now = createTimestamp()
-            const copiedOriginalIdSet = new Set(payload.nodes.map((node) => node.originalNodeId))
-            const pastedIdByOriginalId = new Map(
-                payload.nodes.map((node) => [node.originalNodeId, createNodeId()] as const),
+            const { pastedNodeIds: nextPastedNodeIds, pastedNodes: nextNodes } = createPastedNodesFromPayload(
+                payload,
+                pastePoint,
+                now,
             )
-
-            const nextNodes = payload.nodes.map((clipboardNode): ConversationCard => {
-                const nextNodeId = pastedIdByOriginalId.get(clipboardNode.originalNodeId)
-                if (!nextNodeId) {
-                    throw new Error(`Missing pasted node id for ${clipboardNode.originalNodeId}`)
-                }
-
-                pastedNodeIds.push(nextNodeId)
-
-                // 只保留复制集合内部的 parent/reference 关系 避免替换后指向已删除或未复制的外部节点
-                const nextParentId =
-                    clipboardNode.parentId && copiedOriginalIdSet.has(clipboardNode.parentId)
-                        ? pastedIdByOriginalId.get(clipboardNode.parentId) ?? null
-                        : null
-                const nextReferenceNodeIds = clipboardNode.referenceNodeIds
-                    ?.filter((referenceNodeId) => copiedOriginalIdSet.has(referenceNodeId))
-                    .map((referenceNodeId) => pastedIdByOriginalId.get(referenceNodeId))
-                    .filter((referenceNodeId): referenceNodeId is string => Boolean(referenceNodeId))
-
-                const pastedBaseNode: BaseNode = {
-                    id: nextNodeId,
-                    type: clipboardNode.type,
-                    parentId: nextParentId,
-                    referenceNodeIds:
-                        nextReferenceNodeIds && nextReferenceNodeIds.length > 0
-                            ? nextReferenceNodeIds
-                            : undefined,
-                    position: { // 用 pastePoint + 原位置相对 sourceTopLeft 的偏移 计算新位置
-                        x: pastePoint.x + (clipboardNode.position.x - payload.sourceTopLeft.x),
-                        y: pastePoint.y + (clipboardNode.position.y - payload.sourceTopLeft.y),
-                    },
-                    size: { ...clipboardNode.size },
-                    status: clipboardNode.status,
-                    createdAt: now,
-                    updatedAt: now,
-                }
-
-                switch (clipboardNode.type) {
-                    case "chat":
-                        return {
-                            ...pastedBaseNode,
-                            type: "chat",
-                            userPrompt: clipboardNode.userPrompt,
-                            aiResponse: clipboardNode.aiResponse,
-                        }
-                    case "note":
-                        return {
-                            ...pastedBaseNode,
-                            type: "note",
-                            noteContent: clipboardNode.noteContent,
-                        }
-                }
-
-                return assertNever(clipboardNode)
-            })
+            pastedNodeIds.push(...nextPastedNodeIds)
 
             const snapshot: ConversationSnapshot = {
                 thread: cloneThread(state.activeThread),
@@ -494,72 +579,13 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             }
 
             const now = createTimestamp()
-            const targetTopLeft = targetNodes.reduce(
-                (currentTopLeft, node) => ({
-                    x: Math.min(currentTopLeft.x, node.position.x),
-                    y: Math.min(currentTopLeft.y, node.position.y),
-                }),
-                { x: targetNodes[0].position.x, y: targetNodes[0].position.y },
+            const targetTopLeft = getCardsTopLeft(targetNodes)
+            const { pastedNodeIds: nextPastedNodeIds, pastedNodes } = createPastedNodesFromPayload(
+                payload,
+                targetTopLeft,
+                now,
             )
-            const copiedOriginalIdSet = new Set(payload.nodes.map((clipboardNode) => clipboardNode.originalNodeId))
-            const pastedIdByOriginalId = new Map(
-                payload.nodes.map((clipboardNode) => [clipboardNode.originalNodeId, createNodeId()] as const),
-            )
-
-            const pastedNodes = payload.nodes.map((clipboardNode): ConversationCard => {
-                const nextNodeId = pastedIdByOriginalId.get(clipboardNode.originalNodeId)
-                if (!nextNodeId) {
-                    throw new Error(`Missing replacement node id for ${clipboardNode.originalNodeId}`)
-                }
-                pastedNodeIds.push(nextNodeId)
-
-                // 只保留复制集合内部的 parent/reference 关系 避免替换后指向已删除或未复制的外部节点
-                const nextParentId =
-                    clipboardNode.parentId && copiedOriginalIdSet.has(clipboardNode.parentId)
-                        ? pastedIdByOriginalId.get(clipboardNode.parentId) ?? null
-                        : null
-                const nextReferenceNodeIds = clipboardNode.referenceNodeIds
-                    ?.filter((referenceNodeId) => copiedOriginalIdSet.has(referenceNodeId))
-                    .map((referenceNodeId) => pastedIdByOriginalId.get(referenceNodeId))
-                    .filter((referenceNodeId): referenceNodeId is string => Boolean(referenceNodeId)) // filter 将 Map.get 得到的 string | undefined 收窄为 string
-
-                const nextBaseNode: BaseNode = {
-                    id: nextNodeId,
-                    type: clipboardNode.type,
-                    parentId: nextParentId,
-                    referenceNodeIds:
-                        nextReferenceNodeIds && nextReferenceNodeIds.length > 0
-                            ? nextReferenceNodeIds
-                            : undefined,
-                    // 复制组左上角对齐到被替换选区左上角
-                    position: {
-                        x: targetTopLeft.x + (clipboardNode.position.x - payload.sourceTopLeft.x),
-                        y: targetTopLeft.y + (clipboardNode.position.y - payload.sourceTopLeft.y),
-                    },
-                    size: { ...clipboardNode.size },
-                    status: clipboardNode.status,
-                    createdAt: now,
-                    updatedAt: now,
-                }
-
-                switch (clipboardNode.type) {
-                    case "chat":
-                        return {
-                            ...nextBaseNode,
-                            type: "chat",
-                            userPrompt: clipboardNode.userPrompt,
-                            aiResponse: clipboardNode.aiResponse,
-                        }
-                    case "note":
-                        return {
-                            ...nextBaseNode,
-                            type: "note",
-                            noteContent: clipboardNode.noteContent,
-                        }
-                }
-
-                return assertNever(clipboardNode)
-            })
+            pastedNodeIds.push(...nextPastedNodeIds)
 
             // 除去被替换的节点之后剩下的节点
             const remainingNodes = state.activeThread.cards.filter((node) => !targetIdSet.has(node.id))

@@ -72,37 +72,17 @@ function buildCanvasClipboardPayload(targetCards: ConversationCard[]): CanvasCli
 }
 
 /**
- * 根据右键上下文和画布 selection 解析 Copy 目标
- * 正常右键路径已经由 CanvasWorkspace 修正 selection
- * context.nodeId 和 activeNodeId 只作为 selection 不可用时的防御性兜底
+ * 根据右键上下文和画布 selection 解析命令目标
+ * Copy 和 Paste to replace 都是在处理当前目标节点集合
  * 返回 nodeid(string)[]
  */
-function resolveCopyTargetNodeIds(
+function resolveTargetNodeIds(
     canvasEditor: Editor | null,
     context: CanvasContextMenuContext | undefined,
     activeNodeId: string | null,
 ): string[] {
     const selectedNodeIds = canvasEditor ? getSelectedNodeIdsFromEditor(canvasEditor) : []
     if (selectedNodeIds.length > 0) { // 多选
-        return selectedNodeIds
-    }
-    else if (context?.kind === "node") {
-        return [context.nodeId]
-    }
-
-    return activeNodeId ? [activeNodeId] : []
-}
-
-/**
- * 根据画布 selection 与右键上下文解析 paste to replace 目标
- */
-function resolveReplaceTargetNodeIds(
-    canvasEditor: Editor | null,
-    context: CanvasContextMenuContext | undefined,
-    activeNodeId: string | null,
-): string[] {
-    const selectedNodeIds = canvasEditor ? getSelectedNodeIdsFromEditor(canvasEditor) : []
-    if (selectedNodeIds.length > 0) {
         return selectedNodeIds
     }
     else if (context?.kind === "node") {
@@ -149,7 +129,7 @@ export function useCanvasContextMenuExecutor({
                 setIsCanvasUiHidden((previousHiddenState) => !previousHiddenState)
                 return
             case "copy-node": {
-                const targetNodeIds = resolveCopyTargetNodeIds(canvasEditor, context, activeNodeId)
+                const targetNodeIds = resolveTargetNodeIds(canvasEditor, context, activeNodeId)
                 if (targetNodeIds.length === 0) {
                     return
                 }
@@ -185,7 +165,7 @@ export function useCanvasContextMenuExecutor({
                     return
                 }
 
-                const targetNodeIds = resolveReplaceTargetNodeIds(canvasEditor, context, activeNodeId)
+                const targetNodeIds = resolveTargetNodeIds(canvasEditor, context, activeNodeId)
                 if (targetNodeIds.length === 0) {
                     return
                 }
