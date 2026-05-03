@@ -60,12 +60,12 @@ export const CANVAS_COMMAND_REGISTRY = {
     },
     "paste-to-replace": {
         label: "Paste to replace",
-        shortcut: { key: "v", mod: true, shift: true },
+        shortcut: { key: "r", mod: true, shift: true },
     },
     "toggle-ui": {
         // 这里文案为默认值 真正渲染菜单时 resolver 会按当前隐藏状态改成 Show 或 Hide
         label: "Show UI",
-        shortcut: { key: "tab" },
+        shortcut: { key: "\\", mod: true },
     },
 } as const satisfies Record<CanvasCommandId, CanvasCommandDefinition>
 
