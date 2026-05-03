@@ -1,4 +1,4 @@
-import { TLShapeId } from "tldraw"
+﻿import { TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import {
     type CanvasArrowDescriptor,

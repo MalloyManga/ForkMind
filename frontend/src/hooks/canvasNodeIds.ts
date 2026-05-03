@@ -47,8 +47,8 @@ export function toCanvasReferenceArrowId(sourceNodeId: string, targetNodeId: str
 }
 
 /**
- * 把画布 shapeId 过滤其余的 反解出 nodeId 仅保留 node 卡片 id
- * 去掉 tldraw 自带的 shape: 前缀 以及 我们自制的前缀 仅保留纯粹的UUID存储到store对应的字段
+ * 过滤其余的 shapeId 仅保留 node(卡片) id(其余返回 null)
+ * 仅作字符串的操作 并去除 tldraw 的 shape: 前缀以及我们自制的前缀 保留纯粹的 UUID
  */
 export function parseNodeIdFromShapeId(shapeId: TLShapeId): string | null {
     const normalizedShapeId = normalizeShapeId(shapeId)

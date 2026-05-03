@@ -94,6 +94,19 @@ export function CanvasWorkspace({
         })
 
         const nodeId = hitShape ? parseNodeIdFromShapeId(hitShape.id as TLShapeId) : null
+
+        // 右键 node 之后进行判定
+        if (hitShape && nodeId) {
+            const hitShapeId = hitShape.id as TLShapeId
+            const selectedShapeIds = canvasEditor.getSelectedShapeIds()
+            const isHitShapeAlreadySelected = selectedShapeIds.includes(hitShapeId)
+
+            // 右键卡片不在 selection 当中时 把画布 selection 切到该卡片(已选中则保留多选)
+            if (!isHitShapeAlreadySelected) {
+                canvasEditor.setSelectedShapes([hitShapeId])
+            }
+        }
+
         onOpenContextMenu(
             nodeId
                 ? {

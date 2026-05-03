@@ -22,7 +22,7 @@ type StoreGeneratedNodeKeys = "id" | "createdAt" | "updatedAt"
  * 对联合类型逐个成员执行 Omit
  * K 必须为合法的对象 key
  * T extends unknown 自动遍历 T(联合类型) 同时永远为 true
- * 从 T 接口当中删去 K(key) 字段
+ * 从 T 联合类型接口当中删去 K(key) 字段
  */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, Extract<keyof T, K>> : never
 
@@ -58,12 +58,36 @@ export type AddConversationNodeDraftInput = {
 }[ConversationNodeType]
 
 /**
- * 剪贴板里存放的节点内容快照
- * copy paste 和 paste to replace 保存旧节点内容和关系 但粘贴时必须重新计算 position
- * parentId 先保留 后续粘贴时由业务逻辑判断目标画布是否存在该父节点
- * ConversationCard 的所有类型删去 StoreGeneratedNodeKeys | "position" 再联合
+ * 多节点剪贴板里的单节点快照
  */
-export type ClipboardNodeInput = DistributiveOmit<ConversationCard, StoreGeneratedNodeKeys | "position">
+export type ClipboardNodeSnapshot =
+    DistributiveOmit<ConversationCard, StoreGeneratedNodeKeys> & {
+        originalNodeId: string
+    }
+
+/**
+ * 画布剪贴板 payload
+ */
+export interface CanvasClipboardPayload {
+    nodes: ClipboardNodeSnapshot[]
+    sourceTopLeft: ConversationCardPosition // paste 时计算整体偏移量
+}
+
+/**
+ * 从剪贴板粘贴 nodes 的 Store 入参
+ */
+export interface PasteNodesFromClipboardInput {
+    payload: CanvasClipboardPayload
+    pastePoint: ConversationCardPosition // 右键位置或当前视口中心
+}
+
+/**
+ * Paste to replace 的 Store 入参
+ */
+export interface ReplaceNodesFromClipboardInput {
+    payload: CanvasClipboardPayload
+    targetNodeIds: string[]
+}
 
 /**
  * 从现有节点 Fork 新 chat 节点的入参
@@ -117,7 +141,8 @@ export interface ConversationStoreState {
     updateChatPrompt: (nodeId: string, userPrompt: string) => void
     updateChatResponse: (nodeId: string, aiResponse: string) => void
     updateNoteContent: (nodeId: string, noteContent: string) => void
-    replaceNodeFromClipboard: (nodeId: string, clipboardNode: ClipboardNodeInput) => void
+    pasteNodesFromClipboard: (input: PasteNodesFromClipboardInput) => string[]
+    replaceNodesFromClipboard: (input: ReplaceNodesFromClipboardInput) => string[]
 
     moveNode: (nodeId: string, nextPosition: ConversationCardPosition) => void
     setNodeParent: (nodeId: string, parentId: string | null) => void

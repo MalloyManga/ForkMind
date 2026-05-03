@@ -3,12 +3,12 @@ import type {
     CanvasContextMenuContext,
     CanvasContextMenuItem,
 } from "./canvasContextMenuTypes"
-import type { ClipboardNodeInput } from "../stores/conversationStore"
+import type { CanvasClipboardPayload } from "../stores/conversationStore"
 import type { CanvasCommandId } from './canvasCommands'
 import { assertNever } from "@/lib/utils.ts"
 
 interface UseCanvasContextMenuResolverParams {
-    clipboardCard: ClipboardNodeInput | null
+    clipboardCard: CanvasClipboardPayload | null
     isCanvasUiHidden: boolean
 }
 

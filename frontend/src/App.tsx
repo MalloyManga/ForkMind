@@ -8,7 +8,7 @@
 } from "react"
 import type { Editor } from "tldraw"
 import { CanvasContextMenu } from "./components/CanvasContextMenu"
-import type { ClipboardNodeInput } from "./stores/conversationStore"
+import type { CanvasClipboardPayload } from "./stores/conversationStore"
 import { CanvasWorkspace } from "./components/CanvasWorkspace"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
 import { RightEditorSidebar } from "./components/RightEditorSidebar"
@@ -72,7 +72,7 @@ function App() {
     const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
     const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvasTool 唯一状态源
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
-    const [clipboardCard, setClipboardCard] = useState<ClipboardNodeInput | null>(null) // 全局剪切板 Node 合集
+    const [clipboardPayload, setClipboardPayload] = useState<CanvasClipboardPayload | null>(null) // 当前页面级剪贴板 payload
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
@@ -90,7 +90,6 @@ function App() {
     const activeNode = useConversationStore(selectActiveNode)
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
-    const addNode = useConversationStore((state) => state.addNode)
     const addChatNode = useConversationStore((state) => state.addChatNode)
     const addNoteNode = useConversationStore((state) => state.addNoteNode)
     const deleteNodes = useConversationStore((state) => state.deleteNodes)
@@ -100,7 +99,8 @@ function App() {
     const updateChatPrompt = useConversationStore((state) => state.updateChatPrompt)
     const updateChatResponse = useConversationStore((state) => state.updateChatResponse)
     const updateNoteContent = useConversationStore((state) => state.updateNoteContent)
-    const replaceNodeFromClipboard = useConversationStore((state) => state.replaceNodeFromClipboard)
+    const pasteNodesFromClipboard = useConversationStore((state) => state.pasteNodesFromClipboard)
+    const replaceNodesFromClipboard = useConversationStore((state) => state.replaceNodesFromClipboard)
     const undo = useConversationStore((state) => state.undo)
     const redo = useConversationStore((state) => state.redo)
 
@@ -148,7 +148,7 @@ function App() {
 
     // resolver 只负责根据上下文算菜单内容 不做真正业务写入
     const { resolveContextMenuItems } = useCanvasContextMenuResolver({
-        clipboardCard,
+        clipboardCard: clipboardPayload,
         isCanvasUiHidden,
     })
 
@@ -156,12 +156,12 @@ function App() {
     const { executeCanvasCommand } = useCanvasContextMenuExecutor({
         canvasEditor,
         activeNodeId,
-        clipboardCard,
-        setClipboardCard,
+        clipboardPayload,
+        setClipboardPayload,
         setIsCanvasUiHidden,
         cards,
-        addNode,
-        replaceNodeFromClipboard,
+        pasteNodesFromClipboard,
+        replaceNodesFromClipboard,
         setActiveNodeId,
     })
 

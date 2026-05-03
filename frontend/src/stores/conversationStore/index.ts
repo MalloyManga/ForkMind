@@ -3,11 +3,14 @@ export type {
     AddConversationNodeInput,
     AddNodeDraftInput,
     AddNodeInput,
-    ClipboardNodeInput,
+    CanvasClipboardPayload,
+    ClipboardNodeSnapshot,
     ConversationSnapshot,
     ConversationStoreState,
     ForkChatNodeInput,
     ForkNoteNodeInput,
+    PasteNodesFromClipboardInput,
+    ReplaceNodesFromClipboardInput,
 } from "./contracts"
 export { useConversationStore } from "./store"
 export {
