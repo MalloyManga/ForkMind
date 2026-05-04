@@ -13,12 +13,14 @@ export type CanvasCommandId =
     | "paste-here"
     | "paste-to-replace"
     | "toggle-ui"
+    | "toggle-panels"
 
 /**
  * shortcut 具体定义
  */
 interface CanvasShortcutDefinition {
     key: string
+    code?: string
     mod?: boolean
     shift?: boolean
     alt?: boolean
@@ -65,7 +67,11 @@ export const CANVAS_COMMAND_REGISTRY = {
     "toggle-ui": {
         // 这里文案为默认值 真正渲染菜单时 resolver 会按当前隐藏状态改成 Show 或 Hide
         label: "Show UI",
-        shortcut: { key: "\\", mod: true },
+        shortcut: { key: "\\", code: "Backslash", mod: true },
+    },
+    "toggle-panels": {
+        label: "Minimize UI",
+        shortcut: { key: "\\", code: "Backslash", mod: true, shift: true },
     },
 } as const satisfies Record<CanvasCommandId, CanvasCommandDefinition>
 
@@ -129,14 +135,25 @@ function isModifierStateMatched(event: KeyboardEvent | ReactKeyboardEvent, short
 }
 
 /**
+ * 判断当前按键是否命中快捷键主键
+ * key 用于常规字母 code 用于 \ 这类会被 Shift 变成 | 的物理键
+ */
+function isShortcutKeyMatched(event: KeyboardEvent | ReactKeyboardEvent, shortcut: CanvasShortcutDefinition): boolean {
+    const normalizedKey = event.key.toLowerCase()
+    if (shortcut.code && event.code === shortcut.code) {
+        return true
+    }
+
+    return shortcut.key === normalizedKey
+}
+
+/**
  * 根据键盘事件反查命令 id
  * App 壳层只监听一次 keydown 再把命令转发给 resolver executor 或工具切换逻辑
  */
 export function resolveCanvasCommandByKeyboardEvent(
     event: KeyboardEvent | ReactKeyboardEvent,
 ): CanvasCommandId | null {
-    const normalizedKey = event.key.toLowerCase()
-
     const tempCanvasCommandArray = Object.entries(CANVAS_COMMAND_REGISTRY) as
         [
             CanvasCommandId,
@@ -149,7 +166,7 @@ export function resolveCanvasCommandByKeyboardEvent(
             return false
         }
         // 精确匹配按下的快捷键 与 实际合法的业务快捷键
-        return shortcut.key === normalizedKey && isModifierStateMatched(event, shortcut)
+        return isShortcutKeyMatched(event, shortcut) && isModifierStateMatched(event, shortcut)
     })
 
     return matchedEntry?.[0] ?? null

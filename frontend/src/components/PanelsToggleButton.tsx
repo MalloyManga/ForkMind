@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react"
+import { CANVAS_COMMAND_REGISTRY, formatCanvasShortcut } from "../hooks/canvasCommands"
 import { PanelsToggleIcon } from "./icons/PanelsToggleIcon"
 
 interface PanelsToggleButtonProps {
     isMinimized: boolean
     onToggle: () => void
 }
-
-const PANELS_TOGGLE_SHORTCUT = "Ctrl Shift \\"
-const PANELS_TOGGLE_TOOLTIP_DELAY = 520
 
 function PanelsToggleHint({
     label,
@@ -35,6 +33,7 @@ function PanelsToggleHint({
 export function PanelsToggleButton({ isMinimized, onToggle }: PanelsToggleButtonProps) {
     const tooltipDelayTimerRef = useRef<number | null>(null)
     const [isTooltipVisible, setIsTooltipVisible] = useState(false)
+    const tooltipShortcut = formatCanvasShortcut(CANVAS_COMMAND_REGISTRY["toggle-panels"].shortcut)
 
     const clearTooltipDelayTimer = () => {
         if (tooltipDelayTimerRef.current !== null) {
@@ -52,7 +51,7 @@ export function PanelsToggleButton({ isMinimized, onToggle }: PanelsToggleButton
         tooltipDelayTimerRef.current = window.setTimeout(() => {
             setIsTooltipVisible(true)
             tooltipDelayTimerRef.current = null
-        }, PANELS_TOGGLE_TOOLTIP_DELAY)
+        }, 520)
     }
 
     const endTooltipIntent = () => {
@@ -76,7 +75,7 @@ export function PanelsToggleButton({ isMinimized, onToggle }: PanelsToggleButton
             {isTooltipVisible ? (
                 <PanelsToggleHint
                     label={isMinimized ? "Expand UI" : "Minimize UI"}
-                    shortcut={PANELS_TOGGLE_SHORTCUT}
+                    shortcut={tooltipShortcut ?? ""}
                 />
             ) : null}
 

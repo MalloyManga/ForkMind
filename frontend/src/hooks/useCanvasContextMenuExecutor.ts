@@ -19,6 +19,7 @@ interface UseCanvasContextMenuExecutorParams {
     clipboardPayload: CanvasClipboardPayload | null
     setClipboardPayload: (clipboardPayload: CanvasClipboardPayload | null) => void
     setIsCanvasUiHidden: (nextHidden: boolean | ((previousValue: boolean) => boolean)) => void
+    setAreSidebarsHidden: (nextHidden: boolean | ((previousValue: boolean) => boolean)) => void
     cards: ConversationCard[]
     pasteNodesFromClipboard: (input: PasteNodesFromClipboardInput) => string[]
     replaceNodesFromClipboard: (input: ReplaceNodesFromClipboardInput) => string[]
@@ -114,6 +115,7 @@ export function useCanvasContextMenuExecutor({
     clipboardPayload,
     setClipboardPayload,
     setIsCanvasUiHidden,
+    setAreSidebarsHidden,
     cards,
     pasteNodesFromClipboard,
     replaceNodesFromClipboard,
@@ -127,6 +129,9 @@ export function useCanvasContextMenuExecutor({
             case "toggle-ui":
                 // 这里用函数式更新 避免右键菜单和快捷键连续触发时读到旧闭包值
                 setIsCanvasUiHidden((previousHiddenState) => !previousHiddenState)
+                return
+            case "toggle-panels":
+                setAreSidebarsHidden((previousHiddenState) => !previousHiddenState)
                 return
             case "copy-node": {
                 const targetNodeIds = resolveTargetNodeIds(canvasEditor, context, activeNodeId)
@@ -190,6 +195,7 @@ export function useCanvasContextMenuExecutor({
         pasteNodesFromClipboard,
         replaceNodesFromClipboard,
         setActiveNodeId,
+        setAreSidebarsHidden,
         setClipboardPayload,
         setIsCanvasUiHidden,
     ])

@@ -161,6 +161,7 @@ function App() {
         clipboardPayload,
         setClipboardPayload,
         setIsCanvasUiHidden,
+        setAreSidebarsHidden,
         cards,
         pasteNodesFromClipboard,
         replaceNodesFromClipboard,
@@ -296,13 +297,6 @@ function App() {
 
             // 正在输入文本时 不要抢快捷键 否则用户在右侧编辑栏输入 C V N 这类字符会误触发命令
             if (isTextEditingTarget(event.target)) {
-                return
-            }
-
-            if (event.ctrlKey && event.shiftKey && event.key === "\\") {
-                event.preventDefault()
-                closeContextMenu()
-                setAreSidebarsHidden((previousHiddenState) => !previousHiddenState)
                 return
             }
 
