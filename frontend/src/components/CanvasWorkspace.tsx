@@ -1,5 +1,5 @@
 ﻿import { type MouseEvent as ReactMouseEvent, useCallback, useMemo, useState } from "react"
-import { Editor, type TLComponents, type TLShapeId, Tldraw } from "tldraw"
+import { Editor, type TLComponents, type TLShapeId, Tldraw, useValue } from "tldraw"
 import "tldraw/tldraw.css"
 import { parseNodeIdFromShapeId } from "../hooks/canvasNodeIds"
 import { type CanvasContextMenuContext } from "../hooks/canvasContextMenuTypes"
@@ -47,6 +47,11 @@ export function CanvasWorkspace({
     licenseKey,
 }: CanvasWorkspaceProps) {
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
+    const isCanvasResizing = useValue(
+        "ForkMind canvas resizing",
+        () => canvasEditor?.getPath() === "select.resizing",
+        [canvasEditor],
+    )
 
     const canvasShapeUtils = useMemo(
         // 这里注册我们自定义的 card 和 arrow shape util 让 tldraw 认识业务卡片与箭头
@@ -66,11 +71,16 @@ export function CanvasWorkspace({
             InFrontOfTheCanvas: () => (
                 <CanvasLinkHandlesOverlay
                     onStartLinkDrag={onStartLinkDrag}
-                    isVisible={isCanvasUiVisible && !isContextMenuOpen && currentCanvasTool !== "hand-tool"}
+                    isVisible={
+                        isCanvasUiVisible &&
+                        !isContextMenuOpen &&
+                        currentCanvasTool !== "hand-tool" &&
+                        !isCanvasResizing
+                    }
                 />
             ),
         }),
-        [currentCanvasTool, isCanvasUiVisible, isContextMenuOpen, onStartLinkDrag],
+        [currentCanvasTool, isCanvasResizing, isCanvasUiVisible, isContextMenuOpen, onStartLinkDrag],
     )
 
     const handleWorkspaceContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>) => {
