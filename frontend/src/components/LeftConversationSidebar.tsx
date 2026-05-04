@@ -1,11 +1,11 @@
-import { PanelsToggleIcon } from "./icons/PanelsToggleIcon"
+﻿import type { ReactNode } from "react"
 
 interface LeftConversationSidebarProps {
     threadTitle: string
     cardCount: number
     rootNodeCount: number
     themeMode: "dark" | "light"
-    onTogglePanels: () => void
+    panelsToggleControl: ReactNode
     onToggleTheme: () => void
 }
 
@@ -17,7 +17,7 @@ export function LeftConversationSidebar({
     cardCount,
     rootNodeCount,
     themeMode,
-    onTogglePanels,
+    panelsToggleControl,
     onToggleTheme,
 }: LeftConversationSidebarProps) {
     return (
@@ -27,14 +27,7 @@ export function LeftConversationSidebar({
                     <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                         Conversations
                     </h2>
-                    <button
-                        type="button"
-                        className="rounded-md p-1.5 text-foreground transition-colors hover:bg-accent"
-                        onClick={onTogglePanels}
-                        aria-label="隐藏界面栏"
-                    >
-                        <PanelsToggleIcon className="h-4 w-4" />
-                    </button>
+                    {panelsToggleControl}
                 </div>
 
                 <div className="rounded-xl border bg-card p-3">

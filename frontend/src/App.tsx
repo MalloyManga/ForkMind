@@ -11,8 +11,8 @@ import { CanvasContextMenu } from "./components/CanvasContextMenu"
 import type { CanvasClipboardPayload } from "./stores/conversationStore"
 import { CanvasWorkspace } from "./components/CanvasWorkspace"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
+import { PanelsToggleButton } from "./components/PanelsToggleButton"
 import { RightEditorSidebar } from "./components/RightEditorSidebar"
-import { PanelsToggleIcon } from "./components/icons/PanelsToggleIcon"
 import {
     DEFAULT_LEFT_SIDEBAR_WIDTH,
     DEFAULT_RIGHT_SIDEBAR_WIDTH,
@@ -299,6 +299,13 @@ function App() {
                 return
             }
 
+            if (event.ctrlKey && event.shiftKey && event.key === "\\") {
+                event.preventDefault()
+                closeContextMenu()
+                setAreSidebarsHidden((previousHiddenState) => !previousHiddenState)
+                return
+            }
+
             const commandId = resolveCanvasCommandByKeyboardEvent(event)
             if (!commandId) {
                 return
@@ -333,16 +340,12 @@ function App() {
                 <div className="pointer-events-none absolute left-4 top-4 z-40">
                     <div className="pointer-events-auto inline-flex items-center gap-3 rounded-xl border border-border/70 bg-background/92 px-3 py-2 shadow-lg backdrop-blur-md transition-all duration-200">
                         <div className="max-w-56 truncate text-sm font-medium">{activeThread.title}</div>
-                        <button
-                            type="button"
-                            className="rounded-md p-1.5 text-foreground transition-colors hover:bg-accent"
-                            onClick={() => {
+                        <PanelsToggleButton
+                            isMinimized={areSidebarsHidden}
+                            onToggle={() => {
                                 setAreSidebarsHidden(false)
                             }}
-                            aria-label="显示界面栏"
-                        >
-                            <PanelsToggleIcon className="h-4 w-4" />
-                        </button>
+                        />
                     </div>
                 </div>
             ) : null}
@@ -351,7 +354,7 @@ function App() {
                 {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
                         ref={leftSidebarHostRef}
-                        className="h-full shrink-0 overflow-hidden"
+                        className="h-full shrink-0 overflow-visible"
                         style={{ width: leftSidebarWidth }}
                     >
                         <LeftConversationSidebar
@@ -359,9 +362,14 @@ function App() {
                             cardCount={cards.length}
                             rootNodeCount={rootNodeCount}
                             themeMode={themeMode}
-                            onTogglePanels={() => {
-                                setAreSidebarsHidden(true)
-                            }}
+                            panelsToggleControl={
+                                <PanelsToggleButton
+                                    isMinimized={areSidebarsHidden}
+                                    onToggle={() => {
+                                        setAreSidebarsHidden(true)
+                                    }}
+                                />
+                            }
                             onToggleTheme={() => {
                                 setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
                             }}
