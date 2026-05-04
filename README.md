@@ -1,4 +1,4 @@
-# 🌿 ForkMind (分叉思维)
+﻿# 🌿 ForkMind (分叉思维)
 
 ![ForkMind Banner](./banner.png)
 
@@ -57,13 +57,13 @@ ForkMind 在发起对话请求时，会在内存中执行以下操作：
 - [x] 阶段 1：数据模型定稿（`BaseNode/ChatNode/NoteNode` 可扩展类型、`parentId` 主链、`referenceNodeIds` 参考链、位置与尺寸字段）。
 - [x] 阶段 2：Zustand 业务操作层（语义化 actions、`activeNodeId` 选中态、`undo/redo` 历史栈、防成环父子关系校验、Figma 风格删除降级策略）。
 - [x] 阶段 3：单页三栏 UI 壳（左侧会话栏/中间无限画布/右侧编辑栏，左右栏可收起；右栏由 `activeNodeId` 驱动，`chat` 双框与 `note` 单框切换，可选 `motion` 实现切换动画）。
-- [ ] 阶段 4：画布与节点面板联动（tldraw 节点和 Store 双向同步；选中节点即编辑目标；拖拽保持市面常见无限画布交互心智；支持按住拖拽绘制卡片尺寸，贴近 Figma 创建手感；右键菜单替换为 ForkMind 自定义业务菜单）。
+- [x] 阶段 4：画布与节点面板联动（tldraw 节点和 Store 双向同步；选中节点即编辑目标；拖拽保持市面常见无限画布交互心智；支持按住拖拽绘制卡片尺寸，贴近 Figma 创建手感；右键菜单替换为 ForkMind 自定义业务菜单）。
 - [ ] 阶段 5：Markdown 渲染与编辑体验（卡片支持 Markdown 展示；右栏编辑与卡片内容单一数据源同步；固定宽度 + 最大高度 + 内部滚动方案落地）。
 - [ ] 阶段 6：多会话管理（新建会话、切换会话、卡片跨会话复制、会话列表交互完善）。
 - [ ] 阶段 7：Wails Bridge 契约层（React DTO 与 Go DTO 对齐、统一错误协议）。
 - [ ] 阶段 8：Go 上下文组装算法（`parentId` 主链遍历 + `referenceNodeIds` 参考注入 + 文本锚点追问上下文拼装）。
 - [ ] 阶段 9：模型调用层（BYOK 云模型与本地 Ollama 的统一 Provider 入口）。
-- [ ] 阶段 10：本地 JSON 持久化（会话保存、加载、损坏恢复）。
+- [ ] 阶段 10：本地 JSON 持久化与 JSON 剪贴板（会话保存、加载、损坏恢复；支持复制为 ForkMind JSON、从 JSON 剪贴板粘贴，并在外部数据进入 Store 前执行 validate / normalize）。
 - [ ] 阶段 11：质量收敛与发布准备（Go 单测、日志与错误码、构建与回归检查、Markdown 渲染性能优化与历史系统一致性评估）。
 
 ## 🔭 未来展望 (Roadmap)
