@@ -17,6 +17,9 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
+		Debug: options.Debug{
+			OpenInspectorOnStartup: true, // 启动时直接自动弹开 F12！
+		},
 		Title:  "ForkMind",
 		Width:  1024,
 		Height: 768,
