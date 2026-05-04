@@ -16,6 +16,28 @@ import {
     type syncStableArrowProjection as SyncStableArrowProjectionFn,
 } from "./useCanvasBridge.projection"
 
+/**
+ * 判断画布里的卡片 shape 是否已经和 Store 目标状态一致
+ * 一致时跳过 updateShapes 避免把同一份最终状态重复写回 tldraw
+ */
+function isForkMindCardShapeSynced(
+    currentShape: ForkMindCardShape,
+    nextX: number,
+    nextY: number,
+    nextProps: ForkMindCardShape["props"],
+): boolean {
+    return (
+        currentShape.x === nextX &&
+        currentShape.y === nextY &&
+        currentShape.props.w === nextProps.w &&
+        currentShape.props.h === nextProps.h &&
+        currentShape.props.cardType === nextProps.cardType &&
+        currentShape.props.userPrompt === nextProps.userPrompt &&
+        currentShape.props.aiResponse === nextProps.aiResponse &&
+        currentShape.props.noteContent === nextProps.noteContent
+    )
+}
+
 interface UseCanvasBridgeCanvasSyncParams {
     canvasEditor: Editor | null
     cards: ConversationCard[]
@@ -122,6 +144,19 @@ export function useCanvasBridgeCanvasSync({
                             y: card.position.y,
                             props: nextProps,
                         })
+                        continue
+                    }
+
+                    const existingShape = canvasEditor.getShape(existingShapeId)
+                    if (
+                        existingShape?.type === FORK_MIND_CARD_SHAPE_TYPE &&
+                        isForkMindCardShapeSynced(
+                            existingShape,
+                            card.position.x,
+                            card.position.y,
+                            nextProps,
+                        )
+                    ) {
                         continue
                     }
 
