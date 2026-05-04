@@ -145,6 +145,7 @@ export interface ConversationStoreState {
     replaceNodesFromClipboard: (input: ReplaceNodesFromClipboardInput) => string[]
 
     moveNode: (nodeId: string, nextPosition: ConversationCardPosition) => void
+    resizeNode: (nodeId: string, nextSize: ConversationCardSize) => void
     setNodeParent: (nodeId: string, parentId: string | null) => void
     setNodeReferences: (nodeId: string, referenceNodeIds: string[]) => void
 

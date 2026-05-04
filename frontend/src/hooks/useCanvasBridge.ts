@@ -35,6 +35,7 @@ interface UseCanvasBridgeParams {
         noteContent?: string
     }) => string
     moveNode: (nodeId: string, nextPosition: { x: number; y: number }) => void
+    resizeNode: (nodeId: string, nextSize: { mode: "auto" | "fixed"; width: number; minHeight: number }) => void
     setNodeParent: (nodeId: string, parentId: string | null) => void
     setNodeReferences: (nodeId: string, referenceNodeIds: string[]) => void
     deleteNodes: (nodeIds: string[]) => void
@@ -78,6 +79,7 @@ export function useCanvasBridge({
     addChatNode,
     addNoteNode,
     moveNode,
+    resizeNode,
     setNodeParent,
     setNodeReferences,
     deleteNodes,
@@ -271,6 +273,7 @@ export function useCanvasBridge({
         clearPointerListeners,
         setActiveNodeId,
         moveNode,
+        resizeNode,
         setNodeParent,
         setNodeReferences,
         deleteNodes,

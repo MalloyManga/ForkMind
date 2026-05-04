@@ -673,6 +673,49 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
+     * 调整节点尺寸
+     * 由 tldraw 原生 resize 在 pointerup 后提交
+     * 用户手动调整过尺寸后进入 fixed 模式 避免后续内容变化立即覆盖用户尺寸选择
+     */
+    resizeNode: (nodeId, nextSize) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (
+                !targetNode ||
+                (
+                    targetNode.size.mode === nextSize.mode &&
+                    targetNode.size.width === nextSize.width &&
+                    targetNode.size.minHeight === nextSize.minHeight
+                )
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const nextCards = state.activeThread.cards.map((node) =>
+                node.id === nodeId
+                    ? {
+                        ...node,
+                        size: { ...nextSize },
+                        updatedAt: now,
+                    }
+                    : node,
+            )
+
+            const snapshot: ConversationSnapshot = {
+                thread: cloneThread(state.activeThread),
+                activeNodeId: state.activeNodeId,
+            }
+
+            return {
+                activeThread: { ...state.activeThread, cards: nextCards },
+                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
+                futureSnapshots: [],
+            }
+        })
+    },
+
+    /**
      * 变更父节点关系。
      * 关键约束：禁止自指向、禁止成环、父节点不存在时自动降级为根节点。
      */

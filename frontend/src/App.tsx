@@ -94,6 +94,7 @@ function App() {
     const addNoteNode = useConversationStore((state) => state.addNoteNode)
     const deleteNodes = useConversationStore((state) => state.deleteNodes)
     const moveNode = useConversationStore((state) => state.moveNode)
+    const resizeNode = useConversationStore((state) => state.resizeNode)
     const setNodeParent = useConversationStore((state) => state.setNodeParent)
     const setNodeReferences = useConversationStore((state) => state.setNodeReferences)
     const updateChatPrompt = useConversationStore((state) => state.updateChatPrompt)
@@ -139,6 +140,7 @@ function App() {
         addChatNode,
         addNoteNode,
         moveNode,
+        resizeNode,
         setNodeParent,
         setNodeReferences,
         deleteNodes,

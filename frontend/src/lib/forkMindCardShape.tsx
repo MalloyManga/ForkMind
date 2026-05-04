@@ -1,4 +1,12 @@
-import { HTMLContainer, Rectangle2d, ShapeUtil, T, type TLShape } from "tldraw"
+import {
+    HTMLContainer,
+    Rectangle2d,
+    resizeBox,
+    ShapeUtil,
+    T,
+    type TLResizeInfo,
+    type TLShape,
+} from "tldraw"
 import type { HTMLAttributes } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeSanitize from "rehype-sanitize"
@@ -97,15 +105,20 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
     }
 
     override canResize() {
-        return false
+        return true
     }
 
     override hideResizeHandles() {
-        return true
+        return false
     }
 
     override hideRotateHandle() {
         return true
+    }
+
+    override onResize(shape: ForkMindCardShape, info: TLResizeInfo<ForkMindCardShape>) {
+        // tldraw 只负责计算 resize 过程中的临时 shape Store 回写由 pointerup 的 bridge 层完成
+        return resizeBox(shape, info, { minWidth: 180, minHeight: 120 })
     }
 
     override getGeometry(shape: ForkMindCardShape) {

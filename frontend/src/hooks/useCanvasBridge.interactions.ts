@@ -1,6 +1,7 @@
 ﻿import { useEffect, type MutableRefObject } from "react"
 import type { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard } from "../domain/conversation/types"
+import { FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
 import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
     type ArrowAnchorOverride,
@@ -22,6 +23,7 @@ interface UseCanvasBridgeInteractionsParams {
     clearPointerListeners: () => void
     setActiveNodeId: (nodeId: string | null) => void
     moveNode: (nodeId: string, nextPosition: { x: number; y: number }) => void
+    resizeNode: (nodeId: string, nextSize: { mode: "auto" | "fixed"; width: number; minHeight: number }) => void
     setNodeParent: (nodeId: string, parentId: string | null) => void
     setNodeReferences: (nodeId: string, referenceNodeIds: string[]) => void
     deleteNodes: (nodeIds: string[]) => void
@@ -45,6 +47,7 @@ export function useCanvasBridgeInteractions({
     clearPointerListeners,
     setActiveNodeId,
     moveNode,
+    resizeNode,
     setNodeParent,
     setNodeReferences,
     deleteNodes,
@@ -362,7 +365,7 @@ export function useCanvasBridgeInteractions({
     }, [canvasEditor, isUserMultiSelectionRef])
 
     /**
-     * 节点拖拽结束后 把新坐标提交回 Store
+     * 节点拖拽或 resize 结束后 把新坐标和尺寸提交回 Store
      */
     useEffect(() => {
         if (!canvasEditor) {
@@ -387,17 +390,34 @@ export function useCanvasBridgeInteractions({
                     continue
                 }
 
-                if (
-                    selectedShape.x === sourceNode.position.x &&
-                    selectedShape.y === sourceNode.position.y
-                ) {
+                const hasPositionChanged =
+                    selectedShape.x !== sourceNode.position.x ||
+                    selectedShape.y !== sourceNode.position.y
+
+                if (hasPositionChanged) {
+                    moveNode(selectedNodeId, {
+                        x: selectedShape.x,
+                        y: selectedShape.y,
+                    })
+                }
+
+                if (selectedShape.type !== FORK_MIND_CARD_SHAPE_TYPE) {
                     continue
                 }
 
-                moveNode(selectedNodeId, {
-                    x: selectedShape.x,
-                    y: selectedShape.y,
-                })
+                const nextSize = {
+                    mode: "fixed" as const,
+                    width: selectedShape.props.w,
+                    minHeight: selectedShape.props.h,
+                }
+                const hasSizeChanged =
+                    sourceNode.size.mode !== nextSize.mode ||
+                    sourceNode.size.width !== nextSize.width ||
+                    sourceNode.size.minHeight !== nextSize.minHeight
+
+                if (hasSizeChanged) {
+                    resizeNode(selectedNodeId, nextSize)
+                }
             }
         }
 
@@ -405,7 +425,7 @@ export function useCanvasBridgeInteractions({
         return () => {
             window.removeEventListener("pointerup", handlePointerUp, true)
         }
-    }, [canvasEditor, cardsRef, isApplyingStoreToCanvasRef, moveNode])
+    }, [canvasEditor, cardsRef, isApplyingStoreToCanvasRef, moveNode, resizeNode])
 
     /**
      * 拖拽已经存在的箭头端点之后 吸附到8个锚点上 并进行存储记录用户自定的连接锚点
