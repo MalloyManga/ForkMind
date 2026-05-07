@@ -17,8 +17,10 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "10.1.0",
+    "rehype-katex": "^7.0.1",
     "rehype-sanitize": "6.0.0",
     "remark-gfm": "4.0.1",
+    "remark-math": "^6.0.0",
     "shadcn": "^4.1.2",
     "tailwind-merge": "^3.5.0",
     "tldraw": "4.5.7",
@@ -31,6 +33,7 @@
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
     "@vitejs/plugin-react": "^6.0.1",
+    "shiki": "^4.0.2",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"
