@@ -1,4 +1,4 @@
-import {
+﻿import {
     HTMLContainer,
     Rectangle2d,
     resizeBox,

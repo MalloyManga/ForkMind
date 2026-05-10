@@ -1,6 +1,8 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react"
 import { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
+import { assertNever } from "../lib/utils"
+import type { AddConversationNodeDraftInput } from "../stores/conversationStore"
 import { StartLinkDragInput } from "./canvasLinkTypes"
 import type { CanvasTool } from "./canvasToolTypes"
 import {
@@ -13,7 +15,6 @@ import { useCanvasBridgeCreation } from "./useCanvasBridge.creation"
 import { useCanvasBridgeCanvasSync } from "./useCanvasBridge.canvasSync"
 import { useCanvasBridgeLinkDrag } from "./useCanvasBridge.linkDrag"
 import { useCanvasBridgeInteractions } from "./useCanvasBridge.interactions"
-import { assertNever } from "@/lib/utils.ts"
 
 interface UseCanvasBridgeParams {
     cards: ConversationCard[]
@@ -21,19 +22,7 @@ interface UseCanvasBridgeParams {
     currentCanvasTool: CanvasTool
     setActiveNodeId: (nodeId: string | null) => void
     setCurrentCanvasTool: (canvasTool: CanvasTool) => void // 真正修改 App 当前工具状态的 React setState
-    addChatNode: (input?: {
-        parentId?: string | null
-        position?: { x: number; y: number }
-        size?: { width?: number; minHeight?: number }
-        userPrompt?: string
-        aiResponse?: string
-    }) => string
-    addNoteNode: (input?: {
-        parentId?: string | null
-        position?: { x: number; y: number }
-        size?: { width?: number; minHeight?: number }
-        noteContent?: string
-    }) => string
+    addNode: (input: AddConversationNodeDraftInput) => string
     moveNode: (nodeId: string, nextPosition: { x: number; y: number }) => void
     resizeNode: (nodeId: string, nextSize: { mode: "auto" | "fixed"; width: number; minHeight: number }) => void
     setNodeParent: (nodeId: string, parentId: string | null) => void
@@ -76,8 +65,7 @@ export function useCanvasBridge({
     currentCanvasTool,
     setActiveNodeId,
     setCurrentCanvasTool,
-    addChatNode,
-    addNoteNode,
+    addNode,
     moveNode,
     resizeNode,
     setNodeParent,
@@ -127,39 +115,6 @@ export function useCanvasBridge({
     }, [canvasEditor, currentCanvasTool])
 
     /**
-     * 根据当前创建模式创建节点
-     * cardType 决定创建 chat 还是 note
-     * position 是新卡片左上角在画布坐标系中的位置；
-     * parentId 只有“从某张卡片继续分叉创建”时才会传
-     * 空白区创建与 handle 拖拽创建都统一走此入口
-     */
-    const createNodeByType = useCallback(
-        (
-            cardType: ConversationNodeType,
-            position: Point,
-            parentId: string | null = null,
-        ): string => {
-            switch (cardType) {
-                case "chat":
-                    return addChatNode({
-                        parentId,
-                        position,
-                        userPrompt: "",
-                        aiResponse: "",
-                    })
-                case "note":
-                    return addNoteNode({
-                        parentId,
-                        position,
-                        noteContent: "",
-                    })
-            }
-            return assertNever(cardType)
-        },
-        [addChatNode, addNoteNode],
-    )
-
-    /**
      * 接收cardType创建卡片类型 position卡片位置 父nodeId(直接创建时为null)
      * 返回创建成功之后的NodeId
      */
@@ -170,40 +125,39 @@ export function useCanvasBridge({
             parentId = null,
             size,
         }: CommitNodeCreationInput): string => {
-            let createdNodeId: string
+            let nodeDraft: AddConversationNodeDraftInput
 
-            if (!size) {
-                createdNodeId = createNodeByType(cardType, position, parentId)
+            switch (cardType) {
+                case "chat":
+                    nodeDraft = {
+                        cardType,
+                        parentId,
+                        position,
+                        size,
+                        userPrompt: "",
+                        aiResponse: "",
+                    }
+                    break
+                case "note":
+                    nodeDraft = {
+                        cardType,
+                        parentId,
+                        position,
+                        size,
+                        noteContent: "",
+                    }
+                    break
+                default:
+                    assertNever(cardType)
             }
-            else {
-                switch (cardType) {
-                    case "chat":
-                        createdNodeId = addChatNode({
-                            parentId,
-                            position,
-                            size,
-                            userPrompt: "",
-                            aiResponse: "",
-                        })
-                        break
-                    case "note":
-                        createdNodeId = addNoteNode({
-                            parentId,
-                            position,
-                            size,
-                            noteContent: "",
-                        })
-                        break
-                    default:
-                        return assertNever(cardType)
-                }
-            }
+
+            const createdNodeId = addNode(nodeDraft)
 
             setActiveNodeId(createdNodeId)
             setCurrentCanvasTool("move") // 创建成功之后都回退到Move
             return createdNodeId
         },
-        [addChatNode, addNoteNode, createNodeByType, setActiveNodeId, setCurrentCanvasTool],
+        [addNode, setActiveNodeId, setCurrentCanvasTool],
     )
 
     /**

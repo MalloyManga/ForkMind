@@ -8,6 +8,8 @@ import type {
     ConversationThread,
 } from "../../domain/conversation/types"
 import type {
+    AddConversationNodeDraftInput,
+    AddNodeDraftInput,
     CanvasClipboardPayload,
     ClipboardNodeSnapshot,
     ConversationSnapshot,
@@ -36,6 +38,49 @@ interface RemappedClipboardRelations {
 interface CreatePastedNodesResult {
     pastedNodeIds: string[]
     pastedNodes: ConversationCard[]
+}
+
+/**
+ * Store 内部 chat 节点创建实现
+ * input 来自 addNode 的统一 draft 入口 或 fork 业务动作
+ * 返回值是补齐 id 时间戳 关系和尺寸后的完整 Store 节点
+ */
+function addChatNode(
+    input: AddNodeDraftInput<"chat">,
+    nodes: readonly ConversationCard[],
+): ConversationCard {
+    return createChatNode(input, nodes)
+}
+
+/**
+ * Store 内部 note 节点创建实现
+ * input 来自 addNode 的统一 draft 入口 或 fork 业务动作
+ * 返回值是补齐 id 时间戳 关系和尺寸后的完整 Store 节点
+ */
+function addNoteNode(
+    input: AddNodeDraftInput<"note">,
+    nodes: readonly ConversationCard[],
+): ConversationCard {
+    return createNoteNode(input, nodes)
+}
+
+/**
+ * Store 新增节点的唯一分发点
+ * input.cardType 是业务判别字段 用来选择具体节点工厂
+ * hooks/components 只调用 addNode 不再直接依赖 chat/note 分支函数
+ */
+function createNodeFromDraft(
+    input: AddConversationNodeDraftInput,
+    nodes: readonly ConversationCard[],
+): ConversationCard {
+    switch (input.cardType) {
+        case "chat":
+            return addChatNode(input, nodes)
+        case "note":
+            return addNoteNode(input, nodes)
+    }
+
+    return assertNever(input)
 }
 
 /**
@@ -244,59 +289,15 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
-     * 统一新增节点入口 调用层无需判断 NoteType
-     * inout 为草稿入参
+     * 统一新增节点入口
+     * input 为 UI 或画布桥接层提交的节点草稿
+     * 返回值是新节点 id 用于同步 activeNodeId 和 tldraw 选择态
      */
     addNode: (input) => {
-        switch (input.cardType) {
-            case "chat":
-                return get().addChatNode(input)
-            case "note":
-                return get().addNoteNode(input)
-        }
-
-        return assertNever(input)
-    },
-
-    /**
-     * 新增 chat 节点 并将其设为 active
-     */
-    addChatNode: (input = {}) => {
         let createdNodeId = ""
 
         set((state) => {
-            const nextNode = createChatNode(input, state.activeThread.cards)
-            createdNodeId = nextNode.id
-
-            const nextThread: ConversationThread = {
-                ...state.activeThread,
-                cards: [...state.activeThread.cards, nextNode],
-            }
-
-            const snapshot: ConversationSnapshot = {
-                thread: cloneThread(state.activeThread),
-                activeNodeId: state.activeNodeId,
-            }
-
-            return {
-                activeThread: nextThread,
-                activeNodeId: nextNode.id,
-                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
-                futureSnapshots: [],
-            }
-        })
-
-        return createdNodeId
-    },
-
-    /**
-     * 新增 note 节点 并将其设为 active
-     */
-    addNoteNode: (input = {}) => {
-        let createdNodeId = ""
-
-        set((state) => {
-            const nextNode = createNoteNode(input, state.activeThread.cards)
+            const nextNode = createNodeFromDraft(input, state.activeThread.cards)
             createdNodeId = nextNode.id
 
             const nextThread: ConversationThread = {
@@ -332,7 +333,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 return {}
             }
 
-            const nextNode = createChatNode(
+            const nextNode = addChatNode(
                 {
                     parentId: sourceNode.id,
                     userPrompt: input.userPrompt,
@@ -378,7 +379,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 return {}
             }
 
-            const nextNode = createNoteNode(
+            const nextNode = addNoteNode(
                 {
                     parentId: sourceNode.id,
                     noteContent: input.noteContent,

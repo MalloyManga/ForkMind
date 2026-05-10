@@ -90,8 +90,7 @@ function App() {
     const activeNode = useConversationStore(selectActiveNode)
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
-    const addChatNode = useConversationStore((state) => state.addChatNode)
-    const addNoteNode = useConversationStore((state) => state.addNoteNode)
+    const addNode = useConversationStore((state) => state.addNode)
     const deleteNodes = useConversationStore((state) => state.deleteNodes)
     const moveNode = useConversationStore((state) => state.moveNode)
     const resizeNode = useConversationStore((state) => state.resizeNode)
@@ -137,8 +136,7 @@ function App() {
         setActiveNodeId,
         currentCanvasTool,
         setCurrentCanvasTool,
-        addChatNode,
-        addNoteNode,
+        addNode,
         moveNode,
         resizeNode,
         setNodeParent,

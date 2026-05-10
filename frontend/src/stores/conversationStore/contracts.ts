@@ -127,8 +127,6 @@ export interface ConversationStoreState {
     setActiveThreadCards: (cards: ConversationCard[]) => void
 
     addNode: (input: AddConversationNodeDraftInput) => string
-    addChatNode: (input?: AddNodeDraftInput<"chat">) => string
-    addNoteNode: (input?: AddNodeDraftInput<"note">) => string
     forkChatNode: (input: ForkChatNodeInput) => string | null
     forkNoteNode: (input: ForkNoteNodeInput) => string | null
 
