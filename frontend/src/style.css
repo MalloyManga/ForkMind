@@ -322,3 +322,8 @@ html {
   .fm-card-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--fm-scrollbar-thumb-hover) !important;
 }
+
+.katex {
+  /* 公式颜色跟随正文颜色 */
+  color: var(--foreground);
+}

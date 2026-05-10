@@ -1,7 +1,11 @@
 ﻿import ReactMarkdown from "react-markdown"
-import rehypeSanitize from "rehype-sanitize"
-import remarkGfm from "remark-gfm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    markdownComponents,
+    markdownRehypePlugins,
+    markdownRemarkPlugins,
+    normalizeMarkdownForPreview,
+} from "@/lib/markdownRendering"
 
 interface MarkdownPreviewProps {
     title: string
@@ -13,6 +17,8 @@ interface MarkdownPreviewProps {
  * 右栏编辑时提供实时预览，方便用户确认排版与语义
  */
 export function MarkdownPreview({ title, markdown }: MarkdownPreviewProps) {
+    const previewMarkdown = normalizeMarkdownForPreview(markdown.trim())
+
     return (
         <Card size="sm" className="gap-2">
             <CardHeader className="pb-0">
@@ -20,8 +26,12 @@ export function MarkdownPreview({ title, markdown }: MarkdownPreviewProps) {
             </CardHeader>
             <CardContent>
                 <div className="max-h-52 overflow-y-auto rounded-lg border border-input bg-background p-3 text-sm leading-6">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                        {markdown.trim().length > 0 ? markdown : "_(empty)_"}
+                    <ReactMarkdown
+                        components={markdownComponents}
+                        remarkPlugins={markdownRemarkPlugins}
+                        rehypePlugins={markdownRehypePlugins}
+                    >
+                        {previewMarkdown.length > 0 ? previewMarkdown : "_(empty)_"}
                     </ReactMarkdown>
                 </div>
             </CardContent>

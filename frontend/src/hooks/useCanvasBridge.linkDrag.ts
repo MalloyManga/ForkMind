@@ -276,10 +276,10 @@ export function useCanvasBridgeLinkDrag({
                     props: {
                         w: DEFAULT_CARD_WIDTH,
                         h: session.ghostHeight,
-                        cardType: session.ghostCardType,
-                        userPrompt: "",
-                        aiResponse: "",
-                        noteContent: "",
+                        type: session.ghostCardType,
+                        ...(session.ghostCardType === "chat"
+                            ? { userPrompt: "", aiResponse: "" }
+                            : { noteContent: "" }),
                     },
                 } as unknown as Parameters<Editor["createShape"]>[0]
                 editor.createShape(ghostShape)
@@ -476,10 +476,10 @@ export function useCanvasBridgeLinkDrag({
                     props: {
                         w: DEFAULT_CARD_WIDTH,
                         h: currentGhostHeight,
-                        cardType: currentCreationType,
-                        userPrompt: "",
-                        aiResponse: "",
-                        noteContent: "",
+                        type: currentCreationType,
+                        ...(currentCreationType === "chat"
+                            ? { userPrompt: "", aiResponse: "" }
+                            : { noteContent: "" }),
                     },
                 } as unknown as Parameters<Editor["createShape"]>[0]
 

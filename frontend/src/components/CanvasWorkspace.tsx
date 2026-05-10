@@ -53,8 +53,10 @@ export function CanvasWorkspace({
         [canvasEditor],
     )
 
+    /**
+     * 注册自定义 card 和 arrow shape util 让 tldraw 认识业务卡片与箭头
+     */
     const canvasShapeUtils = useMemo(
-        // 这里注册我们自定义的 card 和 arrow shape util 让 tldraw 认识业务卡片与箭头
         () => [ForkMindCardShapeUtil, ForkMindArrowShapeUtil],
         [],
     )

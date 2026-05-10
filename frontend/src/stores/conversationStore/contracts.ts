@@ -24,7 +24,7 @@ type StoreGeneratedNodeKeys = "id" | "createdAt" | "updatedAt"
  * T extends unknown 自动遍历 T(联合类型) 同时永远为 true
  * 从 T 联合类型接口当中删去 K(key) 字段
  */
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, Extract<keyof T, K>> : never
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, Extract<keyof T, K>> : never
 
 /**
  * 单独一种 Node 类型的完整新增节点入参

@@ -11,6 +11,7 @@ export type {
     ForkNoteNodeInput,
     PasteNodesFromClipboardInput,
     ReplaceNodesFromClipboardInput,
+    DistributiveOmit
 } from "./contracts"
 export { useConversationStore } from "./store"
 export {

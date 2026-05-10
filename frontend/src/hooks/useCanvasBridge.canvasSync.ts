@@ -1,6 +1,7 @@
 import { useEffect, type MutableRefObject } from "react"
 import { type Editor, type TLShapeId } from "tldraw"
 import type { ConversationCard } from "../domain/conversation/types"
+import { assertNever } from "../lib/utils"
 import { type ForkMindCardShape, FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
 import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
@@ -17,7 +18,7 @@ import {
 } from "./useCanvasBridge.projection"
 
 /**
- * 判断画布里的卡片 shape 是否已经和 Store 目标状态一致
+ * 判断画布里的卡片 shape 是否已经和 Store 目标状态完全一致
  * 一致时跳过 updateShapes 避免把同一份最终状态重复写回 tldraw
  */
 function isForkMindCardShapeSynced(
@@ -31,11 +32,86 @@ function isForkMindCardShapeSynced(
         currentShape.y === nextY &&
         currentShape.props.w === nextProps.w &&
         currentShape.props.h === nextProps.h &&
-        currentShape.props.cardType === nextProps.cardType &&
-        currentShape.props.userPrompt === nextProps.userPrompt &&
-        currentShape.props.aiResponse === nextProps.aiResponse &&
-        currentShape.props.noteContent === nextProps.noteContent
+        areSameForkMindCardShapeProps(currentShape.props, nextProps)
     )
+}
+
+/**
+ * 比较同一业务卡片投影后的 props 是否一致
+ * @param currentProps 入参来自 tldraw 当前 shape props
+ * @param nextProps 入参来自 Store card 本轮重新投影的目标 props
+ * @returns 返回 true 表示无需 updateShapes false 表示 Store 投影需要覆盖到画布
+ */
+function areSameForkMindCardShapeProps(
+    currentProps: ForkMindCardShape["props"],
+    nextProps: ForkMindCardShape["props"],
+): boolean {
+    if (currentProps.type !== nextProps.type) {
+        return false
+    }
+
+    switch (nextProps.type) {
+        case "chat":
+            return (
+                currentProps.type === "chat" &&
+                currentProps.userPrompt === nextProps.userPrompt &&
+                currentProps.aiResponse === nextProps.aiResponse
+            )
+        case "note":
+            return currentProps.type === "note" &&
+                currentProps.noteContent === nextProps.noteContent
+    }
+
+    return assertNever(nextProps)
+}
+
+/**
+ * 计算卡片类型对应的默认画布高度
+ * @param card Store 中的业务 card 用于读取 card.type 并暴露新增类型的编译期提醒
+ * @returns 返回 tldraw 自定义 shape 本轮同步时应使用的默认高度
+ * 只影响显示高度 不改 Store 原文内容
+ */
+function getProjectedCardHeight(card: ConversationCard): number {
+    switch (card.type) {
+        case "chat":
+            return CHAT_CARD_HEIGHT
+        case "note":
+            return NOTE_CARD_HEIGHT
+    }
+
+    return assertNever(card)
+}
+
+/**
+ * 将 Store 业务节点转换为 tldraw 自定义 shape props
+ * @param card Store 中的 ConversationCard 是业务层唯一事实源
+ * @returns 返回 tldraw shape props 只包含画布渲染需要的字段
+ * 新增卡片类型时必须在这里补齐投影规则
+ */
+function createForkMindCardShapeProps(card: ConversationCard): ForkMindCardShape["props"] {
+    const projectedHeight = getProjectedCardHeight(card)
+    const baseProps = {
+        w: card.size.width,
+        h: Math.max(card.size.minHeight, projectedHeight),
+    }
+
+    switch (card.type) {
+        case "chat":
+            return {
+                ...baseProps,
+                type: card.type,
+                userPrompt: card.userPrompt,
+                aiResponse: card.aiResponse,
+            }
+        case "note":
+            return {
+                ...baseProps,
+                type: card.type,
+                noteContent: card.noteContent,
+            }
+    }
+
+    return assertNever(card)
 }
 
 interface UseCanvasBridgeCanvasSyncParams {
@@ -125,15 +201,7 @@ export function useCanvasBridgeCanvasSync({
 
                 for (const card of cards) {
                     const nextShapeId = toCanvasNodeShapeId(card.id)
-                    const nextHeight = card.type === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
-                    const nextProps: ForkMindCardShape["props"] = {
-                        w: card.size.width,
-                        h: Math.max(card.size.minHeight, nextHeight),
-                        cardType: card.type,
-                        userPrompt: card.type === "chat" ? card.userPrompt : "",
-                        aiResponse: card.type === "chat" ? card.aiResponse : "",
-                        noteContent: card.type === "note" ? card.noteContent : "",
-                    }
+                    const nextProps = createForkMindCardShapeProps(card)
 
                     const existingShapeId = nodeShapeMap.get(card.id)
                     if (!existingShapeId) {
