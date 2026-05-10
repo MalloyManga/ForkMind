@@ -14,8 +14,9 @@ import {
     markdownRemarkPlugins,
     normalizeMarkdownForPreview,
 } from "./markdownRendering"
-import type { ConversationCard, BaseNode } from '../domain/conversation/types'
-import type { DistributiveOmit } from '../stores/useConversationStore'
+import type { BaseNode, ConversationCard } from "../domain/conversation/types"
+import type { DistributiveOmit } from "../types/typeUtils"
+import { assertNever } from "./utils"
 
 /**
  * 卡片唯一身份标识
@@ -23,7 +24,7 @@ import type { DistributiveOmit } from '../stores/useConversationStore'
 export const FORK_MIND_CARD_SHAPE_TYPE = "forkmind-card"
 
 // BaseNode 接口里删除掉了type字段之后 剩下的字段A 再从ConversationCard当中分别删除字段A 得到联合类型
-type cardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode, 'cardType'>>
+type CardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode, "cardType">>
 
 /**
  * 每种卡片独有字段
@@ -31,7 +32,7 @@ type cardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode,
 export type ForkMindCardShapeProps = {
     w: number
     h: number
-} & cardShapeOwnProps
+} & CardShapeOwnProps
 
 declare module "@tldraw/tlschema" {
     interface TLGlobalShapePropsMap {
@@ -109,13 +110,10 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
     }
 
     override component(shape: ForkMindCardShape) {
-        return (
-            <HTMLContainer
-                id={shape.id}
-                className="fm-card pointer-events-auto h-full w-full overflow-hidden rounded-2xl border border-zinc-300/80 bg-card shadow-sm theme-dark:border-zinc-700/80"
-            >
-                <div className="flex h-full w-full flex-col overflow-hidden">
-                    {shape.props.cardType === "chat" ? (
+        const cardContent = (() => {
+            switch (shape.props.cardType) {
+                case "chat":
+                    return (
                         <>
                             <section className="flex min-h-0 flex-1 flex-col border-b border-zinc-200/80 px-4 py-3 theme-dark:border-zinc-800">
                                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -147,7 +145,9 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                 </div>
                             </section>
                         </>
-                    ) : (
+                    )
+                case "note":
+                    return (
                         <section className="flex min-h-0 flex-1 flex-col px-4 py-3">
                             <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
                                 <ReactMarkdown
@@ -159,7 +159,19 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                 </ReactMarkdown>
                             </div>
                         </section>
-                    )}
+                    )
+            }
+
+            return assertNever(shape.props)
+        })()
+
+        return (
+            <HTMLContainer
+                id={shape.id}
+                className="fm-card pointer-events-auto h-full w-full overflow-hidden rounded-2xl border border-zinc-300/80 bg-card shadow-sm theme-dark:border-zinc-700/80"
+            >
+                <div className="flex h-full w-full flex-col overflow-hidden">
+                    {cardContent}
                 </div>
             </HTMLContainer>
         )

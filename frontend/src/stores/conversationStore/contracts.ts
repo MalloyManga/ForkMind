@@ -5,6 +5,8 @@
     ConversationNodeType,
     ConversationThread,
 } from "../../domain/conversation/types"
+export type { DistributiveOmit } from "../../types/typeUtils"
+import type { DistributiveOmit } from "../../types/typeUtils"
 
 /**
  * 按节点 type 从 ConversationCard 联合类型中取出具体节点 接口对象
@@ -17,14 +19,6 @@ type NodeByType<T extends ConversationNodeType> = Extract<ConversationCard, { ca
  * copy paste fork 手动创建都不能复用旧节点 id 和时间戳
  */
 type StoreGeneratedNodeKeys = "id" | "createdAt" | "updatedAt"
-
-/**
- * 对联合类型逐个成员执行 Omit
- * K 必须为合法的对象 key
- * T extends unknown 自动遍历 T(联合类型) 同时永远为 true
- * 从 T 联合类型接口当中删去 K(key) 字段
- */
-export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, Extract<keyof T, K>> : never
 
 /**
  * 单独一种 Node 类型的完整新增节点入参

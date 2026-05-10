@@ -67,7 +67,7 @@ function areSameForkMindCardShapeProps(
 
 /**
  * 计算卡片类型对应的默认画布高度
- * @param card Store 中的业务 card 用于读取 card.type 并暴露新增类型的编译期提醒
+ * @param card Store 中的业务 card 用于读取 card.cardType 并暴露新增类型的编译期提醒
  * @returns 返回 tldraw 自定义 shape 本轮同步时应使用的默认高度
  * 只影响显示高度 不改 Store 原文内容
  */
