@@ -1,12 +1,12 @@
 // 连接线类型：reply 走主上下文链，reference 走补充资料链。
-export const EDGE_TYPE_REPLY = "reply" as const
-export const EDGE_TYPE_REFERENCE = "reference" as const
+export const EDGE_TYPE_REPLY = "reply"
+export const EDGE_TYPE_REFERENCE = "reference"
 
 // 卡片运行状态：后续流式输出、失败重试都依赖这组枚举值。
-export const NODE_STATUS_IDLE = "idle" as const
-export const NODE_STATUS_STREAMING = "streaming" as const
-export const NODE_STATUS_DONE = "done" as const
-export const NODE_STATUS_ERROR = "error" as const
+export const NODE_STATUS_IDLE = "idle"
+export const NODE_STATUS_STREAMING = "streaming"
+export const NODE_STATUS_DONE = "done"
+export const NODE_STATUS_ERROR = "error"
 
 // 撤销/重做历史上限，防止无限增长造成内存压力。
 export const HISTORY_LIMIT = 100
