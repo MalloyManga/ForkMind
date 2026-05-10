@@ -55,7 +55,10 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         // T 为 tldraw 内部的数据校验器
         w: T.number,
         h: T.number,
-        cardType: T.string,
+        cardType: T.literalEnum("chat", "note"),
+        userPrompt: T.string.optional(),
+        aiResponse: T.string.optional(),
+        noteContent: T.string.optional(),
     }
 
     /**
