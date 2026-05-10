@@ -56,18 +56,18 @@ export function cloneNode(node: ConversationCard): ConversationCard {
         size: { ...node.size },
     }
 
-    switch (node.type) {
+    switch (node.cardType) {
         case "chat":
             return {
                 ...base,
-                type: "chat",
+                cardType: "chat",
                 userPrompt: node.userPrompt,
                 aiResponse: node.aiResponse,
             }
         case "note":
             return {
                 ...base,
-                type: "note",
+                cardType: "note",
                 noteContent: node.noteContent,
             }
     }

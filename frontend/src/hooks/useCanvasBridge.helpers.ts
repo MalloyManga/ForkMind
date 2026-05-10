@@ -99,7 +99,7 @@ const ANCHOR_SIDE_ALL: AnchorSide[] = [
  * 阶段三先落地“固定宽度 + 固定高度上限 + 内部滚动”，避免长 Markdown 把画布排版撑坏
  */
 export function getCardShapeHeight(card: ConversationCard): number {
-    const baseHeight = card.type === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
+    const baseHeight = card.cardType === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
     return Math.max(card.size.minHeight, baseHeight)
 }
 

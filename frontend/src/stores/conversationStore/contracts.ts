@@ -10,7 +10,7 @@
  * 按节点 type 从 ConversationCard 联合类型中取出具体节点 接口对象
  * NodeByType<"note">
  */
-type NodeByType<T extends ConversationNodeType> = Extract<ConversationCard, { type: T }>
+type NodeByType<T extends ConversationNodeType> = Extract<ConversationCard, { cardType: T }>
 
 /**
  * 创建节点时由 Store 负责生成的身份字段
@@ -54,7 +54,7 @@ export type AddNodeDraftInput<T extends ConversationNodeType> =
  * 所有 Node 类型的草稿新增入参联合
  */
 export type AddConversationNodeDraftInput = {
-    [T in ConversationNodeType]: AddNodeDraftInput<T> & { type: T }
+    [T in ConversationNodeType]: AddNodeDraftInput<T> & { cardType: T }
 }[ConversationNodeType]
 
 /**

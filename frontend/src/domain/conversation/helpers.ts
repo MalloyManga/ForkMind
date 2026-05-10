@@ -14,18 +14,18 @@ export function cloneConversationCard(card: ConversationCard): ConversationCard 
         referenceNodeIds: card.referenceNodeIds ? [...card.referenceNodeIds] : undefined,
     }
 
-    switch (card.type) {
+    switch (card.cardType) {
         case "chat":
             return {
                 ...clonedBaseNode,
-                type: "chat",
+                cardType: "chat",
                 userPrompt: card.userPrompt,
                 aiResponse: card.aiResponse,
             }
         case "note":
             return {
                 ...clonedBaseNode,
-                type: "note",
+                cardType: "note",
                 noteContent: card.noteContent,
             }
     }

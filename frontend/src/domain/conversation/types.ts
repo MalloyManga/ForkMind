@@ -53,7 +53,7 @@ export type ConversationNodeType = keyof CardNodeRegistry
  */
 export interface BaseNode {
     id: string
-    type: ConversationNodeType // 限制子节点type
+    cardType: ConversationNodeType // 限制子节点type
     // 当前版本只使用单父链路构造上下文（可预测、可复现）。
     parentId: string | null
     /**
@@ -73,7 +73,7 @@ export interface BaseNode {
  * ChatNode AI 对话节点
  */
 export interface ChatNode extends BaseNode {
-    type: "chat"
+    cardType: "chat"
     userPrompt: string
     aiResponse: string
 }
@@ -82,7 +82,7 @@ export interface ChatNode extends BaseNode {
  * NoteNode：纯笔记节点
  */
 export interface NoteNode extends BaseNode {
-    type: "note"
+    cardType: "note"
     noteContent: string
 }
 

@@ -46,19 +46,19 @@ function areSameForkMindCardShapeProps(
     currentProps: ForkMindCardShape["props"],
     nextProps: ForkMindCardShape["props"],
 ): boolean {
-    if (currentProps.type !== nextProps.type) {
+    if (currentProps.cardType !== nextProps.cardType) {
         return false
     }
 
-    switch (nextProps.type) {
+    switch (nextProps.cardType) {
         case "chat":
             return (
-                currentProps.type === "chat" &&
+                currentProps.cardType === "chat" &&
                 currentProps.userPrompt === nextProps.userPrompt &&
                 currentProps.aiResponse === nextProps.aiResponse
             )
         case "note":
-            return currentProps.type === "note" &&
+            return currentProps.cardType === "note" &&
                 currentProps.noteContent === nextProps.noteContent
     }
 
@@ -72,7 +72,7 @@ function areSameForkMindCardShapeProps(
  * 只影响显示高度 不改 Store 原文内容
  */
 function getProjectedCardHeight(card: ConversationCard): number {
-    switch (card.type) {
+    switch (card.cardType) {
         case "chat":
             return CHAT_CARD_HEIGHT
         case "note":
@@ -95,18 +95,18 @@ function createForkMindCardShapeProps(card: ConversationCard): ForkMindCardShape
         h: Math.max(card.size.minHeight, projectedHeight),
     }
 
-    switch (card.type) {
+    switch (card.cardType) {
         case "chat":
             return {
                 ...baseProps,
-                type: card.type,
+                cardType: card.cardType,
                 userPrompt: card.userPrompt,
                 aiResponse: card.aiResponse,
             }
         case "note":
             return {
                 ...baseProps,
-                type: card.type,
+                cardType: card.cardType,
                 noteContent: card.noteContent,
             }
     }

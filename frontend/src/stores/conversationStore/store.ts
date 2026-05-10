@@ -118,7 +118,7 @@ function createPastedNodesFromPayload(
 
         const pastedBaseNode: BaseNode = {
             id: nextNodeId,
-            type: clipboardNode.type,
+            cardType: clipboardNode.cardType,
             parentId: nextRelations.parentId,
             referenceNodeIds: nextRelations.referenceNodeIds,
             position: {
@@ -131,18 +131,18 @@ function createPastedNodesFromPayload(
             updatedAt: now,
         }
 
-        switch (clipboardNode.type) {
+        switch (clipboardNode.cardType) {
             case "chat":
                 return {
                     ...pastedBaseNode,
-                    type: "chat",
+                    cardType: "chat",
                     userPrompt: clipboardNode.userPrompt,
                     aiResponse: clipboardNode.aiResponse,
                 }
             case "note":
                 return {
                     ...pastedBaseNode,
-                    type: "note",
+                    cardType: "note",
                     noteContent: clipboardNode.noteContent,
                 }
         }
@@ -248,7 +248,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
      * inout 为草稿入参
      */
     addNode: (input) => {
-        switch (input.type) {
+        switch (input.cardType) {
             case "chat":
                 return get().addChatNode(input)
             case "note":
@@ -417,13 +417,13 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     updateChatPrompt: (nodeId, userPrompt) => {
         set((state) => {
             const targetNode = findNodeById(state.activeThread.cards, nodeId)
-            if (!targetNode || targetNode.type !== "chat" || targetNode.userPrompt === userPrompt) {
+            if (!targetNode || targetNode.cardType !== "chat" || targetNode.userPrompt === userPrompt) {
                 return {}
             }
 
             const now = createTimestamp()
             const nextCards = state.activeThread.cards.map((node) => {
-                if (node.id !== nodeId || node.type !== "chat") {
+                if (node.id !== nodeId || node.cardType !== "chat") {
                     return node
                 }
 
@@ -453,13 +453,13 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     updateChatResponse: (nodeId, aiResponse) => {
         set((state) => {
             const targetNode = findNodeById(state.activeThread.cards, nodeId)
-            if (!targetNode || targetNode.type !== "chat" || targetNode.aiResponse === aiResponse || targetNode) {
+            if (!targetNode || targetNode.cardType !== "chat" || targetNode.aiResponse === aiResponse || targetNode) {
                 return {}
             }
 
             const now = createTimestamp()
             const nextCards = state.activeThread.cards.map((node) => {
-                if (node.id !== nodeId || node.type !== "chat") {
+                if (node.id !== nodeId || node.cardType !== "chat") {
                     return node
                 }
 
@@ -489,13 +489,13 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     updateNoteContent: (nodeId, noteContent) => {
         set((state) => {
             const targetNode = findNodeById(state.activeThread.cards, nodeId)
-            if (!targetNode || targetNode.type !== "note" || targetNode.noteContent === noteContent) {
+            if (!targetNode || targetNode.cardType !== "note" || targetNode.noteContent === noteContent) {
                 return {}
             }
 
             const now = createTimestamp()
             const nextCards = state.activeThread.cards.map((node) => {
-                if (node.id !== nodeId || node.type !== "note") {
+                if (node.id !== nodeId || node.cardType !== "note") {
                     return node
                 }
 

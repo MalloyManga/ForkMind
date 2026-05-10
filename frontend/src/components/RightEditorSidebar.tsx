@@ -100,7 +100,7 @@ export function RightEditorSidebar({
                     <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 text-sm text-muted-foreground">
                         选中画布卡片后，可在这里直接编辑 Markdown 内容。
                     </div>
-                ) : activeNode.type === "chat" ? (
+                ) : activeNode.cardType === "chat" ? (
                     <div ref={chatEditorContainerRef} className="flex h-full min-h-0 flex-col">
                         <div
                             className="min-h-0 shrink-0"

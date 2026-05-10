@@ -9,7 +9,7 @@ import { createDefaultSize } from "./helpers"
 const initialCards: ConversationCard[] = [
     {
         id: "root-chat-1",
-        type: "chat",
+        cardType: "chat",
         userPrompt: "解释一下 Rust 所有权模型。",
         aiResponse: "所有权是 Rust 的核心内存安全机制。",
         parentId: null,
@@ -22,7 +22,7 @@ const initialCards: ConversationCard[] = [
     },
     {
         id: "root-note-1",
-        type: "note",
+        cardType: "note",
         noteContent: "这里是用户的 Markdown 笔记卡片。",
         parentId: null,
         referenceNodeIds: undefined,
@@ -34,7 +34,7 @@ const initialCards: ConversationCard[] = [
     },
     {
         id: "root-chat-2",
-        type: "chat",
+        cardType: "chat",
         userPrompt: "如何设计可扩展的 prompt 模板？",
         aiResponse: "建议把 prompt 拆成固定协议层与业务插槽层。",
         parentId: null,

@@ -23,7 +23,7 @@ import type { DistributiveOmit } from '../stores/useConversationStore'
 export const FORK_MIND_CARD_SHAPE_TYPE = "forkmind-card"
 
 // BaseNode 接口里删除掉了type字段之后 剩下的字段A 再从ConversationCard当中分别删除字段A 得到联合类型
-type cardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode, 'type'>>
+type cardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode, 'cardType'>>
 
 /**
  * 每种卡片独有字段
@@ -54,7 +54,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         // T 为 tldraw 内部的数据校验器
         w: T.number,
         h: T.number,
-        type: T.string,
+        cardType: T.string,
     }
 
     /**
@@ -64,7 +64,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         return {
             w: 320,
             h: 220,
-            type: "note",
+            cardType: "note",
             noteContent: "",
         }
     }
@@ -115,7 +115,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                 className="fm-card pointer-events-auto h-full w-full overflow-hidden rounded-2xl border border-zinc-300/80 bg-card shadow-sm theme-dark:border-zinc-700/80"
             >
                 <div className="flex h-full w-full flex-col overflow-hidden">
-                    {shape.props.type === "chat" ? (
+                    {shape.props.cardType === "chat" ? (
                         <>
                             <section className="flex min-h-0 flex-1 flex-col border-b border-zinc-200/80 px-4 py-3 theme-dark:border-zinc-800">
                                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

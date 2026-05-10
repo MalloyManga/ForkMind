@@ -30,7 +30,7 @@ export function createChatNode(
     // 构造 chat 节点主体。
     const nextNode: ChatNode = {
         id: nodeId,
-        type: "chat",
+        cardType: "chat",
         userPrompt: input.userPrompt ?? "",
         aiResponse: input.aiResponse ?? "",
         parentId: validParentId,
@@ -73,7 +73,7 @@ export function createNoteNode(
     // 构造 note 节点主体。
     const nextNode: NoteNode = {
         id: nodeId,
-        type: "note",
+        cardType: "note",
         noteContent: input.noteContent ?? "",
         parentId: validParentId,
         referenceNodeIds: undefined,
