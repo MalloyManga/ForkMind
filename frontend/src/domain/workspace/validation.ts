@@ -71,6 +71,32 @@ function normalizeTimestamp(value: unknown, fallback: string): string {
 }
 
 /**
+ * 规范化从磁盘 导入文件或系统剪贴板进入内存的节点状态
+ * @param value 入参来自外部 JSON status 字段
+ * @param cardType 入参来自已经校验的节点判别字段
+ * @param aiResponse 入参来自 Chat 节点外部回答文本 Note 节点传空字符串
+ * @returns 返回当前进程可安全恢复的状态 外部 streaming 不会跨进程继续存在
+ * 工作区水化和 ForkMind JSON 粘贴解析单节点时触发
+ */
+function normalizeExternalNodeStatus(
+    value: unknown,
+    cardType: "chat" | "note",
+    aiResponse: string,
+): ConversationNodeStatus {
+    if (cardType === "note") {
+        return NODE_STATUS_DONE
+    }
+    if (value === NODE_STATUS_STREAMING) {
+        return aiResponse.length > 0 ? NODE_STATUS_DONE : NODE_STATUS_IDLE
+    }
+    if (VALID_NODE_STATUSES.has(value as ConversationNodeStatus)) {
+        return value as ConversationNodeStatus
+    }
+
+    return NODE_STATUS_IDLE
+}
+
+/**
  * 解析单张外部卡片
  * @param input 入参来自 JSON cards 数组中的未知元素
  * @param path 入参用于生成用户可定位的校验错误路径
@@ -111,11 +137,8 @@ function parseCard(
 
     const position = isUnknownRecord(input.position) ? input.position : {}
     const size = isUnknownRecord(input.size) ? input.size : {}
-    const status = VALID_NODE_STATUSES.has(input.status as ConversationNodeStatus)
-        ? input.status as ConversationNodeStatus
-        : cardType === "chat"
-            ? NODE_STATUS_IDLE
-            : NODE_STATUS_DONE
+    const aiResponse = cardType === "chat" ? readString(input.aiResponse) : ""
+    const status = normalizeExternalNodeStatus(input.status, cardType, aiResponse)
     const requestedReferences = Array.isArray(input.referenceNodeIds)
         ? input.referenceNodeIds.filter((value): value is string => typeof value === "string")
         : undefined
@@ -147,7 +170,7 @@ function parseCard(
             ...baseNode,
             cardType,
             userPrompt: readString(input.userPrompt),
-            aiResponse: readString(input.aiResponse),
+            aiResponse,
         }
         return { ok: true, value: chatNode }
     }
