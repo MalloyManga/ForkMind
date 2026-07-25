@@ -20,13 +20,13 @@
 
 ## ✨ 核心特性 (Core Features)
 
-- 🎨 **无限画布空间 (Infinite Canvas)**：左侧为无边界的可拖拽画布，右侧为极简对话框。告别上下翻滚，全局思维脉络一目了然。
+- 🎨 **无限画布空间 (Infinite Canvas)**：左侧管理会话，中间是无边界可拖拽画布，右侧编辑当前节点。告别上下翻滚，全局思维脉络一目了然。
 - 🔀 **独立上下文分支 (Isolated Context Chains)**：
   - 从对话卡片 A 中引出追问卡片 B。
   - **核心算法**：采用 **树的向上遍历（Upward Tree Traversal）** 算法。卡片 B 仅继承 A 及 A 的祖先节点作为上下文，其他兄弟分支互不干扰。
-- 🔌 **BYOK & 完美支持本地大模型 (Local LLMs)**：
-  - 专为重度效率用户与开发者设计。填入你的 API Key（如 OpenAI, DeepSeek），享受极低成本的顶级算力。
-  - **零跨域限制**：得益于 Go 语言底层网络请求，完美规避浏览器 CORS 限制与混合内容拦截（Mixed Content）。原生支持连接本地 `Ollama` 等离线大模型。
+- 🔌 **OpenAI-compatible & 本地模型优先**：
+  - 仅依赖标准 `/chat/completions` 流式接口，可连接本地 `Ollama` 或用户自行配置的兼容服务。
+  - API Key 只保存在当前运行时内存，不写入工作区文件；Go 网络层规避浏览器 CORS 与 Mixed Content 限制。
 - 💾 **Local-First 数据流 (JSON 驱动)**：
   - 无需注册，无需云端服务器。画布与对话数据采用最原始的 `.json` 格式存储在本地。
   - **极客友好**：用户可随意导出、分享、甚至使用 VSCode 手动二次编辑对话节点树。
@@ -39,8 +39,11 @@ ForkMind 采用极其轻量且高性能的跨平台桌面端架构：
 - **前端生态**: React 18 + Vite
 - **状态管理**: Zustand (在内存中维护对话节点树结构)
 - **AI 交互层**:
-  - 动态注入 System Prompt 控制输出格式。
-  - 动态拼接历史节点上下文。
+  - Go 侧组装 `parentId` 主链与 `referenceNodeIds` 补充参考资料。
+  - OpenAI-compatible SSE 流式输出，支持取消、错误分类和重新生成。
+- **本地数据层**:
+  - 用户配置目录中的 `workspace.json + threads/*.json`，采用临时文件与 `.bak` 恢复策略。
+  - 支持完整工作区单文件导入导出与 ForkMind JSON 系统剪贴板。
 
 ## ⚙️ 底层原理：AI 是如何读取上下文的？
 
@@ -58,20 +61,20 @@ ForkMind 在发起对话请求时，会在内存中执行以下操作：
 - [x] 阶段 2：Zustand 业务操作层（语义化 actions、`activeNodeId` 选中态、`undo/redo` 历史栈、防成环父子关系校验、Figma 风格删除降级策略）。
 - [x] 阶段 3：单页三栏 UI 壳（左侧会话栏/中间无限画布/右侧编辑栏，左右栏可收起；右栏由 `activeNodeId` 驱动，`chat` 双框与 `note` 单框切换，可选 `motion` 实现切换动画）。
 - [x] 阶段 4：画布与节点面板联动（tldraw 节点和 Store 双向同步；选中节点即编辑目标；拖拽保持市面常见无限画布交互心智；支持按住拖拽绘制卡片尺寸，贴近 Figma 创建手感；右键菜单替换为 ForkMind 自定义业务菜单）。
-- [ ] 阶段 5：Markdown 渲染与编辑体验（卡片支持 Markdown 展示；右栏编辑与卡片内容单一数据源同步；固定宽度 + 最大高度 + 内部滚动方案落地）。
-- [ ] 阶段 6：多会话管理（新建会话、切换会话、卡片跨会话复制、会话列表交互完善）。
-- [ ] 阶段 7：Wails Bridge 契约层（React DTO 与 Go DTO 对齐、统一错误协议）。
-- [ ] 阶段 8：Go 上下文组装算法（`parentId` 主链遍历 + `referenceNodeIds` 参考注入 + 文本锚点追问上下文拼装）。
-- [ ] 阶段 9：模型调用层（BYOK 云模型与本地 Ollama 的统一 Provider 入口）。
-- [ ] 阶段 10：本地 JSON 持久化与 JSON 剪贴板（会话保存、加载、损坏恢复；支持复制为 ForkMind JSON、从 JSON 剪贴板粘贴，并在外部数据进入 Store 前执行 validate / normalize）。
-- [ ] 阶段 11：质量收敛与发布准备（Go 单测、日志与错误码、构建与回归检查、Markdown 渲染性能优化与历史系统一致性评估）。
+- [x] 阶段 5：Markdown 渲染与编辑体验（画布卡片渲染 Markdown / GFM / LaTeX / Shiki 代码高亮；右栏编辑与卡片内容保持单一数据源）。
+- [x] 阶段 6：多会话管理（新建、切换、重命名、删除、独立撤销栈与首次 Prompt 自动标题）。
+- [x] 阶段 7：Wails Bridge 契约层（React DTO 与 Go DTO 对齐、统一错误协议、前端严格边界包装）。
+- [x] 阶段 8：Go 上下文组装算法（`parentId` 主链遍历 + `referenceNodeIds` 参考注入；文本锚点延期）。
+- [x] 阶段 9：模型调用层（OpenAI-compatible `/chat/completions`、SSE、取消与运行时 API Key）。
+- [x] 阶段 10：本地 JSON 持久化与 JSON 剪贴板（自动保存、损坏恢复、完整导入导出、系统剪贴板 validate / normalize）。
+- [x] 阶段 11：质量收敛与发布准备（Go 单测、错误码、类型检查与生产构建验证）。
 
 ## 🔭 未来展望 (Roadmap)
 
 - [x] 单个对话支持多个根节点；当根节点过多时，提示用户“建议新开对话”。
 - [ ] 支持把当前对话中的部分卡片复制到其他对话，实现无缝迁移。
-- [ ] 引入“关联边/引用边（Reference Edge）”，满足自由联想与跨分支关系表达。
-- [ ] 固化“主链 + 参考资料”上下文策略：`parentId` 负责主链遍历，`referenceNodeIds` 以“补充参考资料”形式注入提示词。
+- [x] 引入“关联边/引用边（Reference Edge）”，满足自由联想与跨分支关系表达。
+- [x] 固化“主链 + 参考资料”上下文策略：`parentId` 负责主链遍历，`referenceNodeIds` 以“补充参考资料”形式注入提示词。
 - [ ] 支持在卡片文本中选中词/句直接追问：从选中内容拉线创建新卡片，并记录引用锚点。
 - [ ] 支持扩展卡片类型：图片卡片（Image Node）、链接卡片（Link Node）、文件卡片（File Node）等。
 
