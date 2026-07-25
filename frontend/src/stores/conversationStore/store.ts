@@ -383,6 +383,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             const nextThread: ConversationThread = {
                 ...state.activeThread,
                 cards: cards.map((node) => cloneNode(node)),
+                updatedAt: createTimestamp(),
             }
 
             // 如果原 active 节点已不存在（例如导入内容里没有它） 就降级到第一个节点
@@ -412,6 +413,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeNodeId: nextActiveNodeId,
                 pastSnapshots: nextPast,
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
     },
@@ -431,6 +433,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             const nextThread: ConversationThread = {
                 ...state.activeThread,
                 cards: [...state.activeThread.cards, nextNode],
+                updatedAt: nextNode.updatedAt,
             }
 
             const snapshot: ConversationSnapshot = {
@@ -443,6 +446,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeNodeId: nextNode.id,
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
 
@@ -477,6 +481,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             const nextThread: ConversationThread = {
                 ...state.activeThread,
                 cards: [...state.activeThread.cards, nextNode],
+                updatedAt: nextNode.updatedAt,
             }
 
             const snapshot: ConversationSnapshot = {
@@ -489,6 +494,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeNodeId: nextNode.id,
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
 
@@ -522,6 +528,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             const nextThread: ConversationThread = {
                 ...state.activeThread,
                 cards: [...state.activeThread.cards, nextNode],
+                updatedAt: nextNode.updatedAt,
             }
 
             const snapshot: ConversationSnapshot = {
@@ -534,6 +541,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeNodeId: nextNode.id,
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
 
@@ -727,10 +735,12 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeThread: {
                     ...state.activeThread,
                     cards: [...state.activeThread.cards, ...nextNodes],
+                    updatedAt: now,
                 },
                 activeNodeId: pastedNodeIds[0] ?? state.activeNodeId,
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
 
@@ -803,10 +813,12 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeThread: {
                     ...state.activeThread,
                     cards: [...nextCardsBeforePaste, ...pastedNodes],
+                    updatedAt: now,
                 },
                 activeNodeId: pastedNodeIds[0] ?? state.activeNodeId,
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
 
@@ -844,9 +856,10 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             }
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: { ...state.activeThread, cards: nextCards, updatedAt: now },
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
     },
@@ -887,9 +900,10 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             }
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: { ...state.activeThread, cards: nextCards, updatedAt: now },
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
     },
@@ -934,9 +948,10 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             }
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: { ...state.activeThread, cards: nextCards, updatedAt: now },
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
     },
@@ -979,9 +994,10 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             }
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: { ...state.activeThread, cards: nextCards, updatedAt: now },
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
     },
@@ -1049,10 +1065,11 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             }
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: { ...state.activeThread, cards: nextCards, updatedAt: now },
                 activeNodeId: nextActiveNodeId,
                 pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: [],
+                textEditSession: null,
             }
         })
     },
