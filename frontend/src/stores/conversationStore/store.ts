@@ -362,6 +362,20 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     },
 
     /**
+     * 清空所有会话的编辑器运行时缓存
+     * @returns 无返回值 activeThread 会由后续导入水化动作整体替换
+     * 用户导入完整工作区时触发 防止相同 Thread id 复用导入前的撤销栈和选中节点
+     */
+    resetThreadRuntimes: () => {
+        set({
+            pastSnapshots: [],
+            futureSnapshots: [],
+            textEditSession: null,
+            threadRuntimeById: {},
+        })
+    },
+
+    /**
      * 设置当前选中节点
      */
     setActiveNodeId: (nodeId) => {

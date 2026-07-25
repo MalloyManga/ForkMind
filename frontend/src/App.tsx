@@ -38,6 +38,7 @@ import { useAICompletion } from "./hooks/useAICompletion"
 import { type CanvasTool } from "./hooks/canvasToolTypes"
 import { useWorkspaceController } from "./hooks/useWorkspaceController"
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
+import { useWorkspaceTransfer } from "./hooks/useWorkspaceTransfer"
 import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
 import {
     selectActiveNode,
@@ -104,6 +105,7 @@ function App() {
         deleteThread,
     } = useWorkspaceController()
     const workspacePersistence = useWorkspacePersistence()
+    const workspaceTransfer = useWorkspaceTransfer()
     const aiCompletion = useAICompletion()
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
@@ -385,6 +387,9 @@ function App() {
                             persistenceStatus={workspacePersistence.status}
                             persistenceErrorMessage={workspacePersistence.error?.message ?? null}
                             isThreadManagementDisabled={aiCompletion.isRequestActive}
+                            workspaceTransferMessage={workspaceTransfer.message}
+                            workspaceTransferErrorMessage={workspaceTransfer.error?.message ?? null}
+                            isWorkspaceTransferBusy={workspaceTransfer.isBusy}
                             themeMode={themeMode}
                             panelsToggleControl={
                                 <PanelsToggleButton
@@ -400,6 +405,17 @@ function App() {
                             onSwitchThread={switchThread}
                             onRenameThread={renameThread}
                             onDeleteThread={deleteThread}
+                            onExportWorkspace={() => {
+                                void workspaceTransfer.exportWorkspace()
+                            }}
+                            onImportWorkspace={() => {
+                                const shouldReplaceWorkspace = window.confirm(
+                                    "导入会替换当前完整工作区 请确认当前内容已经保存或导出",
+                                )
+                                if (shouldReplaceWorkspace) {
+                                    void workspaceTransfer.importWorkspace()
+                                }
+                            }}
                             onOpenAISettings={() => {
                                 setIsAISettingsOpen(true)
                             }}

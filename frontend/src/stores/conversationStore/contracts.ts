@@ -153,6 +153,7 @@ export interface ConversationStoreState {
     setActiveThread: (thread: ConversationThread) => void
     renameActiveThread: (title: string) => void
     forgetThreadRuntime: (threadId: string) => void
+    resetThreadRuntimes: () => void
     setActiveNodeId: (nodeId: string | null) => void
     setActiveThreadCards: (cards: ConversationCard[]) => void
 

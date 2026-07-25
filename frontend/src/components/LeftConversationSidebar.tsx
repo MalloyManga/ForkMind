@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react"
 import {
     Check,
     AlertCircle,
+    Download,
     GitFork,
     HardDrive,
     Layers,
@@ -13,6 +14,7 @@ import {
     Settings2,
     Sun,
     Trash2,
+    Upload,
     X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -30,12 +32,17 @@ interface LeftConversationSidebarProps {
     persistenceStatus: WorkspacePersistenceStatus
     persistenceErrorMessage: string | null
     isThreadManagementDisabled: boolean
+    workspaceTransferMessage: string | null
+    workspaceTransferErrorMessage: string | null
+    isWorkspaceTransferBusy: boolean
     themeMode: "dark" | "light"
     panelsToggleControl: ReactNode
     onCreateThread: () => void
     onSwitchThread: (threadId: string) => void
     onRenameThread: (threadId: string, title: string) => void
     onDeleteThread: (threadId: string) => void
+    onExportWorkspace: () => void
+    onImportWorkspace: () => void
     onOpenAISettings: () => void
     onToggleTheme: () => void
 }
@@ -69,12 +76,17 @@ export function LeftConversationSidebar({
     persistenceStatus,
     persistenceErrorMessage,
     isThreadManagementDisabled,
+    workspaceTransferMessage,
+    workspaceTransferErrorMessage,
+    isWorkspaceTransferBusy,
     themeMode,
     panelsToggleControl,
     onCreateThread,
     onSwitchThread,
     onRenameThread,
     onDeleteThread,
+    onExportWorkspace,
+    onImportWorkspace,
     onOpenAISettings,
     onToggleTheme,
 }: LeftConversationSidebarProps) {
@@ -317,6 +329,39 @@ export function LeftConversationSidebar({
                         <HardDrive className="h-3 w-3 shrink-0" />
                     )}
                     <span className="truncate">{persistenceLabel}</span>
+                </div>
+                {workspaceTransferMessage || workspaceTransferErrorMessage ? (
+                    <p
+                        className={cn(
+                            "mb-2 truncate px-2 text-[10px]",
+                            workspaceTransferErrorMessage
+                                ? "text-rose-500"
+                                : "text-emerald-600 theme-dark:text-emerald-400",
+                        )}
+                        title={workspaceTransferErrorMessage ?? workspaceTransferMessage ?? undefined}
+                    >
+                        {workspaceTransferErrorMessage ?? workspaceTransferMessage}
+                    </p>
+                ) : null}
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        onClick={onImportWorkspace}
+                        disabled={isThreadManagementDisabled || isWorkspaceTransferBusy}
+                        className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card/50 px-2 py-2 text-[11px] font-medium text-foreground transition-colors duration-200 hover:border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onExportWorkspace}
+                        disabled={isThreadManagementDisabled || isWorkspaceTransferBusy}
+                        className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card/50 px-2 py-2 text-[11px] font-medium text-foreground transition-colors duration-200 hover:border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <Download className="h-3.5 w-3.5" />
+                        Export
+                    </button>
                 </div>
                 <button
                     type="button"

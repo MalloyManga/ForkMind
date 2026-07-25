@@ -5,6 +5,8 @@ import type {
     ForkMindAppBridge,
     OperationBridgeResponse,
     WorkspaceLoadBridgeResponse,
+    WorkspaceExportBridgeResponse,
+    WorkspaceImportBridgeResponse,
     StartChatCompletionInput,
     CancelChatCompletionInput,
 } from "./contracts"
@@ -75,6 +77,42 @@ export async function getDataDirectoryFromBridge(): Promise<DataDirectoryBridgeR
         return await appBridge.GetDataDirectory()
     } catch (error) {
         return { path: "", error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 通过系统保存对话框导出完整 ForkMind 工作区
+ * document 来自已经同步当前 activeThread 的前端快照且不包含 API Key
+ */
+export async function exportWorkspaceFromBridge(
+    document: ForkMindWorkspaceDocument,
+): Promise<WorkspaceExportBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { cancelled: false, error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.ExportWorkspace(document)
+    } catch (error) {
+        return { cancelled: false, error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 通过系统打开对话框读取 ForkMind JSON 原文
+ * 返回 content 仍属于 unknown 边界 调用方必须 JSON.parse 后执行领域校验
+ */
+export async function importWorkspaceFromBridge(): Promise<WorkspaceImportBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { cancelled: false, error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.ImportWorkspace()
+    } catch (error) {
+        return { cancelled: false, error: normalizeBridgeException(error) }
     }
 }
 

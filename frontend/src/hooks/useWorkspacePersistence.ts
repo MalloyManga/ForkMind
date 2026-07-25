@@ -37,7 +37,7 @@ let workspaceHydrationPromise: Promise<WorkspaceHydrationOutcome> | null = null
  * 从当前两个 Store 构造可持久化工作区文档
  * API Key 位于 AISettingsStore 独立字段且不会进入该返回值
  */
-function createWorkspaceDocument(): ForkMindWorkspaceDocument {
+export function createWorkspaceDocumentSnapshot(): ForkMindWorkspaceDocument {
     const workspaceState = useWorkspaceStore.getState()
     const activeThread = useConversationStore.getState().activeThread
     const settings = useAISettingsStore.getState().persistedSettings
@@ -148,7 +148,7 @@ export function useWorkspacePersistence() {
         setError(null)
 
         const saveTimer = window.setTimeout(() => {
-            const document = createWorkspaceDocument()
+            const document = createWorkspaceDocumentSnapshot()
 
             saveQueueRef.current = saveQueueRef.current.then(async () => {
                 setStatus("saving")

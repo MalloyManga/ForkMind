@@ -22,6 +22,19 @@ export interface DataDirectoryBridgeResponse {
     error?: BridgeErrorPayload
 }
 
+export interface WorkspaceExportBridgeResponse {
+    cancelled: boolean
+    path?: string
+    error?: BridgeErrorPayload
+}
+
+export interface WorkspaceImportBridgeResponse {
+    cancelled: boolean
+    path?: string
+    content?: string
+    error?: BridgeErrorPayload
+}
+
 export interface OpenAICompletionConfig {
     baseUrl: string
     apiKey: string
@@ -65,6 +78,8 @@ export interface ForkMindAppBridge {
     LoadWorkspace: () => Promise<WorkspaceLoadBridgeResponse>
     SaveWorkspace: (document: ForkMindWorkspaceDocument) => Promise<OperationBridgeResponse>
     GetDataDirectory: () => Promise<DataDirectoryBridgeResponse>
+    ExportWorkspace: (document: ForkMindWorkspaceDocument) => Promise<WorkspaceExportBridgeResponse>
+    ImportWorkspace: () => Promise<WorkspaceImportBridgeResponse>
     StartChatCompletion: (input: StartChatCompletionInput) => Promise<OperationBridgeResponse>
     CancelChatCompletion: (input: CancelChatCompletionInput) => Promise<OperationBridgeResponse>
 }

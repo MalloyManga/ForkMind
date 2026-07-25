@@ -47,6 +47,23 @@ type DataDirectoryResponse struct {
 	Error *BridgeError `json:"error,omitempty"`
 }
 
+// WorkspaceExportResponse 返回系统保存对话框与工作区导出的结果
+// Cancelled=true 表示用户主动关闭对话框 该情况不是错误
+type WorkspaceExportResponse struct {
+	Cancelled bool         `json:"cancelled"`
+	Path      string       `json:"path,omitempty"`
+	Error     *BridgeError `json:"error,omitempty"`
+}
+
+// WorkspaceImportResponse 返回系统打开对话框读取到的原始 JSON 文本
+// Content 必须继续由 React validateAndNormalizeWorkspace 校验后才能进入 Store
+type WorkspaceImportResponse struct {
+	Cancelled bool         `json:"cancelled"`
+	Path      string       `json:"path,omitempty"`
+	Content   string       `json:"content,omitempty"`
+	Error     *BridgeError `json:"error,omitempty"`
+}
+
 // CardPositionDTO 对应 React ConversationCardPosition
 type CardPositionDTO struct {
 	X float64 `json:"x"`
