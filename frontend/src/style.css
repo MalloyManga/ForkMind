@@ -181,6 +181,10 @@ html {
     var(--foreground) 72%,
     transparent
   );
+
+  /* 画布底色与点阵网格 */
+  --fm-canvas-bg: oklch(0.97 0.004 260);
+  --fm-canvas-dot: oklch(0.72 0.02 260 / 0.5);
 }
 
 .dark {
@@ -245,6 +249,10 @@ html {
   --sidebar-border: oklch(1 0 0 / 10%);
 
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* 画布底色与点阵网格（深色） */
+  --fm-canvas-bg: oklch(0.16 0.006 260);
+  --fm-canvas-dot: oklch(1 0 0 / 0.06);
 }
 
 /* 全局滚动条样式：默认隐藏，仅 hover 到可滚动区域时显示细滑块 */
@@ -326,4 +334,14 @@ html {
 .katex {
   /* 公式颜色跟随正文颜色 */
   color: var(--foreground);
+}
+
+/* 画布点阵网格背景：覆盖 tldraw 默认底色，营造无限画布质感 */
+.fm-canvas-surface .tl-background {
+  background-color: var(--fm-canvas-bg) !important;
+  background-image: radial-gradient(
+    var(--fm-canvas-dot) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
 }

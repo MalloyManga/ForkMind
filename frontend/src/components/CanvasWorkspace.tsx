@@ -10,6 +10,7 @@ import { ForkMindCardShapeUtil } from "../lib/forkMindCardShape"
 import { CanvasCreationDragOverlay } from "./CanvasCreationDragOverlay"
 import { CanvasCreationModeBar } from "./CanvasCreationModeBar"
 import { CanvasLinkHandlesOverlay } from "./CanvasLinkHandlesOverlay"
+import { CanvasMinimap } from "./CanvasMinimap"
 
 interface CanvasWorkspaceProps {
     // tldraw 挂载完成后 把 editor 实例经由 App 交回桥接层 canvasBridge 处理
@@ -71,15 +72,18 @@ export function CanvasWorkspace({
             // 把四向连线 handle 叠到画布最前层
             // 当 UI 全隐藏或当前是 hand-tool 时 不显示这些业务悬浮控件
             InFrontOfTheCanvas: () => (
-                <CanvasLinkHandlesOverlay
-                    onStartLinkDrag={onStartLinkDrag}
-                    isVisible={
-                        isCanvasUiVisible &&
-                        !isContextMenuOpen &&
-                        currentCanvasTool !== "hand-tool" &&
-                        !isCanvasResizing
-                    }
-                />
+                <>
+                    <CanvasLinkHandlesOverlay
+                        onStartLinkDrag={onStartLinkDrag}
+                        isVisible={
+                            isCanvasUiVisible &&
+                            !isContextMenuOpen &&
+                            currentCanvasTool !== "hand-tool" &&
+                            !isCanvasResizing
+                        }
+                    />
+                    {isCanvasUiVisible ? <CanvasMinimap /> : null}
+                </>
             ),
         }),
         [currentCanvasTool, isCanvasResizing, isCanvasUiVisible, isContextMenuOpen, onStartLinkDrag],
@@ -137,7 +141,7 @@ export function CanvasWorkspace({
 
     return (
         <main
-            className="relative flex-1 bg-zinc-50 theme-dark:bg-zinc-900"
+            className="fm-canvas-surface relative flex-1 bg-zinc-100 theme-dark:bg-zinc-950"
             onContextMenu={handleWorkspaceContextMenu}
         >
             <div className="absolute inset-0">

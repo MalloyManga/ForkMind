@@ -6,6 +6,7 @@
     useRef,
     useState,
 } from "react"
+import { GitFork } from "lucide-react"
 import type { Editor } from "tldraw"
 import { CanvasContextMenu } from "./components/CanvasContextMenu"
 import type { CanvasClipboardPayload } from "./stores/conversationStore"
@@ -330,7 +331,10 @@ function App() {
             className={`h-screen w-screen overflow-hidden bg-zinc-100 text-zinc-900 theme-dark:bg-zinc-950 theme-dark:text-zinc-100 ${themeMode === "dark" ? "dark" : ""}`}>
             {areSidebarsHidden && !isCanvasUiHidden ? (
                 <div className="pointer-events-none absolute left-4 top-4 z-40">
-                    <div className="pointer-events-auto inline-flex items-center gap-3 rounded-xl border border-border/70 bg-background/92 px-3 py-2 shadow-lg backdrop-blur-md transition-all duration-200">
+                    <div className="pointer-events-auto inline-flex items-center gap-2.5 rounded-2xl border border-border/60 bg-background/80 py-1.5 pl-2 pr-1.5 shadow-[0_8px_32px_-8px_rgba(15,23,42,0.24)] backdrop-blur-xl transition-all duration-200">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-indigo-500 text-white">
+                            <GitFork className="h-3 w-3" strokeWidth={2.4} />
+                        </span>
                         <div className="max-w-56 truncate text-sm font-medium">{activeThread.title}</div>
                         <PanelsToggleButton
                             isMinimized={areSidebarsHidden}
@@ -371,11 +375,14 @@ function App() {
 
                 {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
-                        className="w-1.5 shrink-0 cursor-col-resize bg-border/80 transition-colors hover:bg-border"
+                        className="group relative w-px shrink-0 cursor-col-resize bg-zinc-200/70 theme-dark:bg-zinc-800"
                         onPointerDown={startResizeLeftSidebar}
                         role="separator"
                         aria-label="调整左侧栏宽度"
-                    />
+                    >
+                        <div className="absolute inset-y-0 -left-1.5 -right-1.5 transition-colors group-hover:bg-sky-400/15" />
+                        <div className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent transition-all group-hover:bg-sky-400/80" />
+                    </div>
                 ) : null}
 
                 <CanvasWorkspace
@@ -393,11 +400,14 @@ function App() {
 
                 {!areSidebarsHidden && !isCanvasUiHidden ? (
                     <div
-                        className="w-1.5 shrink-0 cursor-col-resize bg-border/80 transition-colors hover:bg-border"
+                        className="group relative w-px shrink-0 cursor-col-resize bg-zinc-200/70 theme-dark:bg-zinc-800"
                         onPointerDown={startResizeRightSidebar}
                         role="separator"
                         aria-label="调整右侧栏宽度"
-                    />
+                    >
+                        <div className="absolute inset-y-0 -left-1.5 -right-1.5 transition-colors group-hover:bg-sky-400/15" />
+                        <div className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent transition-all group-hover:bg-sky-400/80" />
+                    </div>
                 ) : null}
 
                 {!areSidebarsHidden && !isCanvasUiHidden ? (

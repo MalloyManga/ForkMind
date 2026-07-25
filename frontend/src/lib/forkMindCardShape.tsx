@@ -17,6 +17,9 @@ import {
 import type { BaseNode, ConversationCard } from "../domain/conversation/types"
 import type { DistributiveOmit } from "../types/typeUtils"
 import { assertNever } from "./utils"
+import { PersonIcon } from "../components/icons/PersonIcon"
+import { RobotIcon } from "../components/icons/RobotIcon"
+import { NotePlusIcon } from "../components/icons/NotePlusIcon"
 
 /**
  * 卡片唯一身份标识
@@ -118,48 +121,63 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                 case "chat":
                     return (
                         <>
-                            <section className="flex min-h-0 flex-1 flex-col border-b border-zinc-200/80 px-4 py-3 theme-dark:border-zinc-800">
-                                <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                    Prompt
-                                </div>
-                                <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
-                                    <ReactMarkdown
-                                        components={markdownComponents} // 识别公式和表格
-                                        remarkPlugins={markdownRemarkPlugins} // 杀毒防 XSS + 渲染数学符号
-                                        rehypePlugins={markdownRehypePlugins} // 修改 css 样式
-                                    >
-                                        {normalizeMarkdownForPreview(shape.props.userPrompt.trim()) || "_empty prompt_"}
-                                    </ReactMarkdown>
+                            <section className="flex min-h-0 flex-1 flex-col border-b border-zinc-200/70 theme-dark:border-zinc-800/80">
+                                <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto py-3 pl-3 pr-2 text-sm leading-relaxed">
+                                    <div className="flex gap-2.5">
+                                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 text-sky-600 theme-dark:text-sky-400">
+                                            <PersonIcon className="h-3.5 w-3.5" />
+                                        </span>
+                                        <div className="min-w-0 flex-1 pt-0.5">
+                                            <ReactMarkdown
+                                                components={markdownComponents} // 识别公式和表格
+                                                remarkPlugins={markdownRemarkPlugins} // 杀毒防 XSS + 渲染数学符号
+                                                rehypePlugins={markdownRehypePlugins} // 修改 css 样式
+                                            >
+                                                {normalizeMarkdownForPreview(shape.props.userPrompt.trim()) || "_empty prompt_"}
+                                            </ReactMarkdown>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 
-                            <section className="flex min-h-0 flex-1 flex-col px-4 py-3">
-                                <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                    AI
-                                </div>
-                                <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
-                                    <ReactMarkdown
-                                        components={markdownComponents}
-                                        remarkPlugins={markdownRemarkPlugins}
-                                        rehypePlugins={markdownRehypePlugins}
-                                    >
-                                        {normalizeMarkdownForPreview(shape.props.aiResponse.trim()) || "_empty response_"}
-                                    </ReactMarkdown>
+                            <section className="flex min-h-0 flex-1 flex-col bg-violet-500/[0.03] theme-dark:bg-violet-500/[0.04]">
+                                <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto py-3 pl-3 pr-2 text-sm leading-relaxed">
+                                    <div className="flex gap-2.5">
+                                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 theme-dark:text-violet-400">
+                                            <RobotIcon className="h-3.5 w-3.5" />
+                                        </span>
+                                        <div className="min-w-0 flex-1 pt-0.5">
+                                            <ReactMarkdown
+                                                components={markdownComponents}
+                                                remarkPlugins={markdownRemarkPlugins}
+                                                rehypePlugins={markdownRehypePlugins}
+                                            >
+                                                {normalizeMarkdownForPreview(shape.props.aiResponse.trim()) || "_empty response_"}
+                                            </ReactMarkdown>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
                         </>
                     )
                 case "note":
                     return (
-                        <section className="flex min-h-0 flex-1 flex-col px-4 py-3">
-                            <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto pr-1">
-                                <ReactMarkdown
-                                    components={markdownComponents}
-                                    remarkPlugins={markdownRemarkPlugins}
-                                    rehypePlugins={markdownRehypePlugins}
-                                >
-                                    {normalizeMarkdownForPreview(shape.props.noteContent.trim()) || "_empty note_"}
-                                </ReactMarkdown>
+                        <section className="flex min-h-0 flex-1 flex-col">
+                            <div className="fm-card-scroll min-h-0 flex-1 overflow-y-auto py-3 pl-3 pr-2 text-sm leading-relaxed">
+                                <div className="flex gap-2.5">
+                                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-400/15 text-amber-600 theme-dark:text-amber-400">
+                                        <NotePlusIcon className="h-3.5 w-3.5" />
+                                    </span>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <ReactMarkdown
+                                            components={markdownComponents}
+                                            remarkPlugins={markdownRemarkPlugins}
+                                            rehypePlugins={markdownRehypePlugins}
+                                        >
+                                            {normalizeMarkdownForPreview(shape.props.noteContent.trim()) || "_empty note_"}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     )
@@ -168,12 +186,18 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
             return assertNever(shape.props)
         })()
 
+        // 左侧类型色条：Chat=靛蓝渐变，Note=琥珀，是卡片在画布上的第一眼身份标识
+        const accentBar =
+            shape.props.cardType === "chat"
+                ? "before:bg-gradient-to-b before:from-sky-400 before:to-violet-500"
+                : "before:bg-amber-400"
+
         return (
             <HTMLContainer
                 id={shape.id}
-                className="fm-card pointer-events-auto h-full w-full overflow-hidden rounded-2xl border border-zinc-300/80 bg-card shadow-sm theme-dark:border-zinc-700/80"
+                className={`fm-card pointer-events-auto relative h-full w-full overflow-hidden rounded-2xl border border-zinc-200/80 bg-card shadow-[0_2px_4px_rgba(15,23,42,0.04),0_10px_28px_-10px_rgba(15,23,42,0.16)] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-[''] theme-dark:border-zinc-700/70 theme-dark:shadow-[0_2px_4px_rgba(0,0,0,0.24),0_14px_36px_-10px_rgba(0,0,0,0.6)] ${accentBar}`}
             >
-                <div className="flex h-full w-full flex-col overflow-hidden">
+                <div className="flex h-full w-full flex-col overflow-hidden pl-[3px]">
                     {cardContent}
                 </div>
             </HTMLContainer>

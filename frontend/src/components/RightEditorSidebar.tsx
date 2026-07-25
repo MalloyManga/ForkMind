@@ -1,11 +1,19 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
+import {
+    useEffect,
+    useRef,
+    useState,
+    type PointerEvent as ReactPointerEvent,
+    type ReactNode,
+} from "react"
+import { FileText, MessageSquareText, PenLine, Sparkles, SquareMousePointer, UserRound } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import {
     CHAT_PROMPT_MAX_RATIO,
     CHAT_PROMPT_MIN_RATIO,
     DEFAULT_CHAT_PROMPT_RATIO,
 } from "../constants/layout"
-import type { ConversationCard } from "../domain/conversation/types"
+import type { ConversationCard, ConversationNodeStatus } from "../domain/conversation/types"
 
 interface RightEditorSidebarProps {
     activeNode: ConversationCard | undefined
@@ -19,12 +27,30 @@ interface ChatEditorResizeState {
     startPromptRatio: number
 }
 
+const STATUS_META: Record<ConversationNodeStatus, { label: string; dot: string; text: string }> = {
+    idle: { label: "Idle", dot: "bg-zinc-400", text: "text-muted-foreground" },
+    streaming: { label: "Streaming", dot: "bg-sky-500", text: "text-sky-600 theme-dark:text-sky-400" },
+    done: { label: "Done", dot: "bg-emerald-500", text: "text-emerald-600 theme-dark:text-emerald-400" },
+    error: { label: "Error", dot: "bg-rose-500", text: "text-rose-600 theme-dark:text-rose-400" },
+}
+
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
 
+function SectionLabel({ icon, title, accent }: { icon: ReactNode; title: string; accent: string }) {
+    return (
+        <div className="mb-2 flex items-center gap-2 px-0.5">
+            <span className={cn("flex h-5 w-5 items-center justify-center rounded-md", accent)}>{icon}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                {title}
+            </span>
+        </div>
+    )
+}
+
 /**
- * 右侧编辑栏。
+ * 右侧编辑栏：头部展示节点身份与状态，正文根据卡片类型渲染 Markdown 编辑区。
  */
 export function RightEditorSidebar({
     activeNode,
@@ -93,58 +119,135 @@ export function RightEditorSidebar({
         document.body.style.userSelect = "none"
     }
 
+    const status = activeNode ? STATUS_META[activeNode.status] : null
+
     return (
-        <aside className="h-full border-l bg-background">
-            <div className="flex h-full flex-col p-4">
+        <aside className="flex h-full flex-col bg-background/95 backdrop-blur-sm">
+            {/* 头部：节点身份 + 状态 */}
+            <header className="flex h-14 shrink-0 items-center gap-2.5 px-4">
+                {activeNode ? (
+                    <>
+                        <span
+                            className={cn(
+                                "flex h-7 w-7 items-center justify-center rounded-lg",
+                                activeNode.cardType === "chat"
+                                    ? "bg-sky-500/15 text-sky-600 theme-dark:text-sky-400"
+                                    : "bg-amber-400/20 text-amber-600 theme-dark:text-amber-400",
+                            )}
+                        >
+                            {activeNode.cardType === "chat" ? (
+                                <MessageSquareText className="h-4 w-4" />
+                            ) : (
+                                <FileText className="h-4 w-4" />
+                            )}
+                        </span>
+                        <div className="min-w-0 flex-1 leading-none">
+                            <div className="text-sm font-semibold capitalize tracking-tight">
+                                {activeNode.cardType === "chat" ? "Chat node" : "Note node"}
+                            </div>
+                            <div className="mt-1 font-mono text-[10px] text-muted-foreground/50">
+                                #{activeNode.id.slice(-6)}
+                            </div>
+                        </div>
+                        {status ? (
+                            <span className="flex items-center gap-1.5 rounded-full bg-muted/70 px-2.5 py-1">
+                                <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
+                                <span className={cn("text-[10px] font-medium", status.text)}>{status.label}</span>
+                            </span>
+                        ) : null}
+                    </>
+                ) : (
+                    <>
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground/60">
+                            <PenLine className="h-4 w-4" />
+                        </span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/60">
+                            Editor
+                        </span>
+                    </>
+                )}
+            </header>
+
+            <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+            {/* 正文编辑区 */}
+            <div className="min-h-0 flex-1 p-3">
                 {!activeNode ? (
-                    <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 text-sm text-muted-foreground">
-                        选中画布卡片后，可在这里直接编辑 Markdown 内容。
+                    <div className="flex h-full flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border/60 px-6 text-center">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-muted/80 to-muted/40 text-muted-foreground/40">
+                            <SquareMousePointer className="h-7 w-7" strokeWidth={1.6} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <p className="text-sm font-medium text-foreground/70">选中一张卡片开始编辑</p>
+                            <p className="text-xs leading-relaxed text-muted-foreground/50">
+                                在画布中点选节点，即可在此
+                                <br />
+                                编辑 Markdown 与 LaTeX 内容
+                            </p>
+                        </div>
                     </div>
                 ) : activeNode.cardType === "chat" ? (
                     <div ref={chatEditorContainerRef} className="flex h-full min-h-0 flex-col">
-                        <div
-                            className="min-h-0 shrink-0"
-                            style={{
-                                flexBasis: `${chatPromptRatio * 100}%`,
-                            }}
+                        <section
+                            className="flex min-h-0 shrink-0 flex-col"
+                            style={{ flexBasis: `${chatPromptRatio * 100}%` }}
                         >
+                            <SectionLabel
+                                icon={<UserRound className="h-3 w-3" />}
+                                title="Prompt"
+                                accent="bg-sky-500/15 text-sky-600 theme-dark:text-sky-400"
+                            />
                             <Textarea
-                                className="h-full min-h-0 w-full resize-none rounded-xl bg-card"
-                                placeholder="用户 Prompt（Markdown）"
+                                className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-sky-500/40"
+                                placeholder="用户 Prompt（支持 Markdown / LaTeX）"
                                 value={activeNode.userPrompt}
                                 onChange={(event) => {
                                     onUpdateChatPrompt(activeNode.id, event.target.value)
                                 }}
                             />
-                        </div>
+                        </section>
 
                         <div
-                            className="my-2 h-1.5 shrink-0 cursor-row-resize rounded-full bg-border/80 transition-colors hover:bg-border"
+                            className="group flex h-4 shrink-0 cursor-row-resize items-center justify-center"
                             onPointerDown={startResizeChatEditors}
                             role="separator"
                             aria-label="调整 Prompt 与 AI Response 区域高度"
-                        />
+                        >
+                            <span className="h-1 w-10 rounded-full bg-border transition-all group-hover:w-16 group-hover:bg-sky-400/70" />
+                        </div>
 
-                        <div className="min-h-0 flex-1">
+                        <section className="flex min-h-0 flex-1 flex-col">
+                            <SectionLabel
+                                icon={<Sparkles className="h-3 w-3" />}
+                                title="AI Response"
+                                accent="bg-violet-500/15 text-violet-600 theme-dark:text-violet-400"
+                            />
                             <Textarea
-                                className="h-full min-h-0 w-full resize-none rounded-xl bg-card"
-                                placeholder="AI Response（Markdown）"
+                                className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-violet-500/40"
+                                placeholder="AI Response（支持 Markdown / LaTeX）"
                                 value={activeNode.aiResponse}
                                 onChange={(event) => {
                                     onUpdateChatResponse(activeNode.id, event.target.value)
                                 }}
                             />
-                        </div>
+                        </section>
                     </div>
                 ) : (
-                    <Textarea
-                        className="h-full min-h-0 flex-1 resize-none rounded-xl bg-card"
-                        placeholder="Markdown 笔记"
-                        value={activeNode.noteContent}
-                        onChange={(event) => {
-                            onUpdateNoteContent(activeNode.id, event.target.value)
-                        }}
-                    />
+                    <div className="flex h-full min-h-0 flex-col">
+                        <SectionLabel
+                            icon={<FileText className="h-3 w-3" />}
+                            title="Note"
+                            accent="bg-amber-400/20 text-amber-600 theme-dark:text-amber-400"
+                        />
+                        <Textarea
+                            className="h-full min-h-0 flex-1 resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-amber-400/40"
+                            placeholder="Markdown 笔记"
+                            value={activeNode.noteContent}
+                            onChange={(event) => {
+                                onUpdateNoteContent(activeNode.id, event.target.value)
+                            }}
+                        />
+                    </div>
                 )}
             </div>
         </aside>
