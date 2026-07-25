@@ -5,6 +5,8 @@ import type {
     ForkMindAppBridge,
     OperationBridgeResponse,
     WorkspaceLoadBridgeResponse,
+    StartChatCompletionInput,
+    CancelChatCompletionInput,
 } from "./contracts"
 
 const BRIDGE_UNAVAILABLE_ERROR: BridgeErrorPayload = {
@@ -73,5 +75,42 @@ export async function getDataDirectoryFromBridge(): Promise<DataDirectoryBridgeR
         return await appBridge.GetDataDirectory()
     } catch (error) {
         return { path: "", error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 启动 OpenAI-compatible 流式请求
+ * 成功返回只表示后台任务已经开始 后续结果通过 Wails Events 发送
+ */
+export async function startChatCompletionFromBridge(
+    input: StartChatCompletionInput,
+): Promise<OperationBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.StartChatCompletion(input)
+    } catch (error) {
+        return { error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 取消指定 OpenAI-compatible 流式请求
+ */
+export async function cancelChatCompletionFromBridge(
+    input: CancelChatCompletionInput,
+): Promise<OperationBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.CancelChatCompletion(input)
+    } catch (error) {
+        return { error: normalizeBridgeException(error) }
     }
 }
