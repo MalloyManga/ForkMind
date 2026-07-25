@@ -34,6 +34,8 @@ import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import { useCanvasContextMenuExecutor } from "./hooks/useCanvasContextMenuExecutor"
 import { useCanvasContextMenuResolver } from "./hooks/useCanvasContextMenuResolver"
 import { type CanvasTool } from "./hooks/canvasToolTypes"
+import { useWorkspaceController } from "./hooks/useWorkspaceController"
+import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
 import {
     selectActiveNode,
     selectActiveNodeId,
@@ -89,6 +91,14 @@ function App() {
     const cards = useConversationStore(selectActiveThreadCards)
     const activeNodeId = useConversationStore(selectActiveNodeId)
     const activeNode = useConversationStore(selectActiveNode)
+    const {
+        threads,
+        activeThreadId,
+        createThread,
+        switchThread,
+        renameThread,
+        deleteThread,
+    } = useWorkspaceController()
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
     const addNode = useConversationStore((state) => state.addNode)
@@ -110,6 +120,10 @@ function App() {
     const rootNodeCount = useMemo(
         // 左侧栏的根节点统计和提醒都依赖这里的结果
         () => cards.filter((card) => card.parentId === null).length,
+        [cards],
+    )
+    const rootNodeWarning = useMemo(
+        () => buildRootNodesWarningMessage(cards),
         [cards],
     )
 
@@ -359,6 +373,9 @@ function App() {
                             threadTitle={activeThread.title}
                             cardCount={cards.length}
                             rootNodeCount={rootNodeCount}
+                            rootNodeWarning={rootNodeWarning}
+                            threads={threads}
+                            activeThreadId={activeThreadId}
                             themeMode={themeMode}
                             panelsToggleControl={
                                 <PanelsToggleButton
@@ -368,6 +385,12 @@ function App() {
                                     }}
                                 />
                             }
+                            onCreateThread={() => {
+                                createThread()
+                            }}
+                            onSwitchThread={switchThread}
+                            onRenameThread={renameThread}
+                            onDeleteThread={deleteThread}
                             onToggleTheme={() => {
                                 setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
                             }}

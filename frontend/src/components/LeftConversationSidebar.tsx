@@ -1,13 +1,34 @@
-import type { ReactNode } from "react"
-import { GitFork, Layers, Moon, Network, Sparkles, Sun } from "lucide-react"
+import { useState, type ReactNode } from "react"
+import {
+    Check,
+    GitFork,
+    Layers,
+    Moon,
+    Network,
+    Pencil,
+    Plus,
+    Sparkles,
+    Sun,
+    Trash2,
+    X,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import type { ConversationThread } from "../domain/conversation/types"
 
 interface LeftConversationSidebarProps {
     threadTitle: string
     cardCount: number
     rootNodeCount: number
+    rootNodeWarning: string | null
+    threads: ConversationThread[]
+    activeThreadId: string
     themeMode: "dark" | "light"
     panelsToggleControl: ReactNode
+    onCreateThread: () => void
+    onSwitchThread: (threadId: string) => void
+    onRenameThread: (threadId: string, title: string) => void
+    onDeleteThread: (threadId: string) => void
     onToggleTheme: () => void
 }
 
@@ -34,10 +55,50 @@ export function LeftConversationSidebar({
     threadTitle,
     cardCount,
     rootNodeCount,
+    rootNodeWarning,
+    threads,
+    activeThreadId,
     themeMode,
     panelsToggleControl,
+    onCreateThread,
+    onSwitchThread,
+    onRenameThread,
+    onDeleteThread,
     onToggleTheme,
 }: LeftConversationSidebarProps) {
+    const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
+    const [editingTitle, setEditingTitle] = useState("")
+
+    /**
+     * 进入会话标题编辑态
+     * @param thread 入参来自当前列表项 用于初始化编辑框与保存目标 id
+     * 用户点击铅笔按钮时触发 不会切换当前画布会话
+     */
+    const beginThreadRename = (thread: ConversationThread) => {
+        setEditingThreadId(thread.id)
+        setEditingTitle(thread.title)
+    }
+
+    /**
+     * 提交会话标题
+     * 空标题的默认值由 Store 领域规则统一处理
+     * 用户按 Enter 或点击确认按钮时触发
+     */
+    const commitThreadRename = () => {
+        if (!editingThreadId) {
+            return
+        }
+
+        onRenameThread(editingThreadId, editingTitle)
+        setEditingThreadId(null)
+        setEditingTitle("")
+    }
+
+    const cancelThreadRename = () => {
+        setEditingThreadId(null)
+        setEditingTitle("")
+    }
+
     return (
         <aside className="flex h-full flex-col bg-background/95 backdrop-blur-sm">
             {/* 品牌头部 */}
@@ -85,11 +146,120 @@ export function LeftConversationSidebar({
                         <StatChip icon={<Layers className="h-3 w-3" />} value={cardCount} label="cards" />
                         <StatChip icon={<Network className="h-3 w-3" />} value={rootNodeCount} label="roots" />
                     </div>
+                    {rootNodeWarning ? (
+                        <p className="mt-3 text-[10px] leading-relaxed text-amber-600 theme-dark:text-amber-400">
+                            {rootNodeWarning}
+                        </p>
+                    ) : null}
                 </div>
 
-                <div className="mt-1 flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border/50 px-4 py-6 text-center">
-                    <span className="text-[11px] font-medium text-muted-foreground/50">多会话与本地持久化</span>
-                    <span className="text-[10px] text-muted-foreground/35">即将到来</span>
+                <div className="mt-2 flex items-center justify-between px-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/50">
+                        Threads
+                    </span>
+                    <button
+                        type="button"
+                        onClick={onCreateThread}
+                        className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        aria-label="新建会话"
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+
+                <div className="space-y-1.5">
+                    {threads.map((thread) => {
+                        const isActive = thread.id === activeThreadId
+                        const isEditing = thread.id === editingThreadId
+
+                        return (
+                            <div
+                                key={thread.id}
+                                className={cn(
+                                    "group flex min-h-10 items-center gap-2 rounded-xl border px-2.5 py-2 transition-colors",
+                                    isActive
+                                        ? "border-sky-400/40 bg-sky-500/10"
+                                        : "border-transparent hover:border-border/70 hover:bg-accent/60",
+                                )}
+                            >
+                                {isEditing ? (
+                                    <Input
+                                        autoFocus
+                                        value={editingTitle}
+                                        onChange={(event) => {
+                                            setEditingTitle(event.target.value)
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter") {
+                                                commitThreadRename()
+                                            }
+                                            if (event.key === "Escape") {
+                                                cancelThreadRename()
+                                            }
+                                        }}
+                                        className="h-7 min-w-0 flex-1 text-xs"
+                                        aria-label="会话标题"
+                                    />
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="min-w-0 flex-1 truncate text-left text-xs font-medium text-foreground/85"
+                                        onClick={() => {
+                                            onSwitchThread(thread.id)
+                                        }}
+                                    >
+                                        {thread.title}
+                                    </button>
+                                )}
+
+                                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                                    {isEditing ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={commitThreadRename}
+                                                className="flex h-6 w-6 items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-500/10"
+                                                aria-label="保存会话标题"
+                                            >
+                                                <Check className="h-3 w-3" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={cancelThreadRename}
+                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                                                aria-label="取消重命名"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    beginThreadRename(thread)
+                                                }}
+                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                                                aria-label={`重命名 ${thread.title}`}
+                                            >
+                                                <Pencil className="h-3 w-3" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    onDeleteThread(thread.id)
+                                                }}
+                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+                                                aria-label={`删除 ${thread.title}`}
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
 
