@@ -7,12 +7,18 @@ import (
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx                 context.Context
+	workspaceRepository *WorkspaceRepository
+	initializationError error
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	workspaceRepository, err := NewDefaultWorkspaceRepository()
+	return &App{
+		workspaceRepository: workspaceRepository,
+		initializationError: err,
+	}
 }
 
 // startup is called when the app starts. The context is saved
