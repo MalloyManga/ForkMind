@@ -113,6 +113,22 @@ export interface ConversationSnapshot {
 }
 
 /**
+ * 右侧编辑栏可修改的文本字段
+ * 该联合类型用于把 focus blur 生命周期和具体 Store 字段绑定
+ */
+export type ConversationTextField = "userPrompt" | "aiResponse" | "noteContent"
+
+/**
+ * 当前连续文本编辑事务
+ * hasChanges 为 false 表示已经 focus 但用户还没有真正修改内容
+ */
+export interface ConversationTextEditSession {
+    nodeId: string
+    field: ConversationTextField
+    hasChanges: boolean
+}
+
+/**
  * Store 状态与行为定义
  * 组件层应只依赖这些语义化方法 不直接拼装底层节点数组
  */
@@ -121,6 +137,7 @@ export interface ConversationStoreState {
     activeNodeId: string | null
     pastSnapshots: ConversationSnapshot[]
     futureSnapshots: ConversationSnapshot[]
+    textEditSession: ConversationTextEditSession | null
 
     setActiveThread: (thread: ConversationThread) => void
     setActiveNodeId: (nodeId: string | null) => void
@@ -133,6 +150,8 @@ export interface ConversationStoreState {
     updateChatPrompt: (nodeId: string, userPrompt: string) => void
     updateChatResponse: (nodeId: string, aiResponse: string) => void
     updateNoteContent: (nodeId: string, noteContent: string) => void
+    beginTextEdit: (nodeId: string, field: ConversationTextField) => void
+    endTextEdit: () => void
     pasteNodesFromClipboard: (input: PasteNodesFromClipboardInput) => string[]
     replaceNodesFromClipboard: (input: ReplaceNodesFromClipboardInput) => string[]
 

@@ -100,6 +100,8 @@ function App() {
     const updateChatPrompt = useConversationStore((state) => state.updateChatPrompt)
     const updateChatResponse = useConversationStore((state) => state.updateChatResponse)
     const updateNoteContent = useConversationStore((state) => state.updateNoteContent)
+    const beginTextEdit = useConversationStore((state) => state.beginTextEdit)
+    const endTextEdit = useConversationStore((state) => state.endTextEdit)
     const pasteNodesFromClipboard = useConversationStore((state) => state.pasteNodesFromClipboard)
     const replaceNodesFromClipboard = useConversationStore((state) => state.replaceNodesFromClipboard)
     const undo = useConversationStore((state) => state.undo)
@@ -421,6 +423,8 @@ function App() {
                             onUpdateChatPrompt={updateChatPrompt}
                             onUpdateChatResponse={updateChatResponse}
                             onUpdateNoteContent={updateNoteContent}
+                            onBeginTextEdit={beginTextEdit}
+                            onEndTextEdit={endTextEdit}
                         />
                     </div>
                 ) : null}

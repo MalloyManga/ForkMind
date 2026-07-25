@@ -14,6 +14,7 @@ import type {
     ClipboardNodeSnapshot,
     ConversationSnapshot,
     ConversationStoreState,
+    ConversationTextField,
 } from "./contracts"
 import { initialThread } from "./initialData"
 import {
@@ -38,6 +39,53 @@ interface RemappedClipboardRelations {
 interface CreatePastedNodesResult {
     pastedNodeIds: string[]
     pastedNodes: ConversationCard[]
+}
+
+interface TextMutationHistoryResult {
+    pastSnapshots: ConversationSnapshot[]
+    futureSnapshots: ConversationSnapshot[]
+    textEditSession: ConversationStoreState["textEditSession"]
+}
+
+/**
+ * 计算一次文本变化对应的历史状态
+ * @param state 入参是当前 Zustand 状态 用于读取编辑事务与历史栈
+ * @param nodeId 入参来自右侧编辑栏当前节点 用于确认本次变化属于哪张卡片
+ * @param field 入参表示当前修改的业务文本字段
+ * @returns 返回本次更新应写回的历史栈与编辑事务状态
+ * 用户连续输入时仅第一次变化保存撤销基线 避免每个字符深拷贝整棵节点树
+ */
+function resolveTextMutationHistory(
+    state: ConversationStoreState,
+    nodeId: string,
+    field: ConversationTextField,
+): TextMutationHistoryResult {
+    const currentSession = state.textEditSession
+    const isMatchingSession =
+        currentSession?.nodeId === nodeId && currentSession.field === field
+    const shouldCaptureSnapshot = !isMatchingSession || !currentSession.hasChanges
+
+    const nextPastSnapshots = shouldCaptureSnapshot
+        ? [
+            ...state.pastSnapshots,
+            {
+                thread: cloneThread(state.activeThread),
+                activeNodeId: state.activeNodeId,
+            },
+        ].slice(-HISTORY_LIMIT)
+        : state.pastSnapshots
+
+    return {
+        pastSnapshots: nextPastSnapshots,
+        futureSnapshots: [],
+        textEditSession: isMatchingSession
+            ? {
+                nodeId,
+                field,
+                hasChanges: true,
+            }
+            : null,
+    }
 }
 
 /**
@@ -212,6 +260,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     activeNodeId: initialThread.cards[0]?.id ?? null,
     pastSnapshots: [],
     futureSnapshots: [],
+    textEditSession: null,
 
     /**
      * 切换到指定线程
@@ -223,6 +272,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             activeNodeId: nextThread.cards[0]?.id ?? null,
             pastSnapshots: [],
             futureSnapshots: [],
+            textEditSession: null,
         })
     },
 
@@ -435,15 +485,15 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 }
             })
 
-            const snapshot: ConversationSnapshot = {
-                thread: cloneThread(state.activeThread),
-                activeNodeId: state.activeNodeId,
-            }
+            const textMutationHistory = resolveTextMutationHistory(
+                state,
+                nodeId,
+                "userPrompt",
+            )
 
             return {
                 activeThread: { ...state.activeThread, cards: nextCards },
-                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
-                futureSnapshots: [],
+                ...textMutationHistory,
             }
         })
     },
@@ -471,15 +521,15 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 }
             })
 
-            const snapshot: ConversationSnapshot = {
-                thread: cloneThread(state.activeThread),
-                activeNodeId: state.activeNodeId,
-            }
+            const textMutationHistory = resolveTextMutationHistory(
+                state,
+                nodeId,
+                "aiResponse",
+            )
 
             return {
                 activeThread: { ...state.activeThread, cards: nextCards },
-                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
-                futureSnapshots: [],
+                ...textMutationHistory,
             }
         })
     },
@@ -507,17 +557,47 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 }
             })
 
-            const snapshot: ConversationSnapshot = {
-                thread: cloneThread(state.activeThread),
-                activeNodeId: state.activeNodeId,
-            }
+            const textMutationHistory = resolveTextMutationHistory(
+                state,
+                nodeId,
+                "noteContent",
+            )
 
             return {
                 activeThread: { ...state.activeThread, cards: nextCards },
-                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
-                futureSnapshots: [],
+                ...textMutationHistory,
             }
         })
+    },
+
+    /**
+     * 开始右侧文本编辑事务
+     * nodeId 和 field 来自获得焦点的 textarea
+     * 真正的撤销快照会延迟到第一次内容变化时创建
+     */
+    beginTextEdit: (nodeId, field) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (!targetNode) {
+                return {}
+            }
+
+            return {
+                textEditSession: {
+                    nodeId,
+                    field,
+                    hasChanges: false,
+                },
+            }
+        })
+    },
+
+    /**
+     * 结束当前文本编辑事务
+     * 用户离开 textarea 或切换节点时触发 null 表示当前没有连续输入需要合并
+     */
+    endTextEdit: () => {
+        set({ textEditSession: null })
     },
 
     /**
@@ -900,6 +980,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeNodeId: previousSnapshot.activeNodeId,
                 pastSnapshots: nextPastSnapshots,
                 futureSnapshots: [currentSnapshot, ...state.futureSnapshots],
+                textEditSession: null,
             }
         })
     },
@@ -924,6 +1005,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 activeNodeId: nextSnapshot.activeNodeId,
                 pastSnapshots: [...state.pastSnapshots, currentSnapshot].slice(-HISTORY_LIMIT),
                 futureSnapshots: restFutureSnapshots,
+                textEditSession: null,
             }
         })
     },

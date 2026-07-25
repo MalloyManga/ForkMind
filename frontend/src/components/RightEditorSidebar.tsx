@@ -14,12 +14,15 @@ import {
     DEFAULT_CHAT_PROMPT_RATIO,
 } from "../constants/layout"
 import type { ConversationCard, ConversationNodeStatus } from "../domain/conversation/types"
+import type { ConversationTextField } from "../stores/conversationStore"
 
 interface RightEditorSidebarProps {
     activeNode: ConversationCard | undefined
     onUpdateChatPrompt: (nodeId: string, value: string) => void
     onUpdateChatResponse: (nodeId: string, value: string) => void
     onUpdateNoteContent: (nodeId: string, value: string) => void
+    onBeginTextEdit: (nodeId: string, field: ConversationTextField) => void
+    onEndTextEdit: () => void
 }
 
 interface ChatEditorResizeState {
@@ -57,6 +60,8 @@ export function RightEditorSidebar({
     onUpdateChatPrompt,
     onUpdateChatResponse,
     onUpdateNoteContent,
+    onBeginTextEdit,
+    onEndTextEdit,
 }: RightEditorSidebarProps) {
     const [chatPromptRatio, setChatPromptRatio] = useState(DEFAULT_CHAT_PROMPT_RATIO)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
@@ -201,6 +206,10 @@ export function RightEditorSidebar({
                                 className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-sky-500/40"
                                 placeholder="用户 Prompt（支持 Markdown / LaTeX）"
                                 value={activeNode.userPrompt}
+                                onFocus={() => {
+                                    onBeginTextEdit(activeNode.id, "userPrompt")
+                                }}
+                                onBlur={onEndTextEdit}
                                 onChange={(event) => {
                                     onUpdateChatPrompt(activeNode.id, event.target.value)
                                 }}
@@ -226,6 +235,10 @@ export function RightEditorSidebar({
                                 className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-violet-500/40"
                                 placeholder="AI Response（支持 Markdown / LaTeX）"
                                 value={activeNode.aiResponse}
+                                onFocus={() => {
+                                    onBeginTextEdit(activeNode.id, "aiResponse")
+                                }}
+                                onBlur={onEndTextEdit}
                                 onChange={(event) => {
                                     onUpdateChatResponse(activeNode.id, event.target.value)
                                 }}
@@ -243,6 +256,10 @@ export function RightEditorSidebar({
                             className="h-full min-h-0 flex-1 resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-amber-400/40"
                             placeholder="Markdown 笔记"
                             value={activeNode.noteContent}
+                            onFocus={() => {
+                                onBeginTextEdit(activeNode.id, "noteContent")
+                            }}
+                            onBlur={onEndTextEdit}
                             onChange={(event) => {
                                 onUpdateNoteContent(activeNode.id, event.target.value)
                             }}

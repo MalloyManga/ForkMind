@@ -7,6 +7,8 @@ export type {
     ClipboardNodeSnapshot,
     ConversationSnapshot,
     ConversationStoreState,
+    ConversationTextField,
+    ConversationTextEditSession,
     ForkChatNodeInput,
     ForkNoteNodeInput,
     PasteNodesFromClipboardInput,
