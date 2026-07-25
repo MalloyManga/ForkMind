@@ -10,6 +10,8 @@ type App struct {
 	ctx                 context.Context
 	workspaceRepository *WorkspaceRepository
 	initializationError error
+	openAIClient        *OpenAIClient
+	aiRequestManager    *AIRequestManager
 }
 
 // NewApp creates a new App application struct
@@ -18,6 +20,8 @@ func NewApp() *App {
 	return &App{
 		workspaceRepository: workspaceRepository,
 		initializationError: err,
+		openAIClient:        NewOpenAIClient(),
+		aiRequestManager:    NewAIRequestManager(),
 	}
 }
 
