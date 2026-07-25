@@ -454,7 +454,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     updateChatResponse: (nodeId, aiResponse) => {
         set((state) => {
             const targetNode = findNodeById(state.activeThread.cards, nodeId)
-            if (!targetNode || targetNode.cardType !== "chat" || targetNode.aiResponse === aiResponse || targetNode) {
+            if (!targetNode || targetNode.cardType !== "chat" || targetNode.aiResponse === aiResponse) {
                 return {}
             }
 
