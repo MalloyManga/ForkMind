@@ -1,6 +1,13 @@
 ﻿import { create } from "zustand"
 import { assertNever } from "@/lib/utils"
-import { DEFAULT_THREAD_TITLE, HISTORY_LIMIT } from "../../domain/conversation/constants"
+import {
+    DEFAULT_THREAD_TITLE,
+    HISTORY_LIMIT,
+    NODE_STATUS_DONE,
+    NODE_STATUS_ERROR,
+    NODE_STATUS_IDLE,
+    NODE_STATUS_STREAMING,
+} from "../../domain/conversation/constants"
 import { deriveThreadTitleFromPrompt } from "../../domain/conversation/helpers"
 import type {
     BaseNode,
@@ -632,6 +639,198 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                     updatedAt: now,
                 },
                 ...textMutationHistory,
+            }
+        })
+    },
+
+    /**
+     * 开始生成 chat 节点的 AI 输出
+     * @param nodeId 入参来自发送或重新生成按钮 用于定位当前 Chat 节点
+     * @returns 返回 true 表示已建立请求前历史基线 false 表示节点无效或 Prompt 为空
+     * 用户触发发送时清空旧回答并进入 streaming 后续 chunk 不再重复写撤销历史
+     */
+    startChatResponse: (nodeId) => {
+        let didStart = false
+
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (
+                !targetNode ||
+                targetNode.cardType !== "chat" ||
+                targetNode.userPrompt.trim().length === 0 ||
+                targetNode.status === NODE_STATUS_STREAMING
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const nextCards: ConversationCard[] = state.activeThread.cards.map((node) =>
+                node.id === nodeId && node.cardType === "chat"
+                    ? {
+                        ...node,
+                        aiResponse: "",
+                        status: NODE_STATUS_STREAMING,
+                        updatedAt: now,
+                    }
+                    : node,
+            )
+            const snapshot: ConversationSnapshot = {
+                thread: cloneThread(state.activeThread),
+                activeNodeId: state.activeNodeId,
+            }
+
+            didStart = true
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: nextCards,
+                    updatedAt: now,
+                },
+                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
+                futureSnapshots: [],
+                textEditSession: null,
+            }
+        })
+
+        return didStart
+    },
+
+    /**
+     * 追加单个流式文本片段
+     * @param nodeId 入参来自已校验的 Wails chunk 事件 用于防止响应写入其他节点
+     * @param delta 入参是 Provider 本次增量文本 空字符串不会产生状态变化
+     * @returns 无返回值 chunk 只更新当前回答和时间戳 不创建逐字符撤销快照
+     * OpenAI-compatible SSE 每到达一个 content delta 时触发
+     */
+    appendChatResponseChunk: (nodeId, delta) => {
+        if (delta.length === 0) {
+            return
+        }
+
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (
+                !targetNode ||
+                targetNode.cardType !== "chat" ||
+                targetNode.status !== NODE_STATUS_STREAMING
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId && node.cardType === "chat"
+                            ? {
+                                ...node,
+                                aiResponse: `${node.aiResponse}${delta}`,
+                                updatedAt: now,
+                            }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
+            }
+        })
+    },
+
+    /**
+     * 标记流式回答正常完成
+     * @param nodeId 入参来自 done 事件 用于定位本次请求对应的 Chat 节点
+     * @returns 无返回值 非 streaming 节点会被忽略
+     * Provider 正常结束 SSE 后触发并把节点收口为 done
+     */
+    completeChatResponse: (nodeId) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (
+                !targetNode ||
+                targetNode.cardType !== "chat" ||
+                targetNode.status !== NODE_STATUS_STREAMING
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId
+                            ? { ...node, status: NODE_STATUS_DONE, updatedAt: now }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
+            }
+        })
+    },
+
+    /**
+     * 收口被用户取消的流式回答
+     * @param nodeId 入参来自 Stop 动作对应的 done cancelled 事件
+     * @returns 无返回值 有部分回答时保留为 done 无任何回答时恢复 idle
+     * 用户主动停止生成后触发并保留已经收到的可用文本
+     */
+    cancelChatResponse: (nodeId) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (
+                !targetNode ||
+                targetNode.cardType !== "chat" ||
+                targetNode.status !== NODE_STATUS_STREAMING
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const nextStatus = targetNode.aiResponse.length > 0
+                ? NODE_STATUS_DONE
+                : NODE_STATUS_IDLE
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId
+                            ? { ...node, status: nextStatus, updatedAt: now }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
+            }
+        })
+    },
+
+    /**
+     * 标记流式回答失败
+     * @param nodeId 入参来自 Bridge 启动错误或 Wails error 事件
+     * @returns 无返回值 非 streaming 节点会被忽略
+     * 网络 Provider 或响应协议失败时触发 回答文本保留用于问题诊断
+     */
+    failChatResponse: (nodeId) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (
+                !targetNode ||
+                targetNode.cardType !== "chat" ||
+                targetNode.status !== NODE_STATUS_STREAMING
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId
+                            ? { ...node, status: NODE_STATUS_ERROR, updatedAt: now }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
             }
         })
     },

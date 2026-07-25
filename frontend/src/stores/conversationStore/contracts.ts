@@ -162,6 +162,11 @@ export interface ConversationStoreState {
 
     updateChatPrompt: (nodeId: string, userPrompt: string) => void
     updateChatResponse: (nodeId: string, aiResponse: string) => void
+    startChatResponse: (nodeId: string) => boolean
+    appendChatResponseChunk: (nodeId: string, delta: string) => void
+    completeChatResponse: (nodeId: string) => void
+    cancelChatResponse: (nodeId: string) => void
+    failChatResponse: (nodeId: string) => void
     updateNoteContent: (nodeId: string, noteContent: string) => void
     beginTextEdit: (nodeId: string, field: ConversationTextField) => void
     endTextEdit: () => void
