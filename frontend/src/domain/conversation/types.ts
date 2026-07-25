@@ -96,4 +96,6 @@ export interface ConversationThread {
     id: string
     title: string
     cards: ConversationCard[]
+    createdAt: string
+    updatedAt: string
 }

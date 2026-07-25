@@ -129,6 +129,16 @@ export interface ConversationTextEditSession {
 }
 
 /**
+ * 单个会话在编辑器中的运行时状态
+ * 切换会话时暂存 active 和历史栈 这些数据不会写入 ForkMind JSON
+ */
+export interface ConversationThreadRuntime {
+    activeNodeId: string | null
+    pastSnapshots: ConversationSnapshot[]
+    futureSnapshots: ConversationSnapshot[]
+}
+
+/**
  * Store 状态与行为定义
  * 组件层应只依赖这些语义化方法 不直接拼装底层节点数组
  */
@@ -138,8 +148,11 @@ export interface ConversationStoreState {
     pastSnapshots: ConversationSnapshot[]
     futureSnapshots: ConversationSnapshot[]
     textEditSession: ConversationTextEditSession | null
+    threadRuntimeById: Record<string, ConversationThreadRuntime>
 
     setActiveThread: (thread: ConversationThread) => void
+    renameActiveThread: (title: string) => void
+    forgetThreadRuntime: (threadId: string) => void
     setActiveNodeId: (nodeId: string | null) => void
     setActiveThreadCards: (cards: ConversationCard[]) => void
 

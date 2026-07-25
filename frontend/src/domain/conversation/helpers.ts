@@ -1,4 +1,5 @@
 import { assertNever } from "@/lib/utils"
+import { DEFAULT_THREAD_TITLE, THREAD_TITLE_MAX_LENGTH } from "./constants"
 import type { BaseNode, ConversationCard } from "./types"
 
 /**
@@ -31,4 +32,21 @@ export function cloneConversationCard(card: ConversationCard): ConversationCard 
     }
 
     return assertNever(card)
+}
+
+/**
+ * 根据首次用户 Prompt 生成会话标题
+ * @param prompt 入参来自当前会话第一张 chat 卡片的用户输入
+ * @returns 返回单行且已限制长度的标题 空白输入返回默认标题
+ * 用户第一次输入内容时触发 后续手动改名后不会再次覆盖
+ */
+export function deriveThreadTitleFromPrompt(prompt: string): string {
+    const normalizedTitle = prompt.replace(/\s+/g, " ").trim()
+    if (normalizedTitle.length === 0) {
+        return DEFAULT_THREAD_TITLE
+    }
+
+    return normalizedTitle.length > THREAD_TITLE_MAX_LENGTH
+        ? `${normalizedTitle.slice(0, THREAD_TITLE_MAX_LENGTH)}...`
+        : normalizedTitle
 }

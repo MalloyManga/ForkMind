@@ -1,6 +1,7 @@
 ﻿import { create } from "zustand"
 import { assertNever } from "@/lib/utils"
-import { HISTORY_LIMIT } from "../../domain/conversation/constants"
+import { DEFAULT_THREAD_TITLE, HISTORY_LIMIT } from "../../domain/conversation/constants"
+import { deriveThreadTitleFromPrompt } from "../../domain/conversation/helpers"
 import type {
     BaseNode,
     ConversationCard,
@@ -15,10 +16,12 @@ import type {
     ConversationSnapshot,
     ConversationStoreState,
     ConversationTextField,
+    ConversationThreadRuntime,
 } from "./contracts"
 import { initialThread } from "./initialData"
 import {
     cloneNode,
+    cloneSnapshot,
     cloneThread,
     createForkPosition,
     createNodeId,
@@ -45,6 +48,20 @@ interface TextMutationHistoryResult {
     pastSnapshots: ConversationSnapshot[]
     futureSnapshots: ConversationSnapshot[]
     textEditSession: ConversationStoreState["textEditSession"]
+}
+
+/**
+ * 深拷贝单个会话的编辑器运行时
+ * @param runtime 入参来自 threadRuntimeById 中的历史状态
+ * @returns 返回与缓存断开引用的新运行时对象
+ * 用户切回旧会话时触发 防止撤销栈跨会话共享对象
+ */
+function cloneThreadRuntime(runtime: ConversationThreadRuntime): ConversationThreadRuntime {
+    return {
+        activeNodeId: runtime.activeNodeId,
+        pastSnapshots: runtime.pastSnapshots.map((snapshot) => cloneSnapshot(snapshot)),
+        futureSnapshots: runtime.futureSnapshots.map((snapshot) => cloneSnapshot(snapshot)),
+    }
 }
 
 /**
@@ -261,18 +278,79 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
     pastSnapshots: [],
     futureSnapshots: [],
     textEditSession: null,
+    threadRuntimeById: {},
 
     /**
      * 切换到指定线程
      */
     setActiveThread: (thread) => {
-        const nextThread = cloneThread(thread)
-        set({
-            activeThread: nextThread,
-            activeNodeId: nextThread.cards[0]?.id ?? null,
-            pastSnapshots: [],
-            futureSnapshots: [],
-            textEditSession: null,
+        set((state) => {
+            const nextThread = cloneThread(thread)
+            const currentRuntime: ConversationThreadRuntime = {
+                activeNodeId: state.activeNodeId,
+                pastSnapshots: state.pastSnapshots.map((snapshot) => cloneSnapshot(snapshot)),
+                futureSnapshots: state.futureSnapshots.map((snapshot) => cloneSnapshot(snapshot)),
+            }
+            const nextRuntimeById = {
+                ...state.threadRuntimeById,
+                [state.activeThread.id]: currentRuntime,
+            }
+            const cachedNextRuntime = nextRuntimeById[nextThread.id]
+            const nextRuntime = cachedNextRuntime
+                ? cloneThreadRuntime(cachedNextRuntime)
+                : {
+                    activeNodeId: nextThread.cards[0]?.id ?? null,
+                    pastSnapshots: [],
+                    futureSnapshots: [],
+                }
+            const normalizedActiveNodeId =
+                nextRuntime.activeNodeId !== null &&
+                    nextThread.cards.some((card) => card.id === nextRuntime.activeNodeId)
+                    ? nextRuntime.activeNodeId
+                    : nextThread.cards[0]?.id ?? null
+
+            return {
+                activeThread: nextThread,
+                activeNodeId: normalizedActiveNodeId,
+                pastSnapshots: nextRuntime.pastSnapshots,
+                futureSnapshots: nextRuntime.futureSnapshots,
+                textEditSession: null,
+                threadRuntimeById: nextRuntimeById,
+            }
+        })
+    },
+
+    /**
+     * 重命名当前会话
+     * title 来自左侧栏内联输入 空字符串降级为默认标题
+     * 返回值为空 因为工作区同步层会自动接收新的 activeThread
+     */
+    renameActiveThread: (title) => {
+        const normalizedTitle = title.trim() || DEFAULT_THREAD_TITLE
+        const now = createTimestamp()
+
+        set((state) => ({
+            activeThread: {
+                ...state.activeThread,
+                title: normalizedTitle,
+                updatedAt: now,
+            },
+        }))
+    },
+
+    /**
+     * 删除某个会话对应的临时编辑器运行时
+     * threadId 来自工作区删除动作 防止已删除会话继续占用历史快照内存
+     */
+    forgetThreadRuntime: (threadId) => {
+        set((state) => {
+            if (!(threadId in state.threadRuntimeById)) {
+                return {}
+            }
+
+            const nextRuntimeById = { ...state.threadRuntimeById }
+            delete nextRuntimeById[threadId]
+            return { threadRuntimeById: nextRuntimeById }
         })
     },
 
@@ -490,9 +568,21 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 nodeId,
                 "userPrompt",
             )
+            const shouldDeriveThreadTitle =
+                state.activeThread.title === DEFAULT_THREAD_TITLE &&
+                targetNode.userPrompt.trim().length === 0 &&
+                userPrompt.trim().length > 0
+            const nextThreadTitle = shouldDeriveThreadTitle
+                ? deriveThreadTitleFromPrompt(userPrompt)
+                : state.activeThread.title
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: {
+                    ...state.activeThread,
+                    title: nextThreadTitle,
+                    cards: nextCards,
+                    updatedAt: now,
+                },
                 ...textMutationHistory,
             }
         })
@@ -528,7 +618,11 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             )
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: {
+                    ...state.activeThread,
+                    cards: nextCards,
+                    updatedAt: now,
+                },
                 ...textMutationHistory,
             }
         })
@@ -564,7 +658,11 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
             )
 
             return {
-                activeThread: { ...state.activeThread, cards: nextCards },
+                activeThread: {
+                    ...state.activeThread,
+                    cards: nextCards,
+                    updatedAt: now,
+                },
                 ...textMutationHistory,
             }
         })

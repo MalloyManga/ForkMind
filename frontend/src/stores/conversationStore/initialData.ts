@@ -54,4 +54,6 @@ export const initialThread: ConversationThread = {
     id: "thread-default",
     title: "默认对话",
     cards: initialCards,
+    createdAt: "2026-03-30T10:00:00.000Z",
+    updatedAt: "2026-03-30T10:05:00.000Z",
 }

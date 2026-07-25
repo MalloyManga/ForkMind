@@ -9,6 +9,7 @@ export type {
     ConversationStoreState,
     ConversationTextField,
     ConversationTextEditSession,
+    ConversationThreadRuntime,
     ForkChatNodeInput,
     ForkNoteNodeInput,
     PasteNodesFromClipboardInput,
