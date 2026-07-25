@@ -38,10 +38,13 @@ export function useWorkspaceController() {
      * @returns 返回新建的 ConversationThread 便于后续聚焦或持久化
      */
     const createThread = useCallback((title?: string): ConversationThread => {
+        // 新建会话会立即切换 conversationStore
+        // 因此必须先同步当前快照 避免最后一次输入仍等待 useEffect 时被旧 workspace 镜像覆盖
+        upsertWorkspaceThread(activeThread)
         const nextThread = createWorkspaceThread(title)
         setActiveThread(nextThread)
         return nextThread
-    }, [createWorkspaceThread, setActiveThread])
+    }, [activeThread, createWorkspaceThread, setActiveThread, upsertWorkspaceThread])
 
     /**
      * 切换当前会话
