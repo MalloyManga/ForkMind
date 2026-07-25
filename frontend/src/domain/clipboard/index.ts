@@ -14,6 +14,10 @@ import type {
     CanvasClipboardPayload,
     ClipboardNodeSnapshot,
 } from "../../stores/conversationStore"
+import {
+    ClipboardGetText,
+    ClipboardSetText,
+} from "../../../wailsjs/runtime/runtime"
 
 export const FORKMIND_CLIPBOARD_FORMAT = "forkmind-canvas-clipboard"
 export const FORKMIND_CLIPBOARD_VERSION = 1
@@ -169,11 +173,28 @@ export function parseForkMindClipboard(content: string): ForkMindClipboardParseR
  * Copy as ForkMind JSON 命令触发
  */
 export async function writeSystemClipboardText(content: string): Promise<void> {
-    if (!navigator.clipboard?.writeText) {
-        throw new Error("当前 WebView 不支持系统剪贴板写入")
+    let browserClipboardError: unknown = null
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(content)
+            return
+        } catch (error) {
+            browserClipboardError = error
+        }
     }
 
-    await navigator.clipboard.writeText(content)
+    const runtimeGlobal = globalThis as typeof globalThis & { runtime?: unknown }
+    if (typeof runtimeGlobal.runtime !== "undefined") {
+        const didWrite = await ClipboardSetText(content)
+        if (didWrite) {
+            return
+        }
+        throw new Error("Wails 系统剪贴板写入失败")
+    }
+
+    throw browserClipboardError instanceof Error
+        ? new Error(`系统剪贴板写入失败: ${browserClipboardError.message}`)
+        : new Error("当前环境不支持系统剪贴板写入")
 }
 
 /**
@@ -182,9 +203,21 @@ export async function writeSystemClipboardText(content: string): Promise<void> {
  * Paste from ForkMind JSON 命令触发
  */
 export async function readSystemClipboardText(): Promise<string> {
-    if (!navigator.clipboard?.readText) {
-        throw new Error("当前 WebView 不支持系统剪贴板读取")
+    let browserClipboardError: unknown = null
+    if (navigator.clipboard?.readText) {
+        try {
+            return await navigator.clipboard.readText()
+        } catch (error) {
+            browserClipboardError = error
+        }
     }
 
-    return navigator.clipboard.readText()
+    const runtimeGlobal = globalThis as typeof globalThis & { runtime?: unknown }
+    if (typeof runtimeGlobal.runtime !== "undefined") {
+        return ClipboardGetText()
+    }
+
+    throw browserClipboardError instanceof Error
+        ? new Error(`系统剪贴板读取失败: ${browserClipboardError.message}`)
+        : new Error("当前环境不支持系统剪贴板读取")
 }
