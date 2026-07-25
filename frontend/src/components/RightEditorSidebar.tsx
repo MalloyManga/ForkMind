@@ -5,7 +5,17 @@ import {
     type PointerEvent as ReactPointerEvent,
     type ReactNode,
 } from "react"
-import { FileText, MessageSquareText, PenLine, Sparkles, SquareMousePointer, UserRound } from "lucide-react"
+import {
+    FileText,
+    MessageSquareText,
+    PenLine,
+    Send,
+    Sparkles,
+    Square,
+    SquareMousePointer,
+    UserRound,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
@@ -23,6 +33,11 @@ interface RightEditorSidebarProps {
     onUpdateNoteContent: (nodeId: string, value: string) => void
     onBeginTextEdit: (nodeId: string, field: ConversationTextField) => void
     onEndTextEdit: () => void
+    activeAIRequestNodeId: string | null
+    canStartAIRequest: boolean
+    aiErrorMessage: string | null
+    onStartAIRequest: (nodeId: string) => void
+    onCancelAIRequest: (nodeId: string) => void
 }
 
 interface ChatEditorResizeState {
@@ -41,13 +56,24 @@ function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
 
-function SectionLabel({ icon, title, accent }: { icon: ReactNode; title: string; accent: string }) {
+function SectionLabel({
+    icon,
+    title,
+    accent,
+    action,
+}: {
+    icon: ReactNode
+    title: string
+    accent: string
+    action?: ReactNode
+}) {
     return (
         <div className="mb-2 flex items-center gap-2 px-0.5">
             <span className={cn("flex h-5 w-5 items-center justify-center rounded-md", accent)}>{icon}</span>
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
                 {title}
             </span>
+            {action ? <span className="ml-auto">{action}</span> : null}
         </div>
     )
 }
@@ -62,6 +88,11 @@ export function RightEditorSidebar({
     onUpdateNoteContent,
     onBeginTextEdit,
     onEndTextEdit,
+    activeAIRequestNodeId,
+    canStartAIRequest,
+    aiErrorMessage,
+    onStartAIRequest,
+    onCancelAIRequest,
 }: RightEditorSidebarProps) {
     const [chatPromptRatio, setChatPromptRatio] = useState(DEFAULT_CHAT_PROMPT_RATIO)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
@@ -125,6 +156,8 @@ export function RightEditorSidebar({
     }
 
     const status = activeNode ? STATUS_META[activeNode.status] : null
+    const isActiveNodeStreaming =
+        activeNode?.cardType === "chat" && activeAIRequestNodeId === activeNode.id
 
     return (
         <aside className="flex h-full flex-col bg-background/95 backdrop-blur-sm">
@@ -206,6 +239,7 @@ export function RightEditorSidebar({
                                 className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-sky-500/40"
                                 placeholder="用户 Prompt（支持 Markdown / LaTeX）"
                                 value={activeNode.userPrompt}
+                                disabled={isActiveNodeStreaming}
                                 onFocus={() => {
                                     onBeginTextEdit(activeNode.id, "userPrompt")
                                 }}
@@ -230,11 +264,38 @@ export function RightEditorSidebar({
                                 icon={<Sparkles className="h-3 w-3" />}
                                 title="AI Response"
                                 accent="bg-violet-500/15 text-violet-600 theme-dark:text-violet-400"
+                                action={isActiveNodeStreaming ? (
+                                    <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="destructive"
+                                        onClick={() => {
+                                            onCancelAIRequest(activeNode.id)
+                                        }}
+                                    >
+                                        <Square className="h-3 w-3 fill-current" />
+                                        Stop
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="secondary"
+                                        disabled={!canStartAIRequest}
+                                        onClick={() => {
+                                            onStartAIRequest(activeNode.id)
+                                        }}
+                                    >
+                                        <Send className="h-3 w-3" />
+                                        {activeNode.aiResponse.trim().length > 0 ? "Regenerate" : "Send"}
+                                    </Button>
+                                )}
                             />
                             <Textarea
                                 className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-violet-500/40"
                                 placeholder="AI Response（支持 Markdown / LaTeX）"
                                 value={activeNode.aiResponse}
+                                disabled={isActiveNodeStreaming}
                                 onFocus={() => {
                                     onBeginTextEdit(activeNode.id, "aiResponse")
                                 }}
@@ -243,6 +304,14 @@ export function RightEditorSidebar({
                                     onUpdateChatResponse(activeNode.id, event.target.value)
                                 }}
                             />
+                            {aiErrorMessage ? (
+                                <p
+                                    role="alert"
+                                    className="mt-2 rounded-lg bg-destructive/10 px-2.5 py-2 text-[11px] leading-relaxed text-destructive"
+                                >
+                                    {aiErrorMessage}
+                                </p>
+                            ) : null}
                         </section>
                     </div>
                 ) : (

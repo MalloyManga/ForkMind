@@ -29,6 +29,7 @@ interface LeftConversationSidebarProps {
     activeThreadId: string
     persistenceStatus: WorkspacePersistenceStatus
     persistenceErrorMessage: string | null
+    isThreadManagementDisabled: boolean
     themeMode: "dark" | "light"
     panelsToggleControl: ReactNode
     onCreateThread: () => void
@@ -67,6 +68,7 @@ export function LeftConversationSidebar({
     activeThreadId,
     persistenceStatus,
     persistenceErrorMessage,
+    isThreadManagementDisabled,
     themeMode,
     panelsToggleControl,
     onCreateThread,
@@ -189,7 +191,8 @@ export function LeftConversationSidebar({
                     <button
                         type="button"
                         onClick={onCreateThread}
-                        className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        disabled={isThreadManagementDisabled}
+                        className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label="新建会话"
                     >
                         <Plus className="h-3.5 w-3.5" />
@@ -232,7 +235,8 @@ export function LeftConversationSidebar({
                                 ) : (
                                     <button
                                         type="button"
-                                        className="min-w-0 flex-1 truncate text-left text-xs font-medium text-foreground/85"
+                                        disabled={isThreadManagementDisabled}
+                                        className="min-w-0 flex-1 truncate text-left text-xs font-medium text-foreground/85 disabled:cursor-not-allowed disabled:opacity-60"
                                         onClick={() => {
                                             onSwitchThread(thread.id)
                                         }}
@@ -246,6 +250,7 @@ export function LeftConversationSidebar({
                                         <>
                                             <button
                                                 type="button"
+                                                disabled={isThreadManagementDisabled}
                                                 onClick={commitThreadRename}
                                                 className="flex h-6 w-6 items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-500/10"
                                                 aria-label="保存会话标题"
@@ -254,6 +259,7 @@ export function LeftConversationSidebar({
                                             </button>
                                             <button
                                                 type="button"
+                                                disabled={isThreadManagementDisabled}
                                                 onClick={cancelThreadRename}
                                                 className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
                                                 aria-label="取消重命名"
@@ -265,20 +271,22 @@ export function LeftConversationSidebar({
                                         <>
                                             <button
                                                 type="button"
+                                                disabled={isThreadManagementDisabled}
                                                 onClick={() => {
                                                     beginThreadRename(thread)
                                                 }}
-                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                                                 aria-label={`重命名 ${thread.title}`}
                                             >
                                                 <Pencil className="h-3 w-3" />
                                             </button>
                                             <button
                                                 type="button"
+                                                disabled={isThreadManagementDisabled}
                                                 onClick={() => {
                                                     onDeleteThread(thread.id)
                                                 }}
-                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+                                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
                                                 aria-label={`删除 ${thread.title}`}
                                             >
                                                 <Trash2 className="h-3 w-3" />

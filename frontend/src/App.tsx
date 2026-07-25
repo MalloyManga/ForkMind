@@ -34,6 +34,7 @@ import type {
 import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import { useCanvasContextMenuExecutor } from "./hooks/useCanvasContextMenuExecutor"
 import { useCanvasContextMenuResolver } from "./hooks/useCanvasContextMenuResolver"
+import { useAICompletion } from "./hooks/useAICompletion"
 import { type CanvasTool } from "./hooks/canvasToolTypes"
 import { useWorkspaceController } from "./hooks/useWorkspaceController"
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
@@ -103,6 +104,7 @@ function App() {
         deleteThread,
     } = useWorkspaceController()
     const workspacePersistence = useWorkspacePersistence()
+    const aiCompletion = useAICompletion()
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
     const addNode = useConversationStore((state) => state.addNode)
@@ -382,6 +384,7 @@ function App() {
                             activeThreadId={activeThreadId}
                             persistenceStatus={workspacePersistence.status}
                             persistenceErrorMessage={workspacePersistence.error?.message ?? null}
+                            isThreadManagementDisabled={aiCompletion.isRequestActive}
                             themeMode={themeMode}
                             panelsToggleControl={
                                 <PanelsToggleButton
@@ -457,6 +460,19 @@ function App() {
                             onUpdateNoteContent={updateNoteContent}
                             onBeginTextEdit={beginTextEdit}
                             onEndTextEdit={endTextEdit}
+                            activeAIRequestNodeId={aiCompletion.activeRequestNodeId}
+                            canStartAIRequest={
+                                activeNode?.cardType === "chat"
+                                    ? aiCompletion.canStart(activeNode.id)
+                                    : false
+                            }
+                            aiErrorMessage={aiCompletion.error?.message ?? null}
+                            onStartAIRequest={(nodeId) => {
+                                void aiCompletion.startCompletion(nodeId)
+                            }}
+                            onCancelAIRequest={(nodeId) => {
+                                void aiCompletion.cancelCompletion(nodeId)
+                            }}
                         />
                     </div>
                 ) : null}
