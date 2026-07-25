@@ -338,7 +338,7 @@ function App() {
                 return
             }
 
-            executeCanvasCommand(commandId)
+            void executeCanvasCommand(commandId)
         }
 
         window.addEventListener("keydown", handleCanvasCommandKeyDown, true)
@@ -501,7 +501,7 @@ function App() {
                     onClose={closeContextMenu}
                     onSelect={(item) => {
                         // 右键菜单按钮只负责把命令抛给 executor 自己不直接碰 store
-                        executeCanvasCommand(item.commandId, contextMenuState.context)
+                        void executeCanvasCommand(item.commandId, contextMenuState.context)
                         closeContextMenu()
                     }}
                 />

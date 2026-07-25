@@ -10,7 +10,9 @@ export type CanvasCommandId =
     | "tool-chat"
     | "tool-note"
     | "copy-node"
+    | "copy-node-json"
     | "paste-here"
+    | "paste-json-here"
     | "paste-to-replace"
     | "toggle-ui"
     | "toggle-panels"
@@ -56,9 +58,17 @@ export const CANVAS_COMMAND_REGISTRY = {
         label: "Copy",
         shortcut: { key: "c", mod: true },
     },
+    "copy-node-json": {
+        label: "Copy as ForkMind JSON",
+        shortcut: undefined,
+    },
     "paste-here": {
         label: "Paste here",
         shortcut: { key: "v", mod: true },
+    },
+    "paste-json-here": {
+        label: "Paste from ForkMind JSON",
+        shortcut: undefined,
     },
     "paste-to-replace": {
         label: "Paste to replace",

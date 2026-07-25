@@ -53,6 +53,9 @@ export function useCanvasContextMenuResolver({
             commandId: 'paste-here',
             isDisabled: clipboardCard === null
         })
+        const pasteJSONHereItem = resolveContextMenuItem({
+            commandId: "paste-json-here",
+        })
         // --------------------------------
 
         switch (context.kind) {
@@ -64,11 +67,15 @@ export function useCanvasContextMenuResolver({
                 })
                 return [
                     pasteHereItem,
+                    pasteJSONHereItem,
                     toogleUIItem
                 ]
             case 'node':
                 const copyNodeItem = resolveContextMenuItem({
                     commandId: 'copy-node'
+                })
+                const copyNodeJSONItem = resolveContextMenuItem({
+                    commandId: "copy-node-json",
                 })
                 const pasteToReplaceItem = resolveContextMenuItem({
                     commandId: 'paste-to-replace',
@@ -76,7 +83,9 @@ export function useCanvasContextMenuResolver({
                 })
                 return [
                     copyNodeItem,
+                    copyNodeJSONItem,
                     pasteHereItem,
+                    pasteJSONHereItem,
                     pasteToReplaceItem
                 ]
             default:
