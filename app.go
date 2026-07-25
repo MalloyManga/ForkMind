@@ -11,6 +11,7 @@ type App struct {
 	initializationError error
 	openAIClient        *OpenAIClient
 	aiRequestManager    *AIRequestManager
+	closeCoordinator    *AppCloseCoordinator
 }
 
 // NewApp creates a new App application struct
@@ -21,6 +22,7 @@ func NewApp() *App {
 		initializationError: err,
 		openAIClient:        NewOpenAIClient(),
 		aiRequestManager:    NewAIRequestManager(),
+		closeCoordinator:    NewAppCloseCoordinator(),
 	}
 }
 
