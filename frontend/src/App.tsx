@@ -35,6 +35,7 @@ import { useCanvasContextMenuExecutor } from "./hooks/useCanvasContextMenuExecut
 import { useCanvasContextMenuResolver } from "./hooks/useCanvasContextMenuResolver"
 import { type CanvasTool } from "./hooks/canvasToolTypes"
 import { useWorkspaceController } from "./hooks/useWorkspaceController"
+import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
 import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
 import {
     selectActiveNode,
@@ -99,6 +100,7 @@ function App() {
         renameThread,
         deleteThread,
     } = useWorkspaceController()
+    const workspacePersistence = useWorkspacePersistence()
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
     const addNode = useConversationStore((state) => state.addNode)
@@ -376,6 +378,8 @@ function App() {
                             rootNodeWarning={rootNodeWarning}
                             threads={threads}
                             activeThreadId={activeThreadId}
+                            persistenceStatus={workspacePersistence.status}
+                            persistenceErrorMessage={workspacePersistence.error?.message ?? null}
                             themeMode={themeMode}
                             panelsToggleControl={
                                 <PanelsToggleButton

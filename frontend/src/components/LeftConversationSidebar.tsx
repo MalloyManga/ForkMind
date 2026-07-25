@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from "react"
 import {
     Check,
+    AlertCircle,
     GitFork,
+    HardDrive,
     Layers,
     Moon,
     Network,
@@ -15,6 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import type { ConversationThread } from "../domain/conversation/types"
+import type { WorkspacePersistenceStatus } from "../hooks/useWorkspacePersistence"
 
 interface LeftConversationSidebarProps {
     threadTitle: string
@@ -23,6 +26,8 @@ interface LeftConversationSidebarProps {
     rootNodeWarning: string | null
     threads: ConversationThread[]
     activeThreadId: string
+    persistenceStatus: WorkspacePersistenceStatus
+    persistenceErrorMessage: string | null
     themeMode: "dark" | "light"
     panelsToggleControl: ReactNode
     onCreateThread: () => void
@@ -58,6 +63,8 @@ export function LeftConversationSidebar({
     rootNodeWarning,
     threads,
     activeThreadId,
+    persistenceStatus,
+    persistenceErrorMessage,
     themeMode,
     panelsToggleControl,
     onCreateThread,
@@ -98,6 +105,25 @@ export function LeftConversationSidebar({
         setEditingThreadId(null)
         setEditingTitle("")
     }
+
+    const persistenceLabel = (() => {
+        switch (persistenceStatus) {
+            case "loading":
+                return "正在加载本地工作区"
+            case "dirty":
+                return "等待自动保存"
+            case "saving":
+                return "正在保存到本地"
+            case "saved":
+                return "已保存到本地"
+            case "idle":
+                return "本地工作区已就绪"
+            case "unavailable":
+                return "桌面 Bridge 未连接"
+            case "error":
+                return persistenceErrorMessage ?? "本地保存失败"
+        }
+    })()
 
     return (
         <aside className="flex h-full flex-col bg-background/95 backdrop-blur-sm">
@@ -265,6 +291,22 @@ export function LeftConversationSidebar({
 
             {/* 主题切换 */}
             <div className="p-3">
+                <div
+                    className={cn(
+                        "mb-2 flex items-center gap-2 px-2 text-[10px]",
+                        persistenceStatus === "error"
+                            ? "text-rose-500"
+                            : "text-muted-foreground/60",
+                    )}
+                    title={persistenceErrorMessage ?? undefined}
+                >
+                    {persistenceStatus === "error" ? (
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                    ) : (
+                        <HardDrive className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">{persistenceLabel}</span>
+                </div>
                 <button
                     type="button"
                     onClick={onToggleTheme}
