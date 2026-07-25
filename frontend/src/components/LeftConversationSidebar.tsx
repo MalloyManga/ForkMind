@@ -10,6 +10,7 @@ import {
     Pencil,
     Plus,
     Sparkles,
+    Settings2,
     Sun,
     Trash2,
     X,
@@ -34,6 +35,7 @@ interface LeftConversationSidebarProps {
     onSwitchThread: (threadId: string) => void
     onRenameThread: (threadId: string, title: string) => void
     onDeleteThread: (threadId: string) => void
+    onOpenAISettings: () => void
     onToggleTheme: () => void
 }
 
@@ -71,6 +73,7 @@ export function LeftConversationSidebar({
     onSwitchThread,
     onRenameThread,
     onDeleteThread,
+    onOpenAISettings,
     onToggleTheme,
 }: LeftConversationSidebarProps) {
     const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
@@ -307,6 +310,19 @@ export function LeftConversationSidebar({
                     )}
                     <span className="truncate">{persistenceLabel}</span>
                 </div>
+                <button
+                    type="button"
+                    onClick={onOpenAISettings}
+                    className="group mb-2 flex w-full cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 text-left transition-colors duration-200 hover:border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 theme-dark:text-sky-400">
+                        <Settings2 className="h-4 w-4" />
+                    </span>
+                    <span className="flex-1">
+                        <span className="block text-xs font-medium text-foreground">AI Connection</span>
+                        <span className="block text-[10px] text-muted-foreground/60">模型与运行时密钥</span>
+                    </span>
+                </button>
                 <button
                     type="button"
                     onClick={onToggleTheme}

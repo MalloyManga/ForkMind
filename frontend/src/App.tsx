@@ -9,6 +9,7 @@
 import { GitFork } from "lucide-react"
 import type { Editor } from "tldraw"
 import { CanvasContextMenu } from "./components/CanvasContextMenu"
+import { AISettingsSheet } from "./components/AISettingsSheet"
 import type { CanvasClipboardPayload } from "./stores/conversationStore"
 import { CanvasWorkspace } from "./components/CanvasWorkspace"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
@@ -78,6 +79,7 @@ function App() {
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
     const [clipboardPayload, setClipboardPayload] = useState<CanvasClipboardPayload | null>(null) // 当前页面级剪贴板 payload
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
+    const [isAISettingsOpen, setIsAISettingsOpen] = useState(false)
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH)
@@ -395,6 +397,9 @@ function App() {
                             onSwitchThread={switchThread}
                             onRenameThread={renameThread}
                             onDeleteThread={deleteThread}
+                            onOpenAISettings={() => {
+                                setIsAISettingsOpen(true)
+                            }}
                             onToggleTheme={() => {
                                 setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
                             }}
@@ -469,6 +474,11 @@ function App() {
                     }}
                 />
             ) : null}
+
+            <AISettingsSheet
+                open={isAISettingsOpen}
+                onOpenChange={setIsAISettingsOpen}
+            />
         </div>
     )
 }
