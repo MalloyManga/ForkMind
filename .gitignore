@@ -1,6 +1,7 @@
 build/bin
 node_modules
 frontend/dist
+frontend/wailsjs/go/
 package.json.md5
 coverage
 coverage.out
