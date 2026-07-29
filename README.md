@@ -7,7 +7,7 @@
 
 ![ForkMind Architecture](https://img.shields.io/badge/Architecture-Local--First-success)
 ![Tech Stack](https://img.shields.io/badge/Tech-Wails%20%7C%20React%20%7C%20Go-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+[![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
 ## 💡 为什么需要 ForkMind？
 
@@ -72,7 +72,7 @@ ForkMind 在发起对话请求时，会在内存中执行以下操作：
 ## 🔭 未来展望 (Roadmap)
 
 - [x] 单个对话支持多个根节点；当根节点过多时，提示用户“建议新开对话”。
-- [ ] 支持把当前对话中的部分卡片复制到其他对话，实现无缝迁移。
+- [x] 支持把当前对话中的部分卡片复制到其他对话，实现无缝迁移（ForkMind JSON 系统剪贴板）。
 - [x] 引入“关联边/引用边（Reference Edge）”，满足自由联想与跨分支关系表达。
 - [x] 固化“主链 + 参考资料”上下文策略：`parentId` 负责主链遍历，`referenceNodeIds` 以“补充参考资料”形式注入提示词。
 - [ ] 支持在卡片文本中选中词/句直接追问：从选中内容拉线创建新卡片，并记录引用锚点。
@@ -130,3 +130,7 @@ wails build
 ---
 
 如果你只想先审查前端交互，不跑完整桌面壳层，可以先执行第 2 步和第 4 步。
+
+## 📄 开源许可证
+
+ForkMind 使用 [MIT License](./LICENSE) 发布。你可以自由使用、修改和分发本项目，但需保留许可证中的版权与授权声明。
