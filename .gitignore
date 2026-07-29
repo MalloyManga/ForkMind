@@ -6,3 +6,4 @@ package.json.md5
 coverage
 coverage.out
 docs/
+__pycache__/
