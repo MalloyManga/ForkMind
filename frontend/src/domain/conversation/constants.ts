@@ -11,8 +11,6 @@ export const NODE_STATUS_ERROR = "error"
 // 撤销/重做历史上限，防止无限增长造成内存压力。
 export const HISTORY_LIMIT = 100
 
-// 单个对话根节点数量阈值。
-export const ROOT_NODE_WARNING_THRESHOLD = 3
 
 // 新建会话在用户第一次输入前使用的稳定默认标题
 export const DEFAULT_THREAD_TITLE = "未命名会话"

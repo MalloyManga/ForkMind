@@ -26,7 +26,6 @@ interface LeftConversationSidebarProps {
     threadTitle: string
     cardCount: number
     rootNodeCount: number
-    rootNodeWarning: string | null
     threads: ConversationThread[]
     activeThreadId: string
     persistenceStatus: WorkspacePersistenceStatus
@@ -70,7 +69,6 @@ export function LeftConversationSidebar({
     threadTitle,
     cardCount,
     rootNodeCount,
-    rootNodeWarning,
     threads,
     activeThreadId,
     persistenceStatus,
@@ -189,11 +187,6 @@ export function LeftConversationSidebar({
                         <StatChip icon={<Layers className="h-3 w-3" />} value={cardCount} label="cards" />
                         <StatChip icon={<Network className="h-3 w-3" />} value={rootNodeCount} label="roots" />
                     </div>
-                    {rootNodeWarning ? (
-                        <p className="mt-3 text-[10px] leading-relaxed text-amber-600 theme-dark:text-amber-400">
-                            {rootNodeWarning}
-                        </p>
-                    ) : null}
                 </div>
 
                 <div className="mt-2 flex items-center justify-between px-1">

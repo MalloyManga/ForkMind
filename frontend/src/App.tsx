@@ -42,7 +42,6 @@ import { useWorkspaceController } from "./hooks/useWorkspaceController"
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
 import { useWorkspaceTransfer } from "./hooks/useWorkspaceTransfer"
 import { importManagedAssetFromBridge, type ManagedAssetKind } from "./bridge"
-import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
 import {
     CANVAS_CARD_ACTIVATE_EVENT,
     CANVAS_TEXT_SELECTION_EVENT,
@@ -192,12 +191,8 @@ function App() {
     const redo = useConversationStore((state) => state.redo)
 
     const rootNodeCount = useMemo(
-        // 左侧栏的根节点统计和提醒都依赖这里的结果
+        // 左侧栏保留根节点数量统计 但不再根据数量展示告警
         () => cards.filter((card) => card.parentId === null).length,
-        [cards],
-    )
-    const rootNodeWarning = useMemo(
-        () => buildRootNodesWarningMessage(cards),
         [cards],
     )
 
@@ -627,7 +622,6 @@ function App() {
                             threadTitle={activeThread.title}
                             cardCount={cards.length}
                             rootNodeCount={rootNodeCount}
-                            rootNodeWarning={rootNodeWarning}
                             threads={threads}
                             activeThreadId={activeThreadId}
                             persistenceStatus={workspacePersistence.status}
