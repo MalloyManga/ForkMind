@@ -2,4 +2,6 @@ build/bin
 node_modules
 frontend/dist
 package.json.md5
+coverage
+coverage.out
 docs/
