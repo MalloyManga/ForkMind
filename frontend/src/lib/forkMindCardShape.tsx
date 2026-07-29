@@ -14,27 +14,59 @@ import {
     markdownRemarkPlugins,
     normalizeMarkdownForPreview,
 } from "./markdownRendering"
-import type { BaseNode, ConversationCard } from "../domain/conversation/types"
-import type { DistributiveOmit } from "../types/typeUtils"
+import type { ConversationTextField } from "../domain/conversation/types"
 import { assertNever } from "./utils"
 import { PersonIcon } from "../components/icons/PersonIcon"
 import { RobotIcon } from "../components/icons/RobotIcon"
 import { NotePlusIcon } from "../components/icons/NotePlusIcon"
+import { FileIcon, ImageIcon, Link2 } from "lucide-react"
+import { ManagedImagePreview } from "../components/ManagedImagePreview"
 import {
     CANVAS_CARD_ACTIVATE_EVENT,
     CANVAS_TEXT_SELECTION_EVENT,
     type CanvasCardActivateEventDetail,
     type CanvasTextSelectionEventDetail,
 } from "../domain/conversation/textSelection"
-import type { ConversationTextField } from "../domain/conversation/types"
 
 /**
  * 卡片唯一身份标识
  */
 export const FORK_MIND_CARD_SHAPE_TYPE = "forkmind-card"
 
+function formatAssetSize(sizeBytes: number): string {
+    if (sizeBytes <= 0) {
+        return "No local asset"
+    }
+    if (sizeBytes < 1024) {
+        return `${sizeBytes} B`
+    }
+    if (sizeBytes < 1024 * 1024) {
+        return `${(sizeBytes / 1024).toFixed(1)} KB`
+    }
+    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 // BaseNode 接口里删除掉了type字段之后 剩下的字段A 再从ConversationCard当中分别删除字段A 得到联合类型
-type CardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode, "cardType">>
+type CardShapeOwnProps =
+    | { cardType: "chat"; userPrompt: string; aiResponse: string }
+    | { cardType: "note"; noteContent: string }
+    | {
+        cardType: "image"
+        assetId: string
+        assetName: string
+        assetMimeType: string
+        assetSizeBytes: number
+        caption: string
+        altText: string
+    }
+    | { cardType: "link"; url: string; title: string; description: string }
+    | {
+        cardType: "file"
+        assetName: string
+        assetMimeType: string
+        assetSizeBytes: number
+        description: string
+    }
 
 /**
  * 每种卡片独有字段
@@ -67,10 +99,19 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         w: T.number,
         h: T.number,
         nodeId: T.string,
-        cardType: T.literalEnum("chat", "note"),
+        cardType: T.literalEnum("chat", "note", "image", "link", "file"),
         userPrompt: T.string.optional(),
         aiResponse: T.string.optional(),
         noteContent: T.string.optional(),
+        assetId: T.string.optional(),
+        assetName: T.string.optional(),
+        assetMimeType: T.string.optional(),
+        assetSizeBytes: T.number.optional(),
+        caption: T.string.optional(),
+        altText: T.string.optional(),
+        url: T.string.optional(),
+        title: T.string.optional(),
+        description: T.string.optional(),
     }
 
     /**
@@ -257,16 +298,100 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                             </div>
                         </section>
                     )
+                case "image":
+                    return (
+                        <section className="flex min-h-0 flex-1 flex-col">
+                            <div className="min-h-0 flex-1 overflow-hidden bg-zinc-100/70 theme-dark:bg-zinc-900/70">
+                                <ManagedImagePreview
+                                    assetId={shape.props.assetId}
+                                    altText={shape.props.altText}
+                                />
+                            </div>
+                            <div className="shrink-0 border-t border-zinc-200/70 px-3 py-2 theme-dark:border-zinc-800/80">
+                                <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                                    <ImageIcon className="h-3.5 w-3.5" />
+                                    <span className="min-w-0 flex-1 truncate">{shape.props.assetName || "Local image"}</span>
+                                    <span>{formatAssetSize(shape.props.assetSizeBytes)}</span>
+                                </div>
+                                <div
+                                    className="line-clamp-2 select-text text-xs leading-relaxed"
+                                    {...createSelectableTextProps("caption")}
+                                >
+                                    {shape.props.caption || shape.props.altText || "_empty image caption_"}
+                                </div>
+                            </div>
+                        </section>
+                    )
+                case "link":
+                    return (
+                        <section className="flex min-h-0 flex-1 flex-col px-3 py-3">
+                            <div className="mb-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-600 theme-dark:text-emerald-400">
+                                <Link2 className="h-4 w-4" />
+                            </div>
+                            <div
+                                className="select-text text-sm font-semibold"
+                                {...createSelectableTextProps("title")}
+                            >
+                                {shape.props.title || "Untitled link"}
+                            </div>
+                            <div
+                                className="mt-1 truncate select-text text-[11px] text-emerald-600 theme-dark:text-emerald-400"
+                                {...createSelectableTextProps("url")}
+                            >
+                                {shape.props.url || "https://"}
+                            </div>
+                            <div
+                                className="fm-card-scroll mt-3 min-h-0 flex-1 overflow-y-auto select-text text-xs leading-relaxed text-muted-foreground"
+                                {...createSelectableTextProps("description")}
+                            >
+                                {shape.props.description || "_empty link description_"}
+                            </div>
+                        </section>
+                    )
+                case "file":
+                    return (
+                        <section className="flex min-h-0 flex-1 flex-col px-3 py-3">
+                            <div className="flex items-start gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-fuchsia-500/12 text-fuchsia-600 theme-dark:text-fuchsia-400">
+                                    <FileIcon className="h-5 w-5" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-sm font-semibold">{shape.props.assetName || "Local file"}</div>
+                                    <div className="mt-1 text-[11px] text-muted-foreground">
+                                        {shape.props.assetMimeType || "No file selected"} · {formatAssetSize(shape.props.assetSizeBytes)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                className="fm-card-scroll mt-4 min-h-0 flex-1 overflow-y-auto select-text text-xs leading-relaxed text-muted-foreground"
+                                {...createSelectableTextProps("description")}
+                            >
+                                {shape.props.description || "_empty file description_"}
+                            </div>
+                        </section>
+                    )
             }
 
             return assertNever(shape.props)
         })()
 
         // 左侧类型色条：Chat=靛蓝渐变，Note=琥珀，是卡片在画布上的第一眼身份标识
-        const accentBar =
-            shape.props.cardType === "chat"
-                ? "before:bg-gradient-to-b before:from-sky-400 before:to-violet-500"
-                : "before:bg-amber-400"
+        const accentBar = (() => {
+            switch (shape.props.cardType) {
+                case "chat":
+                    return "before:bg-gradient-to-b before:from-sky-400 before:to-violet-500"
+                case "note":
+                    return "before:bg-amber-400"
+                case "image":
+                    return "before:bg-cyan-400"
+                case "link":
+                    return "before:bg-emerald-400"
+                case "file":
+                    return "before:bg-fuchsia-400"
+            }
+
+            return assertNever(shape.props)
+        })()
 
         return (
             <HTMLContainer

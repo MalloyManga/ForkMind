@@ -37,7 +37,15 @@ export interface ConversationCardSize {
 /**
  * 可被编辑器或画布 Markdown 选区引用的业务文本字段
  */
-export type ConversationTextField = "userPrompt" | "aiResponse" | "noteContent"
+export type ConversationTextField =
+    | "userPrompt"
+    | "aiResponse"
+    | "noteContent"
+    | "caption"
+    | "altText"
+    | "url"
+    | "title"
+    | "description"
 
 /**
  * 子 Chat 对源卡片文本选区的稳定引用
@@ -59,6 +67,9 @@ export interface ConversationTextAnchor {
 interface CardNodeRegistry {
     "chat": ChatNode
     "note": NoteNode
+    "image": ImageNode
+    "link": LinkNode
+    "file": FileNode
 }
 
 /**
@@ -104,6 +115,46 @@ export interface ChatNode extends BaseNode {
 export interface NoteNode extends BaseNode {
     cardType: "note"
     noteContent: string
+}
+
+/**
+ * ForkMind 管理目录中的本地资产引用
+ * 节点不保存绝对路径 防止工作区 JSON 泄漏用户目录结构
+ */
+export interface ManagedAssetReference {
+    id: string
+    name: string
+    mimeType: string
+    sizeBytes: number
+}
+
+/**
+ * ImageNode 只引用 Go 管理的本地图片并保存文本说明
+ */
+export interface ImageNode extends BaseNode {
+    cardType: "image"
+    asset: ManagedAssetReference | null
+    caption: string
+    altText: string
+}
+
+/**
+ * LinkNode 不主动抓取远端内容 只保存用户输入的文本元数据
+ */
+export interface LinkNode extends BaseNode {
+    cardType: "link"
+    url: string
+    title: string
+    description: string
+}
+
+/**
+ * FileNode 引用 Go 管理的本地文件并保存给 AI 使用的文本描述
+ */
+export interface FileNode extends BaseNode {
+    cardType: "file"
+    asset: ManagedAssetReference | null
+    description: string
 }
 
 /**

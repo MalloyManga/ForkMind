@@ -72,6 +72,29 @@ export function cloneNode(node: ConversationCard): ConversationCard {
                 cardType: "note",
                 noteContent: node.noteContent,
             }
+        case "image":
+            return {
+                ...base,
+                cardType: "image",
+                asset: node.asset ? { ...node.asset } : null,
+                caption: node.caption,
+                altText: node.altText,
+            }
+        case "link":
+            return {
+                ...base,
+                cardType: "link",
+                url: node.url,
+                title: node.title,
+                description: node.description,
+            }
+        case "file":
+            return {
+                ...base,
+                cardType: "file",
+                asset: node.asset ? { ...node.asset } : null,
+                description: node.description,
+            }
     }
 
     return assertNever(node)
@@ -179,6 +202,12 @@ export function normalizeTextAnchor(
                 return anchor.field === "userPrompt" || anchor.field === "aiResponse"
             case "note":
                 return anchor.field === "noteContent"
+            case "image":
+                return anchor.field === "caption" || anchor.field === "altText"
+            case "link":
+                return anchor.field === "url" || anchor.field === "title" || anchor.field === "description"
+            case "file":
+                return anchor.field === "description"
         }
 
         return assertNever(sourceNode)

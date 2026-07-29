@@ -9,5 +9,15 @@ export type CanvasTool = "move" | "hand-tool" | ConversationNodeType
  * 判断当前工具是否属于 创建卡片工具
  */
 export function isCreationCanvasTool(canvasTool: CanvasTool): canvasTool is ConversationNodeType {
-    return canvasTool === "chat" || canvasTool === "note"
+    switch (canvasTool) {
+        case "chat":
+        case "note":
+        case "image":
+        case "link":
+        case "file":
+            return true
+        case "move":
+        case "hand-tool":
+            return false
+    }
 }

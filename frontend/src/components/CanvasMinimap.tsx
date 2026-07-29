@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react"
 import { type Editor, useEditor, useValue, type Box } from "tldraw"
 import { FORK_MIND_CARD_SHAPE_TYPE, type ForkMindCardShape } from "../lib/forkMindCardShape"
+import type { ConversationNodeType } from "../domain/conversation/types"
 
 const MINIMAP_WIDTH = 176
 const MINIMAP_HEIGHT = 116
@@ -11,7 +12,7 @@ interface MinimapItem {
     y: number
     w: number
     h: number
-    cardType: "chat" | "note"
+    cardType: ConversationNodeType
     isActive: boolean
 }
 
@@ -137,10 +138,13 @@ export function CanvasMinimap() {
         [editor, projection],
     )
 
-    const dotColor = useMemo(
+    const dotColor = useMemo<Record<ConversationNodeType, string>>(
         () => ({
             chat: "rgb(99 102 241)",
             note: "rgb(245 158 11)",
+            image: "rgb(34 211 238)",
+            link: "rgb(52 211 153)",
+            file: "rgb(217 70 239)",
         }),
         [],
     )

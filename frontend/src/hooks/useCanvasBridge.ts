@@ -147,6 +147,38 @@ export function useCanvasBridge({
                         noteContent: "",
                     }
                     break
+                case "image":
+                    nodeDraft = {
+                        cardType,
+                        parentId,
+                        position,
+                        size,
+                        asset: null,
+                        caption: "",
+                        altText: "",
+                    }
+                    break
+                case "link":
+                    nodeDraft = {
+                        cardType,
+                        parentId,
+                        position,
+                        size,
+                        url: "",
+                        title: "",
+                        description: "",
+                    }
+                    break
+                case "file":
+                    nodeDraft = {
+                        cardType,
+                        parentId,
+                        position,
+                        size,
+                        asset: null,
+                        description: "",
+                    }
+                    break
                 default:
                     assertNever(cardType)
             }

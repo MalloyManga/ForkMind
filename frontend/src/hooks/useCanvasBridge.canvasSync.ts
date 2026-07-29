@@ -7,10 +7,9 @@ import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId
 import {
     type ArrowAnchorOverride,
     areSameShapeIdSet,
-    CHAT_CARD_HEIGHT,
     createStableArrowProjections,
+    getDefaultHeightByType,
     type LinkDragSession,
-    NOTE_CARD_HEIGHT,
 } from "./useCanvasBridge.helpers"
 import {
     type ForkMindCardShapePartial,
@@ -61,6 +60,25 @@ function areSameForkMindCardShapeProps(
         case "note":
             return currentProps.cardType === "note" &&
                 currentProps.noteContent === nextProps.noteContent
+        case "image":
+            return currentProps.cardType === "image" &&
+                currentProps.assetId === nextProps.assetId &&
+                currentProps.assetName === nextProps.assetName &&
+                currentProps.assetMimeType === nextProps.assetMimeType &&
+                currentProps.assetSizeBytes === nextProps.assetSizeBytes &&
+                currentProps.caption === nextProps.caption &&
+                currentProps.altText === nextProps.altText
+        case "link":
+            return currentProps.cardType === "link" &&
+                currentProps.url === nextProps.url &&
+                currentProps.title === nextProps.title &&
+                currentProps.description === nextProps.description
+        case "file":
+            return currentProps.cardType === "file" &&
+                currentProps.assetName === nextProps.assetName &&
+                currentProps.assetMimeType === nextProps.assetMimeType &&
+                currentProps.assetSizeBytes === nextProps.assetSizeBytes &&
+                currentProps.description === nextProps.description
     }
 
     return assertNever(nextProps)
@@ -73,14 +91,7 @@ function areSameForkMindCardShapeProps(
  * 只影响显示高度 不改 Store 原文内容
  */
 function getProjectedCardHeight(card: ConversationCard): number {
-    switch (card.cardType) {
-        case "chat":
-            return CHAT_CARD_HEIGHT
-        case "note":
-            return NOTE_CARD_HEIGHT
-    }
-
-    return assertNever(card)
+    return getDefaultHeightByType(card.cardType)
 }
 
 /**
@@ -110,6 +121,34 @@ function createForkMindCardShapeProps(card: ConversationCard): ForkMindCardShape
                 ...baseProps,
                 cardType: card.cardType,
                 noteContent: card.noteContent,
+            }
+        case "image":
+            return {
+                ...baseProps,
+                cardType: card.cardType,
+                assetId: card.asset?.id ?? "",
+                assetName: card.asset?.name ?? "",
+                assetMimeType: card.asset?.mimeType ?? "",
+                assetSizeBytes: card.asset?.sizeBytes ?? 0,
+                caption: card.caption,
+                altText: card.altText,
+            }
+        case "link":
+            return {
+                ...baseProps,
+                cardType: card.cardType,
+                url: card.url,
+                title: card.title,
+                description: card.description,
+            }
+        case "file":
+            return {
+                ...baseProps,
+                cardType: card.cardType,
+                assetName: card.asset?.name ?? "",
+                assetMimeType: card.asset?.mimeType ?? "",
+                assetSizeBytes: card.asset?.sizeBytes ?? 0,
+                description: card.description,
             }
     }
 

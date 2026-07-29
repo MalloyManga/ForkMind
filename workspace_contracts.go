@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -89,22 +90,28 @@ type TextAnchorDTO struct {
 	Origin       string `json:"origin"`
 }
 
-// ConversationCardDTO 是 chat note 判别联合在 Go Bridge 中的扁平表示
-// CardType 决定 UserPrompt AIResponse NoteContent 中哪些字段具有业务意义
+// ConversationCardDTO 是所有卡片判别联合在 Go Bridge 中的扁平表示
+// CardType 决定对话文本 本地资产或链接元数据中哪些字段具有业务意义
 type ConversationCardDTO struct {
-	ID               string          `json:"id"`
-	CardType         string          `json:"cardType"`
-	ParentID         *string         `json:"parentId"`
-	ReferenceNodeIDs []string        `json:"referenceNodeIds,omitempty"`
-	SourceAnchor     *TextAnchorDTO  `json:"sourceAnchor,omitempty"`
-	Position         CardPositionDTO `json:"position"`
-	Size             CardSizeDTO     `json:"size"`
-	Status           string          `json:"status"`
-	CreatedAt        string          `json:"createdAt"`
-	UpdatedAt        string          `json:"updatedAt"`
-	UserPrompt       string          `json:"userPrompt,omitempty"`
-	AIResponse       string          `json:"aiResponse,omitempty"`
-	NoteContent      string          `json:"noteContent,omitempty"`
+	ID               string           `json:"id"`
+	CardType         string           `json:"cardType"`
+	ParentID         *string          `json:"parentId"`
+	ReferenceNodeIDs []string         `json:"referenceNodeIds,omitempty"`
+	SourceAnchor     *TextAnchorDTO   `json:"sourceAnchor,omitempty"`
+	Position         CardPositionDTO  `json:"position"`
+	Size             CardSizeDTO      `json:"size"`
+	Status           string           `json:"status"`
+	CreatedAt        string           `json:"createdAt"`
+	UpdatedAt        string           `json:"updatedAt"`
+	UserPrompt       string           `json:"userPrompt,omitempty"`
+	AIResponse       string           `json:"aiResponse,omitempty"`
+	NoteContent      string           `json:"noteContent,omitempty"`
+	Asset            *ManagedAssetDTO `json:"asset,omitempty"`
+	Caption          string           `json:"caption,omitempty"`
+	AltText          string           `json:"altText,omitempty"`
+	URL              string           `json:"url,omitempty"`
+	LinkTitle        string           `json:"title,omitempty"`
+	Description      string           `json:"description,omitempty"`
 }
 
 // ConversationThreadDTO 对应 React ConversationThread
@@ -209,8 +216,26 @@ func validateConversationThread(thread ConversationThreadDTO) error {
 		if _, exists := cardByID[card.ID]; exists {
 			return fmt.Errorf("cards[%d].id %q is duplicated", cardIndex, card.ID)
 		}
-		if card.CardType != "chat" && card.CardType != "note" {
+		if card.CardType != "chat" &&
+			card.CardType != "note" &&
+			card.CardType != "image" &&
+			card.CardType != "link" &&
+			card.CardType != "file" {
 			return fmt.Errorf("cards[%d].cardType %q is invalid", cardIndex, card.CardType)
+		}
+		if card.Asset != nil {
+			if card.CardType != "image" && card.CardType != "file" {
+				return fmt.Errorf("cards[%d].asset is invalid for %s", cardIndex, card.CardType)
+			}
+			if err := validateManagedAsset(*card.Asset, card.CardType); err != nil {
+				return fmt.Errorf("cards[%d].asset: %w", cardIndex, err)
+			}
+		}
+		if card.CardType == "link" && strings.TrimSpace(card.URL) != "" {
+			parsedURL, err := url.ParseRequestURI(strings.TrimSpace(card.URL))
+			if err != nil || parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+				return fmt.Errorf("cards[%d].url must use http or https", cardIndex)
+			}
 		}
 		if !isValidNodeStatus(card.Status) {
 			return fmt.Errorf("cards[%d].status %q is invalid", cardIndex, card.Status)
@@ -312,9 +337,39 @@ func isTextAnchorFieldCompatible(cardType string, field string) bool {
 		return field == "userPrompt" || field == "aiResponse"
 	case "note":
 		return field == "noteContent"
+	case "image":
+		return field == "caption" || field == "altText"
+	case "link":
+		return field == "url" || field == "title" || field == "description"
+	case "file":
+		return field == "description"
 	default:
 		return false
 	}
+}
+
+// validateManagedAsset 校验节点保存的本地资产元数据
+// asset 来自 React Workspace JSON cardType 决定是否额外要求 image MIME
+// 返回 nil 表示该引用可以进入 Repository 或 AI 文本上下文
+// 工作区保存 导入和上下文构造前会触发
+func validateManagedAsset(asset ManagedAssetDTO, cardType string) error {
+	if err := validateManagedAssetID(asset.ID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(asset.Name) == "" {
+		return fmt.Errorf("name cannot be empty")
+	}
+	if strings.TrimSpace(asset.MimeType) == "" {
+		return fmt.Errorf("mimeType cannot be empty")
+	}
+	if asset.SizeBytes <= 0 || asset.SizeBytes > managedAssetMaxBytes {
+		return fmt.Errorf("sizeBytes must be between 1 and %d", managedAssetMaxBytes)
+	}
+	if cardType == "image" && !strings.HasPrefix(asset.MimeType, "image/") {
+		return fmt.Errorf("image asset mimeType must start with image/")
+	}
+
+	return nil
 }
 
 func isValidNodeStatus(status string) bool {

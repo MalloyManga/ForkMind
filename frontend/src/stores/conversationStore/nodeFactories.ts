@@ -1,5 +1,12 @@
 import { NODE_STATUS_DONE, NODE_STATUS_IDLE } from "../../domain/conversation/constants"
-import type { ConversationCard, ChatNode, NoteNode } from "../../domain/conversation/types"
+import type {
+    ConversationCard,
+    FileNode,
+    ImageNode,
+    LinkNode,
+    ChatNode,
+    NoteNode,
+} from "../../domain/conversation/types"
 import type { AddNodeDraftInput } from "./contracts"
 import {
     createDefaultSize,
@@ -106,4 +113,72 @@ export function createNoteNode(
     )
 
     return nextNode
+}
+
+function createNodeBase<T extends ConversationCard>(
+    input: AddNodeDraftInput<T["cardType"]>,
+    nodes: readonly ConversationCard[],
+    node: { cardType: T["cardType"] } & Omit<T, keyof import("../../domain/conversation/types").BaseNode>,
+): T {
+    const now = createTimestamp()
+    const validParentId = normalizeParentId(nodes, input.parentId)
+    const parentNode = validParentId ? findNodeById(nodes, validParentId) : undefined
+    const defaultPosition = parentNode ? createForkPosition(parentNode) : { x: 0, y: 0 }
+    const nodeId = createNodeId()
+    const nextNode = {
+        ...node,
+        id: nodeId,
+        parentId: validParentId,
+        referenceNodeIds: undefined,
+        sourceAnchor: undefined,
+        position: {
+            x: input.position?.x ?? defaultPosition.x,
+            y: input.position?.y ?? defaultPosition.y,
+        },
+        size: createDefaultSize(input.size),
+        status: input.status ?? NODE_STATUS_DONE,
+        createdAt: now,
+        updatedAt: now,
+    } as T
+    nextNode.referenceNodeIds = normalizeReferenceIds(input.referenceNodeIds, nodeId, [...nodes, nextNode])
+    nextNode.sourceAnchor = normalizeTextAnchor(input.sourceAnchor, nodeId, [...nodes, nextNode])
+    return nextNode
+}
+
+/** 创建本地图片节点 用户从 ModeBar 新增时 asset 为空 */
+export function createImageNode(
+    input: AddNodeDraftInput<"image">,
+    nodes: readonly ConversationCard[],
+): ImageNode {
+    return createNodeBase<ImageNode>(input, nodes, {
+        cardType: "image",
+        asset: input.asset ? { ...input.asset } : null,
+        caption: input.caption ?? "",
+        altText: input.altText ?? "",
+    })
+}
+
+/** 创建纯文本链接节点 不进行远端抓取 */
+export function createLinkNode(
+    input: AddNodeDraftInput<"link">,
+    nodes: readonly ConversationCard[],
+): LinkNode {
+    return createNodeBase<LinkNode>(input, nodes, {
+        cardType: "link",
+        url: input.url ?? "",
+        title: input.title ?? "",
+        description: input.description ?? "",
+    })
+}
+
+/** 创建本地文件节点 用户选择文件后再写入 asset */
+export function createFileNode(
+    input: AddNodeDraftInput<"file">,
+    nodes: readonly ConversationCard[],
+): FileNode {
+    return createNodeBase<FileNode>(input, nodes, {
+        cardType: "file",
+        asset: input.asset ? { ...input.asset } : null,
+        description: input.description ?? "",
+    })
 }

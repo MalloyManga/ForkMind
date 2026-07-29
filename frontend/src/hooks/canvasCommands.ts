@@ -9,6 +9,9 @@ export type CanvasCommandId =
     | "tool-hand-tool"
     | "tool-chat"
     | "tool-note"
+    | "tool-image"
+    | "tool-link"
+    | "tool-file"
     | "copy-node"
     | "copy-node-json"
     | "paste-here"
@@ -54,6 +57,18 @@ export const CANVAS_COMMAND_REGISTRY = {
         label: "Note",
         shortcut: { key: "n" },
     },
+    "tool-image": {
+        label: "Image",
+        shortcut: { key: "i" },
+    },
+    "tool-link": {
+        label: "Link",
+        shortcut: { key: "l" },
+    },
+    "tool-file": {
+        label: "File",
+        shortcut: { key: "f" },
+    },
     "copy-node": {
         label: "Copy",
         shortcut: { key: "c", mod: true },
@@ -93,6 +108,9 @@ const CANVAS_TOOL_COMMAND_TO_TOOL = {
     "tool-hand-tool": "hand-tool",
     "tool-chat": "chat",
     "tool-note": "note",
+    "tool-image": "image",
+    "tool-link": "link",
+    "tool-file": "file",
 } as const satisfies Record<Extract<CanvasCommandId, `tool-${string}`>, CanvasTool>
 
 /**

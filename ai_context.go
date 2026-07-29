@@ -180,10 +180,14 @@ func buildOpenAIMessages(
 		if card.SourceAnchor != nil {
 			backgroundSections = append(backgroundSections, formatTextAnchor(*card.SourceAnchor))
 		}
-		if card.CardType == "note" && strings.TrimSpace(card.NoteContent) != "" {
+		if card.CardType != "chat" {
+			backgroundContent := formatReferenceCard(card)
+			if backgroundContent == "" {
+				continue
+			}
 			backgroundSections = append(
 				backgroundSections,
-				fmt.Sprintf("[主链笔记 %s]\n%s", card.ID, strings.TrimSpace(card.NoteContent)),
+				fmt.Sprintf("[主链资料 %s | %s]\n%s", card.ID, card.CardType, backgroundContent),
 			)
 		}
 	}
@@ -252,7 +256,52 @@ func formatReferenceCard(card ConversationCardDTO) string {
 		return strings.Join(sections, "\n\n")
 	case "note":
 		return strings.TrimSpace(card.NoteContent)
+	case "image":
+		sections := make([]string, 0, 3)
+		if card.Asset != nil {
+			sections = append(sections, formatManagedAssetMetadata(*card.Asset))
+		}
+		if altText := strings.TrimSpace(card.AltText); altText != "" {
+			sections = append(sections, "替代文本:\n"+altText)
+		}
+		if caption := strings.TrimSpace(card.Caption); caption != "" {
+			sections = append(sections, "图片说明:\n"+caption)
+		}
+		return strings.Join(sections, "\n\n")
+	case "link":
+		sections := make([]string, 0, 3)
+		if title := strings.TrimSpace(card.LinkTitle); title != "" {
+			sections = append(sections, "链接标题:\n"+title)
+		}
+		if linkURL := strings.TrimSpace(card.URL); linkURL != "" {
+			sections = append(sections, "链接地址:\n"+linkURL)
+		}
+		if description := strings.TrimSpace(card.Description); description != "" {
+			sections = append(sections, "链接说明:\n"+description)
+		}
+		return strings.Join(sections, "\n\n")
+	case "file":
+		sections := make([]string, 0, 2)
+		if card.Asset != nil {
+			sections = append(sections, formatManagedAssetMetadata(*card.Asset))
+		}
+		if description := strings.TrimSpace(card.Description); description != "" {
+			sections = append(sections, "文件说明:\n"+description)
+		}
+		return strings.Join(sections, "\n\n")
 	default:
 		return ""
 	}
+}
+
+// formatManagedAssetMetadata 把本地资产引用转换为纯文本元数据
+// asset 来自已校验的 image 或 file 节点 返回值不包含绝对路径和二进制内容
+// AI 主链背景与 reference 格式化时触发
+func formatManagedAssetMetadata(asset ManagedAssetDTO) string {
+	return fmt.Sprintf(
+		"本地资产: %s\nMIME: %s\n大小: %d bytes",
+		asset.Name,
+		asset.MimeType,
+		asset.SizeBytes,
+	)
 }

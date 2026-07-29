@@ -54,7 +54,7 @@ func TestValidateConversationThreadBoundaries(t *testing.T) {
 		{name: "updated at", mutate: func(thread *ConversationThreadDTO) { thread.UpdatedAt = "bad" }, errorFragment: "updatedAt is invalid"},
 		{name: "card id", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].ID = "" }, errorFragment: "id cannot be empty"},
 		{name: "duplicate card", mutate: func(thread *ConversationThreadDTO) { thread.Cards = append(thread.Cards, thread.Cards[0]) }, errorFragment: "is duplicated"},
-		{name: "card type", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].CardType = "image" }, errorFragment: "cardType"},
+		{name: "card type", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].CardType = "future" }, errorFragment: "cardType"},
 		{name: "status", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].Status = "unknown" }, errorFragment: "status"},
 		{name: "position", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].Position.X = math.Inf(1) }, errorFragment: "position"},
 		{name: "size finite", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].Size.Width = math.NaN() }, errorFragment: "size"},
@@ -62,6 +62,36 @@ func TestValidateConversationThreadBoundaries(t *testing.T) {
 		{name: "size mode", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].Size.Mode = "free" }, errorFragment: "size.mode"},
 		{name: "card created at", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].CreatedAt = "bad" }, errorFragment: "createdAt"},
 		{name: "card updated at", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].UpdatedAt = "bad" }, errorFragment: "updatedAt"},
+		{name: "asset on chat", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].Asset = createTestManagedAsset("image/png")
+		}, errorFragment: "asset is invalid"},
+		{name: "asset id", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].CardType = "file"
+			thread.Cards[0].Asset = createTestManagedAsset("application/pdf")
+			thread.Cards[0].Asset.ID = "../bad"
+		}, errorFragment: "asset"},
+		{name: "asset name", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].CardType = "file"
+			thread.Cards[0].Asset = createTestManagedAsset("application/pdf")
+			thread.Cards[0].Asset.Name = " "
+		}, errorFragment: "name"},
+		{name: "asset mime", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].CardType = "file"
+			thread.Cards[0].Asset = createTestManagedAsset("")
+		}, errorFragment: "mimeType"},
+		{name: "asset size", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].CardType = "file"
+			thread.Cards[0].Asset = createTestManagedAsset("application/pdf")
+			thread.Cards[0].Asset.SizeBytes = 0
+		}, errorFragment: "sizeBytes"},
+		{name: "image mime", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].CardType = "image"
+			thread.Cards[0].Asset = createTestManagedAsset("application/pdf")
+		}, errorFragment: "image asset"},
+		{name: "link url", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].CardType = "link"
+			thread.Cards[0].URL = "ftp://example.com"
+		}, errorFragment: "http or https"},
 		{name: "parent self", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].ParentID = stringPointer(thread.Cards[0].ID) }, errorFragment: "cannot reference itself"},
 		{name: "parent missing", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].ParentID = stringPointer("missing") }, errorFragment: "parentId"},
 		{name: "reference self", mutate: func(thread *ConversationThreadDTO) { thread.Cards[0].ReferenceNodeIDs = []string{thread.Cards[0].ID} }, errorFragment: "cannot reference itself"},
@@ -147,6 +177,12 @@ func TestWorkspaceContractHelpers(t *testing.T) {
 	if !isTextAnchorFieldCompatible("chat", "userPrompt") ||
 		!isTextAnchorFieldCompatible("chat", "aiResponse") ||
 		!isTextAnchorFieldCompatible("note", "noteContent") ||
+		!isTextAnchorFieldCompatible("image", "caption") ||
+		!isTextAnchorFieldCompatible("image", "altText") ||
+		!isTextAnchorFieldCompatible("link", "url") ||
+		!isTextAnchorFieldCompatible("link", "title") ||
+		!isTextAnchorFieldCompatible("link", "description") ||
+		!isTextAnchorFieldCompatible("file", "description") ||
 		isTextAnchorFieldCompatible("note", "userPrompt") ||
 		isTextAnchorFieldCompatible("future", "noteContent") {
 		t.Fatal("isTextAnchorFieldCompatible() returned an invalid result")
@@ -157,6 +193,42 @@ func TestWorkspaceContractHelpers(t *testing.T) {
 	bridgeError := newBridgeError("code", errors.New("message"), true)
 	if bridgeError.Code != "code" || bridgeError.Message != "message" || !bridgeError.Retryable {
 		t.Fatalf("newBridgeError() = %#v", bridgeError)
+	}
+}
+
+// TestValidateConversationThreadSupportsLocalMetadataCards 验证三种扩展卡片能进入同一工作区契约
+func TestValidateConversationThreadSupportsLocalMetadataCards(t *testing.T) {
+	t.Parallel()
+
+	thread := createTestWorkspaceDocument().Threads[0]
+	imageCard := createSecondTestCard(thread)
+	imageCard.ID = "image-node"
+	imageCard.CardType = "image"
+	imageCard.Asset = createTestManagedAsset("image/png")
+	imageCard.Caption = "diagram"
+	fileCard := createSecondTestCard(thread)
+	fileCard.ID = "file-node"
+	fileCard.CardType = "file"
+	fileCard.Asset = createTestManagedAsset("application/pdf")
+	fileCard.Description = "specification"
+	linkCard := createSecondTestCard(thread)
+	linkCard.ID = "link-node"
+	linkCard.CardType = "link"
+	linkCard.URL = "https://example.com/docs"
+	linkCard.LinkTitle = "Docs"
+	thread.Cards = append(thread.Cards, imageCard, fileCard, linkCard)
+
+	if err := validateConversationThread(thread); err != nil {
+		t.Fatalf("validateConversationThread() error = %v", err)
+	}
+}
+
+func createTestManagedAsset(mimeType string) *ManagedAssetDTO {
+	return &ManagedAssetDTO{
+		ID:        strings.Repeat("a", 64) + ".bin",
+		Name:      "asset.bin",
+		MimeType:  mimeType,
+		SizeBytes: 128,
 	}
 }
 

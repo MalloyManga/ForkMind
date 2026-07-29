@@ -1,5 +1,6 @@
 import type { ForkMindWorkspaceDocument } from "../domain/workspace"
 import type { ConversationThread } from "../domain/conversation/types"
+import type { ManagedAssetReference } from "../domain/conversation/types"
 
 export interface BridgeErrorPayload {
     code: string
@@ -37,12 +38,7 @@ export interface WorkspaceImportBridgeResponse {
 
 export type ManagedAssetKind = "image" | "file"
 
-export interface ManagedAsset {
-    id: string
-    name: string
-    mimeType: string
-    sizeBytes: number
-}
+export type ManagedAsset = ManagedAssetReference
 
 export interface ManagedAssetImportBridgeResponse {
     cancelled: boolean

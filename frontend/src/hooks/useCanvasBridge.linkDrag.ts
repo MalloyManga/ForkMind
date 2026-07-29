@@ -3,6 +3,7 @@ import { Editor, TLShapeId, createShapeId } from "tldraw"
 import { DEFAULT_CARD_MIN_HEIGHT, DEFAULT_CARD_WIDTH } from "../domain/conversation/constants"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { type ForkMindCardShape, FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
+import { assertNever } from "../lib/utils"
 import { type LinkDragRelationKind, type StartLinkDragInput } from "./canvasLinkTypes"
 import type { CanvasTool } from "./canvasToolTypes"
 import { isCreationCanvasTool } from "./canvasToolTypes"
@@ -47,6 +48,37 @@ interface UseCanvasBridgeLinkDragParams {
 interface UseCanvasBridgeLinkDragResult {
     handleLinkHandlePointerDown: (input: StartLinkDragInput) => void
     cancelLinkDrag: (editor: Editor) => void
+}
+
+function createGhostCardContentProps(cardType: ConversationNodeType) {
+    switch (cardType) {
+        case "chat":
+            return { cardType, userPrompt: "", aiResponse: "" }
+        case "note":
+            return { cardType, noteContent: "" }
+        case "image":
+            return {
+                cardType,
+                assetId: "",
+                assetName: "",
+                assetMimeType: "",
+                assetSizeBytes: 0,
+                caption: "",
+                altText: "",
+            }
+        case "link":
+            return { cardType, url: "", title: "", description: "" }
+        case "file":
+            return {
+                cardType,
+                assetName: "",
+                assetMimeType: "",
+                assetSizeBytes: 0,
+                description: "",
+            }
+    }
+
+    return assertNever(cardType)
 }
 
 /**
@@ -277,10 +309,7 @@ export function useCanvasBridgeLinkDrag({
                         nodeId: "preview",
                         w: DEFAULT_CARD_WIDTH,
                         h: session.ghostHeight,
-                        cardType: session.ghostCardType,
-                        ...(session.ghostCardType === "chat"
-                            ? { userPrompt: "", aiResponse: "" }
-                            : { noteContent: "" }),
+                        ...createGhostCardContentProps(session.ghostCardType!),
                     },
                 } as unknown as Parameters<Editor["createShape"]>[0]
                 editor.createShape(ghostShape)
@@ -478,10 +507,7 @@ export function useCanvasBridgeLinkDrag({
                         nodeId: "preview",
                         w: DEFAULT_CARD_WIDTH,
                         h: currentGhostHeight,
-                        cardType: currentCreationType,
-                        ...(currentCreationType === "chat"
-                            ? { userPrompt: "", aiResponse: "" }
-                            : { noteContent: "" }),
+                        ...createGhostCardContentProps(currentCreationType),
                     },
                 } as unknown as Parameters<Editor["createShape"]>[0]
 

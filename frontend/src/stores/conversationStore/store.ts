@@ -40,7 +40,13 @@ import {
     normalizeTextAnchor,
     willCreateParentCycle,
 } from "./helpers"
-import { createChatNode, createNoteNode } from "./nodeFactories"
+import {
+    createChatNode,
+    createFileNode,
+    createImageNode,
+    createLinkNode,
+    createNoteNode,
+} from "./nodeFactories"
 
 interface RemappedClipboardRelations {
     parentId: string | null
@@ -138,6 +144,27 @@ function addNoteNode(
     return createNoteNode(input, nodes)
 }
 
+function addImageNode(
+    input: AddNodeDraftInput<"image">,
+    nodes: readonly ConversationCard[],
+): ConversationCard {
+    return createImageNode(input, nodes)
+}
+
+function addLinkNode(
+    input: AddNodeDraftInput<"link">,
+    nodes: readonly ConversationCard[],
+): ConversationCard {
+    return createLinkNode(input, nodes)
+}
+
+function addFileNode(
+    input: AddNodeDraftInput<"file">,
+    nodes: readonly ConversationCard[],
+): ConversationCard {
+    return createFileNode(input, nodes)
+}
+
 /**
  * Store 新增节点的唯一分发点
  * input.cardType 是业务判别字段 用来选择具体节点工厂
@@ -152,6 +179,12 @@ function createNodeFromDraft(
             return addChatNode(input, nodes)
         case "note":
             return addNoteNode(input, nodes)
+        case "image":
+            return addImageNode(input, nodes)
+        case "link":
+            return addLinkNode(input, nodes)
+        case "file":
+            return addFileNode(input, nodes)
     }
 
     return assertNever(input)
@@ -276,6 +309,29 @@ function createPastedNodesFromPayload(
                     ...pastedBaseNode,
                     cardType: "note",
                     noteContent: clipboardNode.noteContent,
+                }
+            case "image":
+                return {
+                    ...pastedBaseNode,
+                    cardType: "image",
+                    asset: clipboardNode.asset ? { ...clipboardNode.asset } : null,
+                    caption: clipboardNode.caption,
+                    altText: clipboardNode.altText,
+                }
+            case "link":
+                return {
+                    ...pastedBaseNode,
+                    cardType: "link",
+                    url: clipboardNode.url,
+                    title: clipboardNode.title,
+                    description: clipboardNode.description,
+                }
+            case "file":
+                return {
+                    ...pastedBaseNode,
+                    cardType: "file",
+                    asset: clipboardNode.asset ? { ...clipboardNode.asset } : null,
+                    description: clipboardNode.description,
                 }
         }
 
@@ -906,6 +962,145 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                     updatedAt: now,
                 },
                 ...textMutationHistory,
+            }
+        })
+    },
+
+    /**
+     * 更新图片节点的本地资产或文本说明
+     * update 来自选择图片 Alt Text 和 Caption 编辑动作
+     */
+    updateImageNode: (nodeId, update) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (!targetNode || targetNode.cardType !== "image") {
+                return {}
+            }
+
+            const nextAsset = update.asset === undefined
+                ? targetNode.asset
+                : update.asset
+                    ? { ...update.asset }
+                    : null
+            const nextCaption = update.caption ?? targetNode.caption
+            const nextAltText = update.altText ?? targetNode.altText
+            if (
+                targetNode.caption === nextCaption &&
+                targetNode.altText === nextAltText &&
+                JSON.stringify(targetNode.asset) === JSON.stringify(nextAsset)
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const changedTextField: ConversationTextField | undefined =
+                update.caption !== undefined
+                    ? "caption"
+                    : update.altText !== undefined
+                        ? "altText"
+                        : undefined
+            const mutationHistory = changedTextField
+                ? resolveTextMutationHistory(state, nodeId, changedTextField)
+                : {
+                    pastSnapshots: [
+                        ...state.pastSnapshots,
+                        { thread: cloneThread(state.activeThread), activeNodeId: state.activeNodeId },
+                    ].slice(-HISTORY_LIMIT),
+                    futureSnapshots: [],
+                    textEditSession: null,
+                }
+
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId && node.cardType === "image"
+                            ? { ...node, asset: nextAsset, caption: nextCaption, altText: nextAltText, updatedAt: now }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
+                ...mutationHistory,
+            }
+        })
+    },
+
+    /** 更新链接节点 URL 标题或描述 不执行网络抓取 */
+    updateLinkNode: (nodeId, update) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (!targetNode || targetNode.cardType !== "link") {
+                return {}
+            }
+
+            const nextURL = update.url ?? targetNode.url
+            const nextTitle = update.title ?? targetNode.title
+            const nextDescription = update.description ?? targetNode.description
+            if (targetNode.url === nextURL && targetNode.title === nextTitle && targetNode.description === nextDescription) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const changedTextField: ConversationTextField =
+                update.url !== undefined ? "url" : update.title !== undefined ? "title" : "description"
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId && node.cardType === "link"
+                            ? { ...node, url: nextURL, title: nextTitle, description: nextDescription, updatedAt: now }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
+                ...resolveTextMutationHistory(state, nodeId, changedTextField),
+            }
+        })
+    },
+
+    /** 更新文件节点的本地资产或文本描述 */
+    updateFileNode: (nodeId, update) => {
+        set((state) => {
+            const targetNode = findNodeById(state.activeThread.cards, nodeId)
+            if (!targetNode || targetNode.cardType !== "file") {
+                return {}
+            }
+
+            const nextAsset = update.asset === undefined
+                ? targetNode.asset
+                : update.asset
+                    ? { ...update.asset }
+                    : null
+            const nextDescription = update.description ?? targetNode.description
+            if (
+                targetNode.description === nextDescription &&
+                JSON.stringify(targetNode.asset) === JSON.stringify(nextAsset)
+            ) {
+                return {}
+            }
+
+            const now = createTimestamp()
+            const mutationHistory = update.description !== undefined
+                ? resolveTextMutationHistory(state, nodeId, "description")
+                : {
+                    pastSnapshots: [
+                        ...state.pastSnapshots,
+                        { thread: cloneThread(state.activeThread), activeNodeId: state.activeNodeId },
+                    ].slice(-HISTORY_LIMIT),
+                    futureSnapshots: [],
+                    textEditSession: null,
+                }
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: state.activeThread.cards.map((node) =>
+                        node.id === nodeId && node.cardType === "file"
+                            ? { ...node, asset: nextAsset, description: nextDescription, updatedAt: now }
+                            : node,
+                    ),
+                    updatedAt: now,
+                },
+                ...mutationHistory,
             }
         })
     },

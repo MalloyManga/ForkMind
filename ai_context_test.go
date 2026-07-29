@@ -123,6 +123,65 @@ func TestBuildAIRuntimeContextIncludesTextAnchor(t *testing.T) {
 	}
 }
 
+// TestBuildAIRuntimeContextIncludesLocalMetadataCards 验证图片 文件和链接只以文本元数据进入背景区
+func TestBuildAIRuntimeContextIncludesLocalMetadataCards(t *testing.T) {
+	t.Parallel()
+
+	thread := createContextTestThread()
+	imageParentID := "root-chat"
+	thread.Cards = append(thread.Cards, ConversationCardDTO{
+		ID:        "image-parent",
+		CardType:  "image",
+		ParentID:  &imageParentID,
+		Position:  CardPositionDTO{X: 200, Y: 200},
+		Size:      CardSizeDTO{Mode: "auto", Width: 360, MinHeight: 160},
+		Status:    "done",
+		CreatedAt: thread.CreatedAt,
+		UpdatedAt: thread.UpdatedAt,
+		Asset:     createTestManagedAsset("image/png"),
+		Caption:   "architecture diagram",
+		AltText:   "boxes and arrows",
+	})
+	linkCard := ConversationCardDTO{
+		ID:          "link-reference",
+		CardType:    "link",
+		Position:    CardPositionDTO{X: 300, Y: 300},
+		Size:        CardSizeDTO{Mode: "auto", Width: 360, MinHeight: 160},
+		Status:      "done",
+		CreatedAt:   thread.CreatedAt,
+		UpdatedAt:   thread.UpdatedAt,
+		URL:         "https://example.com/docs",
+		LinkTitle:   "Docs",
+		Description: "reference page",
+	}
+	thread.Cards = append(thread.Cards, linkCard)
+	childIndex := findContextTestCardIndex(thread.Cards, "child-chat")
+	thread.Cards[childIndex].ParentID = stringPointer("image-parent")
+	thread.Cards[childIndex].ReferenceNodeIDs = []string{"link-reference"}
+
+	context, err := BuildAIRuntimeContext(BuildAIContextInput{
+		Thread:       thread,
+		ActiveNodeID: "child-chat",
+		SystemPrompt: "system",
+	})
+	if err != nil {
+		t.Fatalf("BuildAIRuntimeContext() error = %v", err)
+	}
+	joinedMessages := make([]string, 0, len(context.Messages))
+	for _, message := range context.Messages {
+		joinedMessages = append(joinedMessages, message.Content)
+	}
+	joined := strings.Join(joinedMessages, "\n")
+	for _, fragment := range []string{"architecture diagram", "boxes and arrows", "https://example.com/docs", "asset.bin", "image/png"} {
+		if !strings.Contains(joined, fragment) {
+			t.Fatalf("messages do not contain %q: %s", fragment, joined)
+		}
+	}
+	if strings.Contains(joined, `C:\\`) || strings.Contains(joined, "data:image") {
+		t.Fatalf("messages leaked local path or binary data: %s", joined)
+	}
+}
+
 // TestBuildAIRuntimeContextRejectsNonChatActiveNode 验证 Note 不能直接发起模型请求
 func TestBuildAIRuntimeContextRejectsNonChatActiveNode(t *testing.T) {
 	t.Parallel()
@@ -256,6 +315,36 @@ func TestFormatReferenceCardVariants(t *testing.T) {
 	if content := formatReferenceCard(ConversationCardDTO{CardType: "future"}); content != "" {
 		t.Fatalf("unknown reference = %q", content)
 	}
+	imageContent := formatReferenceCard(ConversationCardDTO{
+		CardType: "image",
+		Asset:    createTestManagedAsset("image/png"),
+		AltText:  " alt ",
+		Caption:  " caption ",
+	})
+	for _, fragment := range []string{"asset.bin", "替代文本:\nalt", "图片说明:\ncaption"} {
+		if !strings.Contains(imageContent, fragment) {
+			t.Fatalf("image reference = %q, want %q", imageContent, fragment)
+		}
+	}
+	linkContent := formatReferenceCard(ConversationCardDTO{
+		CardType:    "link",
+		URL:         " https://example.com ",
+		LinkTitle:   " title ",
+		Description: " description ",
+	})
+	for _, fragment := range []string{"链接标题:\ntitle", "链接地址:\nhttps://example.com", "链接说明:\ndescription"} {
+		if !strings.Contains(linkContent, fragment) {
+			t.Fatalf("link reference = %q, want %q", linkContent, fragment)
+		}
+	}
+	fileContent := formatReferenceCard(ConversationCardDTO{
+		CardType:    "file",
+		Asset:       createTestManagedAsset("application/pdf"),
+		Description: " spec ",
+	})
+	if !strings.Contains(fileContent, "application/pdf") || !strings.Contains(fileContent, "文件说明:\nspec") {
+		t.Fatalf("file reference = %q", fileContent)
+	}
 }
 
 // TestFormatTextAnchor 验证锚点标签会保留来源 字段和去空白后的 quote
@@ -270,6 +359,22 @@ func TestFormatTextAnchor(t *testing.T) {
 	for _, fragment := range []string{"来源 source", "字段 noteContent", "selected text"} {
 		if !strings.Contains(formatted, fragment) {
 			t.Fatalf("formatTextAnchor() = %q, want %q", formatted, fragment)
+		}
+	}
+}
+
+// TestFormatManagedAssetMetadata 验证模型上下文只包含可公开文本元数据
+func TestFormatManagedAssetMetadata(t *testing.T) {
+	t.Parallel()
+
+	formatted := formatManagedAssetMetadata(ManagedAssetDTO{
+		Name:      "report.pdf",
+		MimeType:  "application/pdf",
+		SizeBytes: 2048,
+	})
+	for _, fragment := range []string{"report.pdf", "application/pdf", "2048 bytes"} {
+		if !strings.Contains(formatted, fragment) {
+			t.Fatalf("formatManagedAssetMetadata() = %q, want %q", formatted, fragment)
 		}
 	}
 }

@@ -2,6 +2,7 @@ import type { ComponentType } from "react"
 import type { ConversationNodeType } from "../domain/conversation/types"
 import { ChatPlusIcon } from "./icons/ChatPlusIcon"
 import { NotePlusIcon } from "./icons/NotePlusIcon"
+import { FilePlus2, ImagePlus, Link2 } from "lucide-react"
 
 export interface CanvasCreationRegistryItem {
     tooltip: string
@@ -20,5 +21,17 @@ export const CANVAS_CREATION_REGISTRY: Record<ConversationNodeType, CanvasCreati
     note: {
         tooltip: "Note",
         Icon: NotePlusIcon,
+    },
+    image: {
+        tooltip: "Image",
+        Icon: ImagePlus,
+    },
+    link: {
+        tooltip: "Link",
+        Icon: Link2,
+    },
+    file: {
+        tooltip: "File",
+        Icon: FilePlus2,
     },
 }

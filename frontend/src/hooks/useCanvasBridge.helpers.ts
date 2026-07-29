@@ -13,6 +13,9 @@ import {
 
 export const CHAT_CARD_HEIGHT = 280
 export const NOTE_CARD_HEIGHT = 220
+export const IMAGE_CARD_HEIGHT = 280
+export const LINK_CARD_HEIGHT = 220
+export const FILE_CARD_HEIGHT = 220
 export const GHOST_NODE_OPACITY_VISIBLE = 0.48
 export const GHOST_NODE_OPACITY_HIDDEN = 0
 
@@ -99,7 +102,7 @@ const ANCHOR_SIDE_ALL: AnchorSide[] = [
  * 阶段三先落地“固定宽度 + 固定高度上限 + 内部滚动”，避免长 Markdown 把画布排版撑坏
  */
 export function getCardShapeHeight(card: ConversationCard): number {
-    const baseHeight = card.cardType === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
+    const baseHeight = getDefaultHeightByType(card.cardType)
     return Math.max(card.size.minHeight, baseHeight)
 }
 
@@ -107,7 +110,18 @@ export function getCardShapeHeight(card: ConversationCard): number {
  * 双击空白创建或拖拽幽灵卡片时 根据当前选择的卡片类型计算初始高度
  */
 export function getDefaultHeightByType(cardType: ConversationNodeType): number {
-    return cardType === "chat" ? CHAT_CARD_HEIGHT : NOTE_CARD_HEIGHT
+    switch (cardType) {
+        case "chat":
+            return CHAT_CARD_HEIGHT
+        case "note":
+            return NOTE_CARD_HEIGHT
+        case "image":
+            return IMAGE_CARD_HEIGHT
+        case "link":
+            return LINK_CARD_HEIGHT
+        case "file":
+            return FILE_CARD_HEIGHT
+    }
 }
 
 /**

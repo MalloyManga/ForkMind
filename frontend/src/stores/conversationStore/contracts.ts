@@ -6,6 +6,9 @@
     ConversationTextAnchor,
     ConversationTextField,
     ConversationThread,
+    FileNode,
+    ImageNode,
+    LinkNode,
 } from "../../domain/conversation/types"
 export type { DistributiveOmit } from "../../types/typeUtils"
 export type { ConversationTextField } from "../../domain/conversation/types"
@@ -107,6 +110,10 @@ export interface ForkNoteNodeInput {
     referenceNodeIds?: string[]
 }
 
+export type ImageNodeUpdate = Pick<ImageNode, "asset" | "caption" | "altText">
+export type LinkNodeUpdate = Pick<LinkNode, "url" | "title" | "description">
+export type FileNodeUpdate = Pick<FileNode, "asset" | "description">
+
 /**
  * 历史快照 用于 undo redo
  * 同时保存 thread 和 activeNodeId 避免回滚后内容变了 但右侧编辑目标没跟着回滚
@@ -171,6 +178,9 @@ export interface ConversationStoreState {
     cancelChatResponse: (nodeId: string) => void
     failChatResponse: (nodeId: string) => void
     updateNoteContent: (nodeId: string, noteContent: string) => void
+    updateImageNode: (nodeId: string, update: Partial<ImageNodeUpdate>) => void
+    updateLinkNode: (nodeId: string, update: Partial<LinkNodeUpdate>) => void
+    updateFileNode: (nodeId: string, update: Partial<FileNodeUpdate>) => void
     beginTextEdit: (nodeId: string, field: ConversationTextField) => void
     endTextEdit: () => void
     pasteNodesFromClipboard: (input: PasteNodesFromClipboardInput) => string[]

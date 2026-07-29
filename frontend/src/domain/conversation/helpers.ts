@@ -13,6 +13,7 @@ export function cloneConversationCard(card: ConversationCard): ConversationCard 
         position: { ...card.position },
         size: { ...card.size },
         referenceNodeIds: card.referenceNodeIds ? [...card.referenceNodeIds] : undefined,
+        sourceAnchor: card.sourceAnchor ? { ...card.sourceAnchor } : undefined,
     }
 
     switch (card.cardType) {
@@ -28,6 +29,29 @@ export function cloneConversationCard(card: ConversationCard): ConversationCard 
                 ...clonedBaseNode,
                 cardType: "note",
                 noteContent: card.noteContent,
+            }
+        case "image":
+            return {
+                ...clonedBaseNode,
+                cardType: "image",
+                asset: card.asset ? { ...card.asset } : null,
+                caption: card.caption,
+                altText: card.altText,
+            }
+        case "link":
+            return {
+                ...clonedBaseNode,
+                cardType: "link",
+                url: card.url,
+                title: card.title,
+                description: card.description,
+            }
+        case "file":
+            return {
+                ...clonedBaseNode,
+                cardType: "file",
+                asset: card.asset ? { ...card.asset } : null,
+                description: card.description,
             }
     }
 

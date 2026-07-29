@@ -11,8 +11,13 @@ import type {
     ChatNode,
     ConversationCard,
     ConversationNodeStatus,
+    ConversationNodeType,
     ConversationTextAnchor,
     ConversationThread,
+    FileNode,
+    ImageNode,
+    LinkNode,
+    ManagedAssetReference,
     NoteNode,
 } from "../conversation/types"
 import {
@@ -89,7 +94,16 @@ function parseTextAnchor(input: unknown): ConversationTextAnchor | undefined {
     if (
         !sourceNodeId ||
         !quote ||
-        (field !== "userPrompt" && field !== "aiResponse" && field !== "noteContent") ||
+        (
+            field !== "userPrompt" &&
+            field !== "aiResponse" &&
+            field !== "noteContent" &&
+            field !== "caption" &&
+            field !== "altText" &&
+            field !== "url" &&
+            field !== "title" &&
+            field !== "description"
+        ) ||
         (origin !== "editor" && origin !== "canvas")
     ) {
         return undefined
@@ -127,7 +141,36 @@ function isTextAnchorFieldCompatible(
             return anchor.field === "userPrompt" || anchor.field === "aiResponse"
         case "note":
             return anchor.field === "noteContent"
+        case "image":
+            return anchor.field === "caption" || anchor.field === "altText"
+        case "link":
+            return anchor.field === "url" || anchor.field === "title" || anchor.field === "description"
+        case "file":
+            return anchor.field === "description"
     }
+
+    return false
+}
+
+function parseManagedAsset(input: unknown): ManagedAssetReference | null {
+    if (!isUnknownRecord(input)) {
+        return null
+    }
+
+    const id = readString(input.id).trim()
+    const name = readString(input.name).trim()
+    const mimeType = readString(input.mimeType).trim()
+    const sizeBytes = isFiniteNumber(input.sizeBytes) ? Math.floor(input.sizeBytes) : 0
+    if (
+        !/^[a-f0-9]{64}(?:\.[a-z0-9]{1,10})?$/.test(id) ||
+        !name ||
+        !mimeType ||
+        sizeBytes <= 0
+    ) {
+        return null
+    }
+
+    return { id, name, mimeType, sizeBytes }
 }
 
 /**
@@ -140,10 +183,10 @@ function isTextAnchorFieldCompatible(
  */
 function normalizeExternalNodeStatus(
     value: unknown,
-    cardType: "chat" | "note",
+    cardType: ConversationNodeType,
     aiResponse: string,
 ): ConversationNodeStatus {
-    if (cardType === "note") {
+    if (cardType !== "chat") {
         return NODE_STATUS_DONE
     }
     if (value === NODE_STATUS_STREAMING) {
@@ -184,12 +227,18 @@ function parseCard(
     }
 
     const cardType = input.cardType
-    if (cardType !== "chat" && cardType !== "note") {
+    if (
+        cardType !== "chat" &&
+        cardType !== "note" &&
+        cardType !== "image" &&
+        cardType !== "link" &&
+        cardType !== "file"
+    ) {
         return {
             ok: false,
             error: {
                 code: "invalid_card_type",
-                message: "节点 cardType 只能是 chat 或 note",
+                message: "节点 cardType 只能是 chat note image link 或 file",
                 path: `${path}.cardType`,
             },
         }
@@ -236,12 +285,45 @@ function parseCard(
         return { ok: true, value: chatNode }
     }
 
-    const noteNode: NoteNode = {
-        ...baseNode,
-        cardType,
-        noteContent: readString(input.noteContent),
+    switch (cardType) {
+        case "note": {
+            const noteNode: NoteNode = {
+                ...baseNode,
+                cardType,
+                noteContent: readString(input.noteContent),
+            }
+            return { ok: true, value: noteNode }
+        }
+        case "image": {
+            const imageNode: ImageNode = {
+                ...baseNode,
+                cardType,
+                asset: parseManagedAsset(input.asset),
+                caption: readString(input.caption),
+                altText: readString(input.altText),
+            }
+            return { ok: true, value: imageNode }
+        }
+        case "link": {
+            const linkNode: LinkNode = {
+                ...baseNode,
+                cardType,
+                url: readString(input.url),
+                title: readString(input.title),
+                description: readString(input.description),
+            }
+            return { ok: true, value: linkNode }
+        }
+        case "file": {
+            const fileNode: FileNode = {
+                ...baseNode,
+                cardType,
+                asset: parseManagedAsset(input.asset),
+                description: readString(input.description),
+            }
+            return { ok: true, value: fileNode }
+        }
     }
-    return { ok: true, value: noteNode }
 }
 
 /**

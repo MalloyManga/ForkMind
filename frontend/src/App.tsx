@@ -39,6 +39,7 @@ import { type CanvasTool } from "./hooks/canvasToolTypes"
 import { useWorkspaceController } from "./hooks/useWorkspaceController"
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
 import { useWorkspaceTransfer } from "./hooks/useWorkspaceTransfer"
+import { importManagedAssetFromBridge, type ManagedAssetKind } from "./bridge"
 import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
 import {
     CANVAS_CARD_ACTIVATE_EVENT,
@@ -92,6 +93,7 @@ function App() {
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
     const [isAISettingsOpen, setIsAISettingsOpen] = useState(false)
     const [canvasTextSelection, setCanvasTextSelection] = useState<CanvasTextSelectionState | null>(null)
+    const [managedAssetErrorMessage, setManagedAssetErrorMessage] = useState<string | null>(null)
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH)
@@ -129,6 +131,9 @@ function App() {
     const updateChatPrompt = useConversationStore((state) => state.updateChatPrompt)
     const updateChatResponse = useConversationStore((state) => state.updateChatResponse)
     const updateNoteContent = useConversationStore((state) => state.updateNoteContent)
+    const updateImageNode = useConversationStore((state) => state.updateImageNode)
+    const updateLinkNode = useConversationStore((state) => state.updateLinkNode)
+    const updateFileNode = useConversationStore((state) => state.updateFileNode)
     const beginTextEdit = useConversationStore((state) => state.beginTextEdit)
     const endTextEdit = useConversationStore((state) => state.endTextEdit)
     const pasteNodesFromClipboard = useConversationStore((state) => state.pasteNodesFromClipboard)
@@ -214,6 +219,27 @@ function App() {
         setCanvasTextSelection(null)
         window.getSelection()?.removeAllRanges()
     }, [forkChatNode])
+
+    const handleSelectManagedAsset = useCallback(async (nodeId: string, kind: ManagedAssetKind) => {
+        setManagedAssetErrorMessage(null)
+        const response = await importManagedAssetFromBridge(kind)
+        if (response.error) {
+            setManagedAssetErrorMessage(response.error.message)
+            return
+        }
+        if (response.cancelled || !response.asset) {
+            return
+        }
+
+        switch (kind) {
+            case "image":
+                updateImageNode(nodeId, { asset: response.asset })
+                return
+            case "file":
+                updateFileNode(nodeId, { asset: response.asset })
+                return
+        }
+    }, [updateFileNode, updateImageNode])
 
     const handleAppCanvasMount = useCallback((editor: Editor) => {
         // App 自己留 editor 是为了给右键菜单 executor 提供视口中心和 page 坐标能力
@@ -521,6 +547,13 @@ function App() {
                             onUpdateChatPrompt={updateChatPrompt}
                             onUpdateChatResponse={updateChatResponse}
                             onUpdateNoteContent={updateNoteContent}
+                            onUpdateImageNode={updateImageNode}
+                            onUpdateLinkNode={updateLinkNode}
+                            onUpdateFileNode={updateFileNode}
+                            onSelectManagedAsset={(nodeId, kind) => {
+                                void handleSelectManagedAsset(nodeId, kind)
+                            }}
+                            managedAssetErrorMessage={managedAssetErrorMessage}
                             onBeginTextEdit={beginTextEdit}
                             onEndTextEdit={endTextEdit}
                             activeAIRequestNodeId={aiCompletion.activeRequestNodeId}
