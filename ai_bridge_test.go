@@ -155,6 +155,9 @@ func TestStartAndRunChatCompletionEvents(t *testing.T) {
 		if requestBody.Model != "test-model" || requestBody.Temperature != defaultOpenAITemperature || requestBody.MaxTokens != defaultOpenAIMaxTokens {
 			t.Errorf("chat defaults = %#v", requestBody)
 		}
+		if len(requestBody.Tools) != 1 || requestBody.Tools[0].Function.Name != canvasPlanToolName || requestBody.ToolChoice != "auto" {
+			t.Errorf("chat tools = %#v choice = %q", requestBody.Tools, requestBody.ToolChoice)
+		}
 		responseWriter.Header().Set("Content-Type", "text/event-stream")
 		_, _ = responseWriter.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
 	}))
@@ -184,6 +187,51 @@ func TestStartAndRunChatCompletionEvents(t *testing.T) {
 	}
 	if app.aiRequestManager.Cancel(input.RequestID) {
 		t.Fatal("request remains registered after completion")
+	}
+}
+
+// TestRunChatCompletionEmitsCanvasPlanBeforeDone 验证合法工具调用先进入审批事件再结算请求
+func TestRunChatCompletionEmitsCanvasPlanBeforeDone(t *testing.T) {
+	previousEmitter := emitWailsEvent
+	defer func() { emitWailsEvent = previousEmitter }()
+
+	events := make(chan eventRecord, 2)
+	emitWailsEvent = func(_ context.Context, name string, payload ...interface{}) {
+		if len(payload) > 0 {
+			events <- eventRecord{name: name, payload: payload[0]}
+		}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, _ *http.Request) {
+		responseWriter.Header().Set("Content-Type", "text/event-stream")
+		_, _ = responseWriter.Write([]byte(`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-plan","type":"function","function":{"name":"propose_canvas_plan","arguments":"{\"nodes\":[{\"tempId\":\"one\",\"cardType\":\"note\",\"content\":{\"noteContent\":\"generated\"},\"parentTempId\":null,\"referenceTempIds\":[]}] }"}}]},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+
+`))
+	}))
+	defer server.Close()
+
+	manager := NewAIRequestManager()
+	_, cancel := context.WithCancel(context.Background())
+	if err := manager.Register("request-plan", cancel); err != nil {
+		t.Fatalf("register plan request: %v", err)
+	}
+	app := &App{
+		ctx:              context.Background(),
+		openAIClient:     newOpenAIClientWithHTTPClient(server.Client()),
+		aiRequestManager: manager,
+	}
+	input := createAIStartInput("request-plan")
+	input.Config.BaseURL = server.URL
+	app.runChatCompletion(context.Background(), input, AIRuntimeContextDTO{Messages: []OpenAIMessageDTO{{Role: openAIRoleUser, Content: "create canvas"}}})
+
+	planEvent := <-events
+	doneEvent := <-events
+	if planEvent.name != aiEventCanvasPlan || doneEvent.name != aiEventDone {
+		t.Fatalf("events = %#v %#v", planEvent, doneEvent)
+	}
+	if proposal, ok := planEvent.payload.(AICanvasPlanEvent); !ok || len(proposal.Plan.Nodes) != 1 || proposal.SchemaVersion != canvasPlanSchemaVersion {
+		t.Fatalf("canvas plan payload = %#v", planEvent.payload)
 	}
 }
 

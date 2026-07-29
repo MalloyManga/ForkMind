@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,6 +35,81 @@ func TestWorkspaceRepositorySaveAndLoad(t *testing.T) {
 	}
 	if actualDocument.Threads[0].Cards[0].UserPrompt != "hello" {
 		t.Fatalf("UserPrompt = %q, want hello", actualDocument.Threads[0].Cards[0].UserPrompt)
+	}
+}
+
+// TestWorkspaceRepositoryMigratesLegacySystemPrompt 验证旧版可编辑生成参数只被兼容读取一次
+// 迁移后的领域设置只保留 baseUrl model 再次保存时不会把旧字段写回磁盘
+func TestWorkspaceRepositoryMigratesLegacySystemPrompt(t *testing.T) {
+	t.Parallel()
+
+	repository := NewWorkspaceRepository(t.TempDir())
+	indexDocument, threadDocument := createRepositoryDocuments()
+	legacyIndexDocument := struct {
+		Format         string                      `json:"format"`
+		Version        string                      `json:"version"`
+		ActiveThreadID string                      `json:"activeThreadId"`
+		Threads        []workspaceThreadIndexEntry `json:"threads"`
+		Settings       struct {
+			BaseURL      string  `json:"baseUrl"`
+			Model        string  `json:"model"`
+			SystemPrompt string  `json:"systemPrompt"`
+			Temperature  float64 `json:"temperature"`
+			MaxTokens    int     `json:"maxTokens"`
+		} `json:"settings"`
+		LastModified string `json:"lastModified"`
+	}{
+		Format:         indexDocument.Format,
+		Version:        indexDocument.Version,
+		ActiveThreadID: indexDocument.ActiveThreadID,
+		Threads:        indexDocument.Threads,
+		LastModified:   indexDocument.LastModified,
+	}
+	legacyIndexDocument.Settings.BaseURL = indexDocument.Settings.BaseURL
+	legacyIndexDocument.Settings.Model = indexDocument.Settings.Model
+	legacyIndexDocument.Settings.SystemPrompt = "legacy user editable prompt"
+	legacyIndexDocument.Settings.Temperature = 0.7
+	legacyIndexDocument.Settings.MaxTokens = 4096
+
+	if err := writeJSONAtomically(filepath.Join(repository.RootDir(), workspaceIndexFileName), legacyIndexDocument); err != nil {
+		t.Fatalf("write legacy workspace index: %v", err)
+	}
+	threadPath, err := repository.resolveIndexedThreadPath(indexDocument.Threads[0].File)
+	if err != nil {
+		t.Fatalf("resolve legacy thread path: %v", err)
+	}
+	if err := writeJSONAtomically(threadPath, threadDocument); err != nil {
+		t.Fatalf("write legacy thread: %v", err)
+	}
+
+	loadedDocument, exists, err := repository.LoadWorkspace()
+	if err != nil {
+		t.Fatalf("LoadWorkspace() legacy error = %v", err)
+	}
+	if !exists {
+		t.Fatal("LoadWorkspace() legacy exists = false want true")
+	}
+	if loadedDocument.Settings != indexDocument.Settings {
+		t.Fatalf("migrated settings = %#v want %#v", loadedDocument.Settings, indexDocument.Settings)
+	}
+
+	if err := repository.SaveWorkspace(loadedDocument); err != nil {
+		t.Fatalf("SaveWorkspace() migrated error = %v", err)
+	}
+	encodedIndex, err := os.ReadFile(filepath.Join(repository.RootDir(), workspaceIndexFileName))
+	if err != nil {
+		t.Fatalf("read migrated workspace index: %v", err)
+	}
+	for _, removedField := range []string{"systemPrompt", "temperature", "maxTokens"} {
+		if strings.Contains(string(encodedIndex), removedField) {
+			t.Fatalf("migrated workspace index still contains %s: %s", removedField, encodedIndex)
+		}
+	}
+
+	unknownSettingsPath := filepath.Join(repository.RootDir(), "unknown-settings.json")
+	writeTestBytes(t, unknownSettingsPath, []byte(`{"baseUrl":"https://example.com/v1","model":"test","other":true}`))
+	if _, _, err := readJSONFile[PersistedOpenAISettingsDTO](unknownSettingsPath); err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("unknown persisted setting error = %v", err)
 	}
 }
 

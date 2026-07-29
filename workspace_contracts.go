@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/url"
@@ -129,6 +131,34 @@ type ConversationThreadDTO struct {
 type PersistedOpenAISettingsDTO struct {
 	BaseURL string `json:"baseUrl"`
 	Model   string `json:"model"`
+}
+
+// UnmarshalJSON 兼容读取旧版设置中已经改为后端内部控制的生成参数
+// encodedSettings 来自 Wails Bridge 输入或磁盘 workspace.json 的 settings 对象
+// 返回 nil 表示 baseUrl model 已完成严格解码 旧生成参数已丢弃且不会再次序列化
+// 工作区加载或 Bridge 解码旧版文档时触发 其它未知字段仍会返回错误
+func (settings *PersistedOpenAISettingsDTO) UnmarshalJSON(encodedSettings []byte) error {
+	type persistedOpenAISettingsJSON struct {
+		BaseURL      string  `json:"baseUrl"`
+		Model        string  `json:"model"`
+		SystemPrompt string  `json:"systemPrompt"`
+		Temperature  float64 `json:"temperature"`
+		MaxTokens    int     `json:"maxTokens"`
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(encodedSettings))
+	decoder.DisallowUnknownFields()
+	var decodedSettings persistedOpenAISettingsJSON
+	if err := decoder.Decode(&decodedSettings); err != nil {
+		return fmt.Errorf("decode persisted OpenAI settings: %w", err)
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return fmt.Errorf("decode persisted OpenAI settings: %w", err)
+	}
+
+	settings.BaseURL = decodedSettings.BaseURL
+	settings.Model = decodedSettings.Model
+	return nil
 }
 
 // WorkspaceDocumentDTO 是 React 与 Go 之间传输的完整工作区快照

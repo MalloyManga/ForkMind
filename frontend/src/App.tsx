@@ -10,7 +10,6 @@ import { GitFork } from "lucide-react"
 import type { Editor } from "tldraw"
 import { CanvasContextMenu } from "./components/CanvasContextMenu"
 import { AISettingsSheet } from "./components/AISettingsSheet"
-import type { CanvasClipboardPayload } from "./stores/conversationStore"
 import { CanvasWorkspace } from "./components/CanvasWorkspace"
 import { LeftConversationSidebar } from "./components/LeftConversationSidebar"
 import { PanelsToggleButton } from "./components/PanelsToggleButton"
@@ -102,13 +101,28 @@ function resolveSidebarDragWidth(
     }
 }
 
+/**
+ * 判断键盘事件是否来自文本编辑区域
+ * @param eventTarget 入参来自全局 keydown 的 event.target 可能是输入控件或 contenteditable 内部子元素
+ * @returns true 表示保留浏览器原生快捷键 false 表示允许 Canvas 命令继续解析
+ * 用户在侧栏表单或卡片富文本区域按下快捷键时触发
+ */
 function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
-    if (!(eventTarget instanceof HTMLElement)) {
+    if (!(eventTarget instanceof Element)) {
         return false
     }
 
-    const tagName = eventTarget.tagName.toLowerCase()
-    return tagName === "textarea" || tagName === "input" || eventTarget.isContentEditable
+    return eventTarget.closest("input, textarea, [contenteditable]:not([contenteditable='false'])") !== null
+}
+
+/**
+ * 判断当前页面是否存在用户主动选择的普通文本
+ * @returns true 表示 Ctrl Cmd C 应交给浏览器复制文字 false 表示可以复制 Canvas 卡片 JSON
+ * 用户在卡片正文或侧栏说明中拖选文字后按下复制快捷键时触发
+ */
+function hasBrowserTextSelection(): boolean {
+    const selection = window.getSelection()
+    return selection !== null && !selection.isCollapsed && selection.toString().length > 0
 }
 
 function App() {
@@ -118,7 +132,6 @@ function App() {
     const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
     const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvasTool 唯一状态源
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
-    const [clipboardPayload, setClipboardPayload] = useState<CanvasClipboardPayload | null>(null) // 当前页面级剪贴板 payload
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
     const [isAISettingsOpen, setIsAISettingsOpen] = useState(false)
     const [canvasTextSelection, setCanvasTextSelection] = useState<CanvasTextSelectionState | null>(null)
@@ -253,7 +266,6 @@ function App() {
 
     // resolver 只负责根据上下文算菜单内容 不做真正业务写入
     const { resolveContextMenuItems } = useCanvasContextMenuResolver({
-        clipboardCard: clipboardPayload,
         isCanvasUiHidden,
     })
 
@@ -261,8 +273,6 @@ function App() {
     const { executeCanvasCommand } = useCanvasContextMenuExecutor({
         canvasEditor,
         activeNodeId,
-        clipboardPayload,
-        setClipboardPayload,
         setIsCanvasUiHidden,
         setAreSidebarsHidden,
         cards,
@@ -521,6 +531,11 @@ function App() {
                 return
             }
 
+            // 页面文字选区优先走浏览器系统复制 避免卡片 Copy 命令覆盖用户选择的文本
+            if (commandId === "copy-node" && hasBrowserTextSelection()) {
+                return
+            }
+
             const nextCanvasTool = resolveCanvasToolByCommand(commandId)
             event.preventDefault()
             closeContextMenu()
@@ -744,6 +759,9 @@ function App() {
                                 void aiCompletion.cancelCompletion(nodeId)
                             }}
                             onForkTextSelection={handleForkTextSelection}
+                            pendingCanvasPlan={aiCompletion.pendingCanvasPlan}
+                            onAcceptCanvasPlan={aiCompletion.acceptCanvasPlan}
+                            onRejectCanvasPlan={aiCompletion.rejectCanvasPlan}
                             />
                         </div>
                     </div>

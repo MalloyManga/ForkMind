@@ -3,12 +3,18 @@ import type {
     AIStreamChunkEvent,
     AIStreamDoneEvent,
     AIStreamErrorEvent,
+    AICanvasPlanEvent,
     BridgeErrorPayload,
 } from "./contracts"
+import {
+    isSupportedCanvasPlanSchemaVersion,
+    parseCanvasPlan,
+} from "../domain/canvasPlan"
 
 const AI_EVENT_CHUNK = "forkmind:ai:chunk"
 const AI_EVENT_DONE = "forkmind:ai:done"
 const AI_EVENT_ERROR = "forkmind:ai:error"
+const AI_EVENT_CANVAS_PLAN = "forkmind:ai:canvas-plan"
 
 type UnknownRecord = Record<string, unknown>
 
@@ -16,6 +22,7 @@ interface AIEventHandlers {
     onChunk: (event: AIStreamChunkEvent) => void
     onDone: (event: AIStreamDoneEvent) => void
     onError: (event: AIStreamErrorEvent) => void
+    onCanvasPlan: (event: AICanvasPlanEvent) => void
 }
 
 function isUnknownRecord(value: unknown): value is UnknownRecord {
@@ -101,10 +108,32 @@ function parseErrorEvent(value: unknown): AIStreamErrorEvent | null {
     }
 }
 
+function parseCanvasPlanEvent(value: unknown): AICanvasPlanEvent | null {
+    if (!isUnknownRecord(value)) {
+        return null
+    }
+    const plan = parseCanvasPlan(value.plan)
+    if (
+        typeof value.requestId !== "string" ||
+        typeof value.nodeId !== "string" ||
+        !isSupportedCanvasPlanSchemaVersion(value.schemaVersion) ||
+        !plan
+    ) {
+        return null
+    }
+
+    return {
+        requestId: value.requestId,
+        nodeId: value.nodeId,
+        schemaVersion: value.schemaVersion,
+        plan,
+    }
+}
+
 /**
  * 订阅 Go OpenAI 流式事件
  * 每个 payload 都从 unknown 校验后才交给业务 Hook
- * 返回函数会一次性解除三个监听 避免 React StrictMode 重复订阅
+ * 返回函数会一次性解除全部监听 避免 React StrictMode 重复订阅
  */
 export function subscribeAIEvents(handlers: AIEventHandlers): () => void {
     const runtimeGlobal = globalThis as typeof globalThis & { runtime?: unknown }
@@ -130,10 +159,17 @@ export function subscribeAIEvents(handlers: AIEventHandlers): () => void {
             handlers.onError(event)
         }
     })
+    const unsubscribeCanvasPlan = EventsOn(AI_EVENT_CANVAS_PLAN, (payload: unknown) => {
+        const event = parseCanvasPlanEvent(payload)
+        if (event) {
+            handlers.onCanvasPlan(event)
+        }
+    })
 
     return () => {
         unsubscribeChunk()
         unsubscribeDone()
         unsubscribeError()
+        unsubscribeCanvasPlan()
     }
 }

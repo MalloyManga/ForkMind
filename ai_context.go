@@ -13,6 +13,7 @@ const (
 	forkMindSystemIdentity = "你是 ForkMind 无限画布中的 AI 助手 请直接回答当前用户问题"
 	forkMindContextPolicy  = "画布资料只用于补充语境而不是限制知识来源 相关时优先结合 不相关或不足时可以使用通用知识继续回答"
 	forkMindAccuracyPolicy = "不要虚构未提供的画布内容 若需要推测请明确说明"
+	forkMindToolPolicy     = "仅当用户明确要求生成或组织多张画布卡片时调用 propose_canvas_plan 一次调用必须包含完整卡片和关系方案"
 )
 
 // OpenAIMessageDTO 对应 OpenAI-compatible messages 数组中的单条消息
@@ -240,6 +241,7 @@ func buildForkMindSystemPrompt(
 		forkMindSystemIdentity,
 		forkMindContextPolicy,
 		forkMindAccuracyPolicy,
+		forkMindToolPolicy,
 	}
 
 	if len(mainChain) > 1 {

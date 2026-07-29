@@ -7,6 +7,7 @@ import {
     type SyntheticEvent,
 } from "react"
 import {
+    Check,
     FileText,
     GitFork,
     ImageIcon,
@@ -19,6 +20,8 @@ import {
     Square,
     SquareMousePointer,
     UserRound,
+    Workflow,
+    X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -39,6 +42,7 @@ import type {
 } from "../domain/conversation/types"
 import type { ManagedAssetKind } from "../bridge"
 import { ManagedImagePreview } from "./ManagedImagePreview"
+import type { PendingCanvasPlan } from "../domain/canvasPlan"
 
 interface RightEditorSidebarProps {
     activeNode: ConversationCard | undefined
@@ -67,6 +71,9 @@ interface RightEditorSidebarProps {
     onStartAIRequest: (nodeId: string) => void
     onCancelAIRequest: (nodeId: string) => void
     onForkTextSelection: (anchor: ConversationTextAnchor) => void
+    pendingCanvasPlan: PendingCanvasPlan | null
+    onAcceptCanvasPlan: () => void
+    onRejectCanvasPlan: () => void
 }
 
 interface ChatEditorResizeState {
@@ -179,11 +186,20 @@ export function RightEditorSidebar({
     onStartAIRequest,
     onCancelAIRequest,
     onForkTextSelection,
+    pendingCanvasPlan,
+    onAcceptCanvasPlan,
+    onRejectCanvasPlan,
 }: RightEditorSidebarProps) {
     const [chatPromptRatio, setChatPromptRatio] = useState(DEFAULT_CHAT_PROMPT_RATIO)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
     const chatResizeStateRef = useRef<ChatEditorResizeState | null>(null)
     const [textSelection, setTextSelection] = useState<ConversationTextAnchor | null>(null)
+    const pendingPlanRelationCount = pendingCanvasPlan
+        ? pendingCanvasPlan.plan.nodes.reduce(
+            (relationCount, node) => relationCount + (node.parentTempId ? 1 : 0) + node.referenceTempIds.length,
+            0,
+        )
+        : 0
 
     useEffect(() => {
         setTextSelection(null)
@@ -608,6 +624,36 @@ export function RightEditorSidebar({
             </header>
 
             <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+            {pendingCanvasPlan ? (
+                <section
+                    className="border-b border-border/70 bg-muted/35 px-4 py-3"
+                    aria-live="polite"
+                    aria-label="AI 画布提案"
+                >
+                    <div className="flex items-start gap-2.5">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-600 theme-dark:text-sky-400">
+                            <Workflow className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-foreground">Canvas proposal ready</p>
+                            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                                {pendingCanvasPlan.plan.nodes.length} cards · {pendingPlanRelationCount} relations
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={onRejectCanvasPlan}>
+                            <X data-icon="inline-start" />
+                            Reject
+                        </Button>
+                        <Button type="button" size="sm" onClick={onAcceptCanvasPlan}>
+                            <Check data-icon="inline-start" />
+                            Accept
+                        </Button>
+                    </div>
+                </section>
+            ) : null}
 
             {/* 正文编辑区 */}
             <div className="min-h-0 flex-1 p-3">

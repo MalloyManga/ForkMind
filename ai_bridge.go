@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	aiEventChunk = "forkmind:ai:chunk"
-	aiEventDone  = "forkmind:ai:done"
-	aiEventError = "forkmind:ai:error"
+	aiEventChunk      = "forkmind:ai:chunk"
+	aiEventDone       = "forkmind:ai:done"
+	aiEventError      = "forkmind:ai:error"
+	aiEventCanvasPlan = "forkmind:ai:canvas-plan"
 )
 
 // StartChatCompletionInput 是 React 点击 Send 时提交给 Wails 的完整请求
@@ -49,6 +50,14 @@ type AIStreamErrorEvent struct {
 	RequestID string      `json:"requestId"`
 	NodeID    string      `json:"nodeId"`
 	Error     BridgeError `json:"error"`
+}
+
+// AICanvasPlanEvent 把 Go 已校验的模型提案送往 React 等待用户接受或拒绝
+type AICanvasPlanEvent struct {
+	RequestID     string        `json:"requestId"`
+	NodeID        string        `json:"nodeId"`
+	SchemaVersion int           `json:"schemaVersion"`
+	Plan          CanvasPlanDTO `json:"plan"`
 }
 
 // AIRequestManager 保存正在运行的 requestId 与 cancel 函数
@@ -162,6 +171,7 @@ func (a *App) runChatCompletion(
 			Messages:    runtimeContext.Messages,
 			Temperature: defaultOpenAITemperature,
 			MaxTokens:   defaultOpenAIMaxTokens,
+			Tools:       []openAIToolDefinition{canvasPlanToolDefinition()},
 		},
 		func(content string) error {
 			emitWailsEvent(a.ctx, aiEventChunk, AIStreamChunkEvent{
@@ -190,6 +200,31 @@ func (a *App) runChatCompletion(
 			Error:     *bridgeError,
 		})
 		return
+	}
+	if len(result.ToolCalls) > 1 {
+		emitWailsEvent(a.ctx, aiEventError, AIStreamErrorEvent{
+			RequestID: input.RequestID,
+			NodeID:    input.ActiveNodeID,
+			Error:     *newBridgeError(errorCodeInvalidData, fmt.Errorf("AI returned %d tool calls only one canvas plan is allowed", len(result.ToolCalls)), false),
+		})
+		return
+	}
+	if len(result.ToolCalls) == 1 {
+		plan, planErr := parseCanvasPlanToolCall(result.ToolCalls[0])
+		if planErr != nil {
+			emitWailsEvent(a.ctx, aiEventError, AIStreamErrorEvent{
+				RequestID: input.RequestID,
+				NodeID:    input.ActiveNodeID,
+				Error:     *newBridgeError(errorCodeInvalidData, planErr, false),
+			})
+			return
+		}
+		emitWailsEvent(a.ctx, aiEventCanvasPlan, AICanvasPlanEvent{
+			RequestID:     input.RequestID,
+			NodeID:        input.ActiveNodeID,
+			SchemaVersion: canvasPlanSchemaVersion,
+			Plan:          plan,
+		})
 	}
 
 	emitWailsEvent(a.ctx, aiEventDone, AIStreamDoneEvent{

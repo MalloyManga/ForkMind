@@ -76,6 +76,28 @@ func TestOpenAIClientStreamCompletion(t *testing.T) {
 	}
 }
 
+// TestConsumeOpenAIEventStreamAggregatesToolCallArguments 验证分散在多个 SSE delta 的工具参数按 index 拼接
+func TestConsumeOpenAIEventStreamAggregatesToolCallArguments(t *testing.T) {
+	t.Parallel()
+
+	stream := strings.Join([]string{
+		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"propose_canvas_plan","arguments":"{\"nodes\":["}}]},"finish_reason":null}]}`,
+		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"]}"}}]},"finish_reason":"tool_calls"}]}`,
+		"data: [DONE]",
+		"",
+	}, "\n\n")
+	result, err := consumeOpenAIEventStream(strings.NewReader(stream), func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("consumeOpenAIEventStream() error = %v", err)
+	}
+	if result.FinishReason != "tool_calls" || len(result.ToolCalls) != 1 {
+		t.Fatalf("stream result = %#v", result)
+	}
+	if toolCall := result.ToolCalls[0]; toolCall.ID != "call-1" || toolCall.Name != canvasPlanToolName || toolCall.Arguments != `{"nodes":[]}` {
+		t.Fatalf("tool call = %#v", toolCall)
+	}
+}
+
 // TestOpenAIClientReturnsProviderError 验证非 2xx OpenAI error.message 被保留
 func TestOpenAIClientReturnsProviderError(t *testing.T) {
 	t.Parallel()

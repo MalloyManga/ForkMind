@@ -3,6 +3,7 @@ export type {
     AddConversationNodeInput,
     AddNodeDraftInput,
     AddNodeInput,
+    ApplyCanvasPlanInput,
     CanvasClipboardPayload,
     ClipboardNodeSnapshot,
     ConversationSnapshot,

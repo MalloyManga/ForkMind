@@ -1,6 +1,7 @@
 import type { ForkMindWorkspaceDocument } from "../domain/workspace"
 import type { ConversationThread } from "../domain/conversation/types"
 import type { ManagedAssetReference } from "../domain/conversation/types"
+import type { CanvasPlan } from "../domain/canvasPlan"
 
 export interface BridgeErrorPayload {
     code: string
@@ -85,6 +86,13 @@ export interface AIStreamErrorEvent {
     requestId: string
     nodeId: string
     error: BridgeErrorPayload
+}
+
+export interface AICanvasPlanEvent {
+    requestId: string
+    nodeId: string
+    schemaVersion: 1
+    plan: CanvasPlan
 }
 
 export interface ForkMindAppBridge {

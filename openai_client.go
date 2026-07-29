@@ -37,20 +37,43 @@ type openAIStreamRequest struct {
 	Messages    []OpenAIMessageDTO
 	Temperature float64
 	MaxTokens   int
+	Tools       []openAIToolDefinition
+}
+
+type openAIFunctionDefinition struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Parameters  json.RawMessage `json:"parameters"`
+}
+
+type openAIToolDefinition struct {
+	Type     string                   `json:"type"`
+	Function openAIFunctionDefinition `json:"function"`
 }
 
 type openAIChatCompletionsRequest struct {
-	Model       string             `json:"model"`
-	Messages    []OpenAIMessageDTO `json:"messages"`
-	Stream      bool               `json:"stream"`
-	Temperature float64            `json:"temperature"`
-	MaxTokens   int                `json:"max_tokens"`
+	Model       string                 `json:"model"`
+	Messages    []OpenAIMessageDTO     `json:"messages"`
+	Stream      bool                   `json:"stream"`
+	Temperature float64                `json:"temperature"`
+	MaxTokens   int                    `json:"max_tokens"`
+	Tools       []openAIToolDefinition `json:"tools,omitempty"`
+	ToolChoice  string                 `json:"tool_choice,omitempty"`
 }
 
 type openAIStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
@@ -67,6 +90,14 @@ type openAIErrorEnvelope struct {
 // OpenAIStreamResult 表示一次 SSE 完成后的结算信息
 type OpenAIStreamResult struct {
 	FinishReason string
+	ToolCalls    []OpenAIToolCall
+}
+
+// OpenAIToolCall 是流式 delta.tool_calls 按 index 聚合后的完整函数调用
+type OpenAIToolCall struct {
+	ID        string
+	Name      string
+	Arguments string
 }
 
 // OpenAIHTTPError 保留 Provider HTTP 状态码与可读消息
@@ -140,6 +171,10 @@ func (client *OpenAIClient) StreamCompletion(
 		Stream:      true,
 		Temperature: request.Temperature,
 		MaxTokens:   request.MaxTokens,
+		Tools:       request.Tools,
+	}
+	if len(request.Tools) > 0 {
+		requestBody.ToolChoice = "auto"
 	}
 	encodedRequest, err := json.Marshal(requestBody)
 	if err != nil {
@@ -238,6 +273,8 @@ func consumeOpenAIEventStream(
 ) (OpenAIStreamResult, error) {
 	bufferedReader := bufio.NewReader(reader)
 	result := OpenAIStreamResult{}
+	toolCallByIndex := make(map[int]*OpenAIToolCall)
+	toolCallIndexes := make([]int, 0)
 
 	for {
 		line, readErr := bufferedReader.ReadString('\n')
@@ -245,6 +282,7 @@ func consumeOpenAIEventStream(
 		if strings.HasPrefix(trimmedLine, "data:") {
 			data := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "data:"))
 			if data == "[DONE]" {
+				result.ToolCalls = collectOpenAIToolCalls(toolCallByIndex, toolCallIndexes)
 				return result, nil
 			}
 			if data != "" {
@@ -258,6 +296,24 @@ func consumeOpenAIEventStream(
 							return OpenAIStreamResult{}, fmt.Errorf("handle OpenAI stream chunk: %w", err)
 						}
 					}
+					for _, toolCallDelta := range choice.Delta.ToolCalls {
+						toolCall, exists := toolCallByIndex[toolCallDelta.Index]
+						if !exists {
+							toolCall = &OpenAIToolCall{}
+							toolCallByIndex[toolCallDelta.Index] = toolCall
+							toolCallIndexes = append(toolCallIndexes, toolCallDelta.Index)
+						}
+						if toolCallDelta.ID != "" {
+							toolCall.ID = toolCallDelta.ID
+						}
+						if toolCallDelta.Function.Name != "" {
+							toolCall.Name = toolCallDelta.Function.Name
+						}
+						toolCall.Arguments += toolCallDelta.Function.Arguments
+						if len(toolCall.Arguments) > maxCanvasPlanToolArgumentSize {
+							return OpenAIStreamResult{}, fmt.Errorf("OpenAI tool arguments exceed %d bytes", maxCanvasPlanToolArgumentSize)
+						}
+					}
 					if choice.FinishReason != nil {
 						result.FinishReason = *choice.FinishReason
 					}
@@ -266,12 +322,25 @@ func consumeOpenAIEventStream(
 		}
 
 		if errors.Is(readErr, io.EOF) {
+			result.ToolCalls = collectOpenAIToolCalls(toolCallByIndex, toolCallIndexes)
 			return result, nil
 		}
 		if readErr != nil {
 			return OpenAIStreamResult{}, fmt.Errorf("read OpenAI event stream: %w", readErr)
 		}
 	}
+}
+
+// collectOpenAIToolCalls 按 SSE 首次出现的 index 顺序输出完整调用
+// toolCallByIndex 和 indexes 来自 consumeOpenAIEventStream 的单次响应聚合状态
+func collectOpenAIToolCalls(toolCallByIndex map[int]*OpenAIToolCall, indexes []int) []OpenAIToolCall {
+	toolCalls := make([]OpenAIToolCall, 0, len(indexes))
+	for _, toolCallIndex := range indexes {
+		if toolCall := toolCallByIndex[toolCallIndex]; toolCall != nil {
+			toolCalls = append(toolCalls, *toolCall)
+		}
+	}
+	return toolCalls
 }
 
 // decodeOpenAIHTTPError 读取 Provider 非 2xx 响应

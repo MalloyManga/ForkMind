@@ -1,6 +1,8 @@
 ﻿import { create } from "zustand"
 import { assertNever } from "@/lib/utils"
 import {
+    DEFAULT_CARD_MIN_HEIGHT,
+    DEFAULT_CARD_WIDTH,
     DEFAULT_THREAD_TITLE,
     HISTORY_LIMIT,
     NODE_STATUS_DONE,
@@ -8,16 +10,19 @@ import {
     NODE_STATUS_IDLE,
     NODE_STATUS_STREAMING,
 } from "../../domain/conversation/constants"
+import type { CanvasPlan, CanvasPlanNode } from "../../domain/canvasPlan"
 import { deriveThreadTitleFromPrompt } from "../../domain/conversation/helpers"
 import type {
     BaseNode,
     ConversationCard,
     ConversationCardPosition,
+    ConversationNodeStatus,
     ConversationThread,
 } from "../../domain/conversation/types"
 import type {
     AddConversationNodeDraftInput,
     AddNodeDraftInput,
+    ApplyCanvasPlanInput,
     CanvasClipboardPayload,
     ClipboardNodeSnapshot,
     ConversationSnapshot,
@@ -63,6 +68,90 @@ interface TextMutationHistoryResult {
     pastSnapshots: ConversationSnapshot[]
     futureSnapshots: ConversationSnapshot[]
     textEditSession: ConversationStoreState["textEditSession"]
+}
+
+const AI_PLAN_FIRST_COLUMN_GAP = 120
+const AI_PLAN_COLUMN_WIDTH = 440
+const AI_PLAN_ROW_HEIGHT = 220
+
+/**
+ * 计算提案节点相对提案根节点的父链深度
+ * @param node 入参来自已经通过 Go 和前端双重校验的单个计划节点
+ * @param nodeByTempId 入参是同一计划的临时 id 索引
+ * @returns 返回 0 开始的列深度 Go 已拒绝父链环 因此遍历一定终止
+ * 用户接受 AI 画布提案时用于确定稳定列布局
+ */
+function resolveCanvasPlanNodeDepth(
+    node: CanvasPlanNode,
+    nodeByTempId: ReadonlyMap<string, CanvasPlanNode>,
+): number {
+    let depth = 0
+    let parentTempId = node.parentTempId
+    while (parentTempId) {
+        depth += 1
+        parentTempId = nodeByTempId.get(parentTempId)?.parentTempId ?? null
+    }
+    return depth
+}
+
+/**
+ * 把 CanvasPlan 转成现有剪贴板批量重映射算法可消费的 payload
+ * @param input.plan 来自用户正在审批的模型提案 input.sourceNodeId 是发起提案的 Chat
+ * @param sourceNode 入参来自当前 Zustand 会话 用作布局原点和提案根节点最终父级
+ * @returns 返回带临时 id 内部关系和绝对布局的剪贴板快照
+ * applyCanvasPlan 单事务内部调用 不会读写系统剪贴板
+ */
+function createCanvasPlanClipboardPayload(
+    input: ApplyCanvasPlanInput,
+    sourceNode: ConversationCard,
+): CanvasClipboardPayload {
+    const nodeByTempId = new Map(input.plan.nodes.map((node) => [node.tempId, node]))
+    const rowIndexByDepth = new Map<number, number>()
+
+    const nodes = input.plan.nodes.map((node): ClipboardNodeSnapshot => {
+        const depth = resolveCanvasPlanNodeDepth(node, nodeByTempId)
+        const rowIndex = rowIndexByDepth.get(depth) ?? 0
+        rowIndexByDepth.set(depth, rowIndex + 1)
+        const status: ConversationNodeStatus =
+            node.cardType === "chat" && node.content.aiResponse.length === 0
+                ? NODE_STATUS_IDLE
+                : NODE_STATUS_DONE
+        const baseNode = {
+            originalNodeId: node.tempId,
+            parentId: node.parentTempId,
+            referenceNodeIds: node.referenceTempIds.length > 0 ? [...node.referenceTempIds] : undefined,
+            position: {
+                x: sourceNode.position.x + sourceNode.size.width + AI_PLAN_FIRST_COLUMN_GAP + depth * AI_PLAN_COLUMN_WIDTH,
+                y: sourceNode.position.y + rowIndex * AI_PLAN_ROW_HEIGHT,
+            },
+            size: {
+                mode: "auto" as const,
+                width: DEFAULT_CARD_WIDTH,
+                minHeight: DEFAULT_CARD_MIN_HEIGHT,
+            },
+            status,
+        }
+
+        switch (node.cardType) {
+            case "chat":
+                return { ...baseNode, cardType: node.cardType, ...node.content }
+            case "note":
+                return { ...baseNode, cardType: node.cardType, ...node.content }
+            case "image":
+                return { ...baseNode, cardType: node.cardType, asset: null, ...node.content }
+            case "link":
+                return { ...baseNode, cardType: node.cardType, ...node.content }
+            case "file":
+                return { ...baseNode, cardType: node.cardType, asset: null, ...node.content }
+        }
+
+        return assertNever(node)
+    })
+
+    return {
+        nodes,
+        sourceTopLeft: { x: 0, y: 0 },
+    }
 }
 
 /**
@@ -1252,6 +1341,63 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
         })
 
         return pastedNodeIds
+    },
+
+    /**
+     * 接受并应用一份 AI CanvasPlan
+     * input.plan 来自 Go 已校验且用户明确接受的待审批提案 sourceNodeId 绑定本次请求来源
+     * 返回本次创建的真实节点 id 数组 空数组表示来源节点已失效
+     * 全部节点 关系 布局和单次撤销快照在同一个 Zustand set 中完成
+     */
+    applyCanvasPlan: (input) => {
+        let createdNodeIds: string[] = []
+
+        set((state) => {
+            const sourceNode = findNodeById(state.activeThread.cards, input.sourceNodeId)
+            if (!sourceNode) {
+                return {}
+            }
+
+            const payload = createCanvasPlanClipboardPayload(input, sourceNode)
+            const now = createTimestamp()
+            const pasteResult = createPastedNodesFromPayload(payload, { x: 0, y: 0 }, now)
+            createdNodeIds = pasteResult.pastedNodeIds
+            const createdIdByTempId = new Map(
+                input.plan.nodes.map((planNode, nodeIndex) => [
+                    planNode.tempId,
+                    pasteResult.pastedNodeIds[nodeIndex],
+                ]),
+            )
+            const rootCreatedNodeIdSet = new Set(
+                input.plan.nodes
+                    .filter((planNode) => planNode.parentTempId === null)
+                    .map((planNode) => createdIdByTempId.get(planNode.tempId))
+                    .filter((nodeId): nodeId is string => nodeId !== undefined),
+            )
+            const attachedNodes = pasteResult.pastedNodes.map((node) =>
+                rootCreatedNodeIdSet.has(node.id)
+                    ? { ...node, parentId: sourceNode.id }
+                    : node,
+            )
+            const snapshot: ConversationSnapshot = {
+                thread: cloneThread(state.activeThread),
+                activeNodeId: state.activeNodeId,
+            }
+
+            return {
+                activeThread: {
+                    ...state.activeThread,
+                    cards: [...state.activeThread.cards, ...attachedNodes],
+                    updatedAt: now,
+                },
+                activeNodeId: createdNodeIds[0] ?? state.activeNodeId,
+                pastSnapshots: [...state.pastSnapshots, snapshot].slice(-HISTORY_LIMIT),
+                futureSnapshots: [],
+                textEditSession: null,
+            }
+        })
+
+        return createdNodeIds
     },
 
     /**

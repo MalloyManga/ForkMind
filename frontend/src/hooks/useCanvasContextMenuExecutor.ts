@@ -21,14 +21,28 @@ import type { Point } from "./useCanvasBridge.helpers"
 interface UseCanvasContextMenuExecutorParams {
     canvasEditor: Editor | null
     activeNodeId: string | null
-    clipboardPayload: CanvasClipboardPayload | null
-    setClipboardPayload: (clipboardPayload: CanvasClipboardPayload | null) => void
     setIsCanvasUiHidden: (nextHidden: boolean | ((previousValue: boolean) => boolean)) => void
     setAreSidebarsHidden: (nextHidden: boolean | ((previousValue: boolean) => boolean)) => void
     cards: ConversationCard[]
     pasteNodesFromClipboard: (input: PasteNodesFromClipboardInput) => string[]
     replaceNodesFromClipboard: (input: ReplaceNodesFromClipboardInput) => string[]
     setActiveNodeId: (nodeId: string | null) => void
+}
+
+/**
+ * 从系统剪贴板读取并验证 ForkMind JSON
+ * @returns 成功时返回可交给 Zustand paste action 的 CanvasClipboardPayload
+ * @throws 系统剪贴板不可用或内容不是合法 ForkMind JSON 时抛出用户可读错误
+ * Paste Here 与 Paste to Replace 每次执行时调用 保证系统剪贴板是唯一事实源
+ */
+async function readForkMindSystemClipboardPayload(): Promise<CanvasClipboardPayload> {
+    const clipboardContent = await readSystemClipboardText()
+    const parseResult = parseForkMindClipboard(clipboardContent)
+    if (!parseResult.ok) {
+        throw new Error(parseResult.error)
+    }
+
+    return parseResult.value
 }
 
 /**
@@ -82,8 +96,6 @@ function getViewportCenterPagePoint(canvasEditor: Editor): Point {
 export function useCanvasContextMenuExecutor({
     canvasEditor,
     activeNodeId,
-    clipboardPayload,
-    setClipboardPayload,
     setIsCanvasUiHidden,
     setAreSidebarsHidden,
     cards,
@@ -114,15 +126,6 @@ export function useCanvasContextMenuExecutor({
                     .map((nodeId) => cardById.get(nodeId))
                     .filter((card): card is ConversationCard => card !== undefined)
 
-                setClipboardPayload(createCanvasClipboardPayload(targetCards))
-                return
-            }
-            case "copy-node-json": {
-                const targetNodeIds = resolveTargetNodeIds(canvasEditor, context, activeNodeId)
-                const cardById = new Map(cards.map((card) => [card.id, card]))
-                const targetCards = targetNodeIds
-                    .map((nodeId) => cardById.get(nodeId))
-                    .filter((card): card is ConversationCard => card !== undefined)
                 const nextClipboardPayload = createCanvasClipboardPayload(targetCards)
                 if (!nextClipboardPayload) {
                     return
@@ -130,69 +133,45 @@ export function useCanvasContextMenuExecutor({
 
                 try {
                     await writeSystemClipboardText(serializeForkMindClipboard(nextClipboardPayload))
-                    setClipboardPayload(nextClipboardPayload)
                 } catch (error) {
                     window.alert(error instanceof Error ? error.message : "系统剪贴板写入失败")
                 }
                 return
             }
             case "paste-here": {
-                if (!clipboardPayload) {
-                    return
-                }
-
                 // 右键菜单时使用当次右键的 pagePoint 键盘粘贴时退化到当前视口中心
                 const pastePoint = context?.pagePoint ?? (canvasEditor ? getViewportCenterPagePoint(canvasEditor) : null)
                 if (!pastePoint) {
                     return
                 }
 
-                const pastedNodeIds = pasteNodesFromClipboard({
-                    payload: clipboardPayload,
-                    pastePoint,
-                })
-                setActiveNodeId(pastedNodeIds[0] ?? null)
+                try {
+                    const clipboardPayload = await readForkMindSystemClipboardPayload()
+                    const pastedNodeIds = pasteNodesFromClipboard({
+                        payload: clipboardPayload,
+                        pastePoint,
+                    })
+                    setActiveNodeId(pastedNodeIds[0] ?? null)
+                } catch (error) {
+                    window.alert(error instanceof Error ? error.message : "系统剪贴板读取失败")
+                }
                 return
             }
             case "paste-to-replace": {
-                if (!clipboardPayload) {
-                    return
-                }
-
                 const targetNodeIds = resolveTargetNodeIds(canvasEditor, context, activeNodeId)
                 if (targetNodeIds.length === 0) {
                     return
                 }
 
-                const pastedNodeIds = replaceNodesFromClipboard({
-                    payload: clipboardPayload,
-                    targetNodeIds,
-                })
-                if (pastedNodeIds.length > 0) {
-                    setActiveNodeId(pastedNodeIds[0])
-                }
-                return
-            }
-            case "paste-json-here": {
-                const pastePoint = context?.pagePoint ?? (canvasEditor ? getViewportCenterPagePoint(canvasEditor) : null)
-                if (!pastePoint) {
-                    return
-                }
-
                 try {
-                    const clipboardContent = await readSystemClipboardText()
-                    const parseResult = parseForkMindClipboard(clipboardContent)
-                    if (!parseResult.ok) {
-                        window.alert(parseResult.error)
-                        return
-                    }
-
-                    setClipboardPayload(parseResult.value)
-                    const pastedNodeIds = pasteNodesFromClipboard({
-                        payload: parseResult.value,
-                        pastePoint,
+                    const clipboardPayload = await readForkMindSystemClipboardPayload()
+                    const pastedNodeIds = replaceNodesFromClipboard({
+                        payload: clipboardPayload,
+                        targetNodeIds,
                     })
-                    setActiveNodeId(pastedNodeIds[0] ?? null)
+                    if (pastedNodeIds.length > 0) {
+                        setActiveNodeId(pastedNodeIds[0])
+                    }
                 } catch (error) {
                     window.alert(error instanceof Error ? error.message : "系统剪贴板读取失败")
                 }
@@ -205,12 +184,10 @@ export function useCanvasContextMenuExecutor({
         activeNodeId,
         canvasEditor,
         cards,
-        clipboardPayload,
         pasteNodesFromClipboard,
         replaceNodesFromClipboard,
         setActiveNodeId,
         setAreSidebarsHidden,
-        setClipboardPayload,
         setIsCanvasUiHidden,
     ])
 

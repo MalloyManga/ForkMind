@@ -7,6 +7,7 @@ import {
 } from "../bridge"
 import { useAISettingsStore } from "../stores/useAISettingsStore"
 import { useConversationStore } from "../stores/useConversationStore"
+import type { PendingCanvasPlan } from "../domain/canvasPlan"
 
 const AI_REQUEST_ID_PREFIX = "ai-request"
 const AI_ERROR_CODE_REQUEST_ACTIVE = "request_active"
@@ -23,10 +24,13 @@ export interface UseAICompletionResult {
     isRequestActive: boolean
     activeRequestNodeId: string | null
     error: BridgeErrorPayload | null
+    pendingCanvasPlan: PendingCanvasPlan | null
     canStart: (nodeId: string) => boolean
     startCompletion: (nodeId: string) => Promise<void>
     cancelCompletion: (nodeId: string) => Promise<void>
     clearError: () => void
+    acceptCanvasPlan: () => void
+    rejectCanvasPlan: () => void
 }
 
 function createAIRequestId(): string {
@@ -54,6 +58,14 @@ export function useAICompletion(): UseAICompletionResult {
     const activeRequestRef = useRef<ActiveAIRequest | null>(null)
     const [activeRequestNodeId, setActiveRequestNodeId] = useState<string | null>(null)
     const [error, setError] = useState<BridgeErrorPayload | null>(null)
+    const [pendingCanvasPlan, setPendingCanvasPlan] = useState<PendingCanvasPlan | null>(null)
+    const activeThreadId = useConversationStore((state) => state.activeThread.id)
+
+    useEffect(() => {
+        setPendingCanvasPlan((currentPlan) =>
+            currentPlan && currentPlan.threadId !== activeThreadId ? null : currentPlan,
+        )
+    }, [activeThreadId])
 
     const clearActiveRequest = useCallback((requestId: string) => {
         if (activeRequestRef.current?.requestId !== requestId) {
@@ -113,6 +125,20 @@ export function useAICompletion(): UseAICompletionResult {
             conversationState.failChatResponse(event.nodeId)
             setError(event.error)
             clearActiveRequest(event.requestId)
+        },
+        onCanvasPlan: (event) => {
+            const activeRequest = activeRequestRef.current
+            if (!activeRequest || event.requestId !== activeRequest.requestId || event.nodeId !== activeRequest.nodeId) {
+                return
+            }
+
+            setPendingCanvasPlan({
+                requestId: event.requestId,
+                threadId: activeRequest.threadId,
+                sourceNodeId: event.nodeId,
+                schemaVersion: event.schemaVersion,
+                plan: event.plan,
+            })
         },
     }), [clearActiveRequest])
 
@@ -188,6 +214,7 @@ export function useAICompletion(): UseAICompletionResult {
         activeRequestRef.current = activeRequest
         setActiveRequestNodeId(nodeId)
         setError(null)
+        setPendingCanvasPlan(null)
 
         const response = await startChatCompletionFromBridge({
             requestId,
@@ -227,13 +254,39 @@ export function useAICompletion(): UseAICompletionResult {
         }
     }, [])
 
+    /**
+     * 接受当前 AI 画布提案并交给 Zustand 单事务落盘
+     * @returns 无返回值 来源会话已切换或节点失效时 Store 会返回空结果
+     * 用户点击右侧栏 Accept 时触发
+     */
+    const acceptCanvasPlan = useCallback(() => {
+        const proposal = pendingCanvasPlan
+        if (!proposal || useConversationStore.getState().activeThread.id !== proposal.threadId) {
+            setPendingCanvasPlan(null)
+            return
+        }
+
+        useConversationStore.getState().applyCanvasPlan({
+            plan: proposal.plan,
+            sourceNodeId: proposal.sourceNodeId,
+        })
+        setPendingCanvasPlan(null)
+    }, [pendingCanvasPlan])
+
+    const rejectCanvasPlan = useCallback(() => {
+        setPendingCanvasPlan(null)
+    }, [])
+
     return {
         isRequestActive: activeRequestNodeId !== null,
         activeRequestNodeId,
         error,
+        pendingCanvasPlan,
         canStart,
         startCompletion,
         cancelCompletion,
         clearError: () => setError(null),
+        acceptCanvasPlan,
+        rejectCanvasPlan,
     }
 }

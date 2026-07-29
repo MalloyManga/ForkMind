@@ -13,6 +13,7 @@
 export type { DistributiveOmit } from "../../types/typeUtils"
 export type { ConversationTextField } from "../../domain/conversation/types"
 import type { DistributiveOmit } from "../../types/typeUtils"
+import type { CanvasPlan } from "../../domain/canvasPlan"
 
 /**
  * 按节点 type 从 ConversationCard 联合类型中取出具体节点 接口对象
@@ -87,6 +88,11 @@ export interface PasteNodesFromClipboardInput {
 export interface ReplaceNodesFromClipboardInput {
     payload: CanvasClipboardPayload
     targetNodeIds: string[]
+}
+
+export interface ApplyCanvasPlanInput {
+    plan: CanvasPlan
+    sourceNodeId: string
 }
 
 /**
@@ -185,6 +191,7 @@ export interface ConversationStoreState {
     endTextEdit: () => void
     pasteNodesFromClipboard: (input: PasteNodesFromClipboardInput) => string[]
     replaceNodesFromClipboard: (input: ReplaceNodesFromClipboardInput) => string[]
+    applyCanvasPlan: (input: ApplyCanvasPlanInput) => string[]
 
     moveNode: (nodeId: string, nextPosition: ConversationCardPosition) => void
     resizeNode: (nodeId: string, nextSize: ConversationCardSize) => void

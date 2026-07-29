@@ -18,6 +18,7 @@ import {
 
 export const FORKMIND_CLIPBOARD_FORMAT = "forkmind-canvas-clipboard"
 export const FORKMIND_CLIPBOARD_VERSION = 1
+export const FORKMIND_CLIPBOARD_MAX_TEXT_LENGTH = 8 * 1024 * 1024
 
 const CLIPBOARD_VALIDATION_THREAD_ID = "clipboard-validation-thread"
 
@@ -45,7 +46,7 @@ function createClipboardNodeSnapshot(card: ConversationCard): ClipboardNodeSnaps
  * 从业务卡片集合构造画布剪贴板 payload
  * @param targetCards 入参来自 tldraw 当前选中节点映射后的领域卡片
  * @returns 返回包含内部关系和整体左上角的快照 空集合返回 null
- * 内存 Copy 与系统 JSON Copy 共用该入口 保证两种剪贴板语义一致
+ * 用户复制画布节点时触发 结果只会继续序列化到系统剪贴板
  */
 export function createCanvasClipboardPayload(
     targetCards: ConversationCard[],
@@ -72,7 +73,7 @@ export function createCanvasClipboardPayload(
  * 序列化 ForkMind 系统剪贴板文档
  * @param payload 入参来自 createCanvasClipboardPayload 或已校验的系统剪贴板
  * @returns 返回带 format version 包装的可移植 JSON 字符串
- * 用户点击 Copy as ForkMind JSON 时触发
+ * 用户执行 Copy 时触发
  */
 export function serializeForkMindClipboard(payload: CanvasClipboardPayload): string {
     return JSON.stringify({
@@ -86,9 +87,16 @@ export function serializeForkMindClipboard(payload: CanvasClipboardPayload): str
  * 解析并规范化外部 ForkMind 剪贴板 JSON
  * @param content 入参来自浏览器系统剪贴板 readText 结果
  * @returns 成功时返回可直接交给 Store 的 payload 失败时返回用户可读错误
- * 用户点击 Paste from ForkMind JSON 时触发 外部节点会复用工作区验证器检查类型 关系与重复 id
+ * 用户执行 Paste Here 或 Paste to Replace 时触发 外部节点会复用工作区验证器检查类型 关系与重复 id
  */
 export function parseForkMindClipboard(content: string): ForkMindClipboardParseResult {
+    if (content.length > FORKMIND_CLIPBOARD_MAX_TEXT_LENGTH) {
+        return {
+            ok: false,
+            error: `剪贴板内容超过 ${FORKMIND_CLIPBOARD_MAX_TEXT_LENGTH} 字符限制`,
+        }
+    }
+
     let parsedDocument: unknown
     try {
         parsedDocument = JSON.parse(content) as unknown
@@ -164,7 +172,7 @@ export function parseForkMindClipboard(content: string): ForkMindClipboardParseR
  * 写入系统文本剪贴板
  * @param content 入参是带 ForkMind format/version 的 JSON 字符串
  * @returns Promise 在浏览器确认写入后完成 不可用或被系统拒绝时抛出明确错误
- * Copy as ForkMind JSON 命令触发
+ * Copy 命令触发
  */
 export async function writeSystemClipboardText(content: string): Promise<void> {
     let browserClipboardError: unknown = null
@@ -194,7 +202,7 @@ export async function writeSystemClipboardText(content: string): Promise<void> {
 /**
  * 读取系统文本剪贴板
  * @returns 返回系统剪贴板当前文本 不可用或权限被拒绝时抛出明确错误
- * Paste from ForkMind JSON 命令触发
+ * Paste Here 与 Paste to Replace 命令触发
  */
 export async function readSystemClipboardText(): Promise<string> {
     let browserClipboardError: unknown = null
