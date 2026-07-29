@@ -4,9 +4,11 @@ import {
     useState,
     type PointerEvent as ReactPointerEvent,
     type ReactNode,
+    type SyntheticEvent,
 } from "react"
 import {
     FileText,
+    GitFork,
     MessageSquareText,
     PenLine,
     Send,
@@ -23,8 +25,12 @@ import {
     CHAT_PROMPT_MIN_RATIO,
     DEFAULT_CHAT_PROMPT_RATIO,
 } from "../constants/layout"
-import type { ConversationCard, ConversationNodeStatus } from "../domain/conversation/types"
-import type { ConversationTextField } from "../stores/conversationStore"
+import type {
+    ConversationCard,
+    ConversationNodeStatus,
+    ConversationTextAnchor,
+    ConversationTextField,
+} from "../domain/conversation/types"
 
 interface RightEditorSidebarProps {
     activeNode: ConversationCard | undefined
@@ -38,6 +44,7 @@ interface RightEditorSidebarProps {
     aiErrorMessage: string | null
     onStartAIRequest: (nodeId: string) => void
     onCancelAIRequest: (nodeId: string) => void
+    onForkTextSelection: (anchor: ConversationTextAnchor) => void
 }
 
 interface ChatEditorResizeState {
@@ -93,10 +100,16 @@ export function RightEditorSidebar({
     aiErrorMessage,
     onStartAIRequest,
     onCancelAIRequest,
+    onForkTextSelection,
 }: RightEditorSidebarProps) {
     const [chatPromptRatio, setChatPromptRatio] = useState(DEFAULT_CHAT_PROMPT_RATIO)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
     const chatResizeStateRef = useRef<ChatEditorResizeState | null>(null)
+    const [textSelection, setTextSelection] = useState<ConversationTextAnchor | null>(null)
+
+    useEffect(() => {
+        setTextSelection(null)
+    }, [activeNode?.id])
 
     useEffect(() => {
         const handlePointerMove = (event: PointerEvent) => {
@@ -158,6 +171,73 @@ export function RightEditorSidebar({
     const status = activeNode ? STATUS_META[activeNode.status] : null
     const isActiveNodeStreaming =
         activeNode?.cardType === "chat" && activeAIRequestNodeId === activeNode.id
+
+    /**
+     * 从右侧 textarea 捕获精确字符选区
+     * @param event 入参来自 textarea 原生 select 事件
+     * @param nodeId 入参是当前右侧编辑节点 id
+     * @param field 入参表示选区属于 Prompt Response 或 Note
+     * @returns 无返回值 有效选区写入局部动作态 空选区会清除旧动作
+     * 用户拖选或使用键盘扩展选区时触发
+     */
+    const captureTextareaSelection = (
+        event: SyntheticEvent<HTMLTextAreaElement>,
+        nodeId: string,
+        field: ConversationTextField,
+    ) => {
+        const textarea = event.currentTarget
+        const startOffset = textarea.selectionStart
+        const endOffset = textarea.selectionEnd
+        if (endOffset <= startOffset) {
+            setTextSelection((currentSelection) =>
+                currentSelection?.sourceNodeId === nodeId && currentSelection.field === field
+                    ? null
+                    : currentSelection,
+            )
+            return
+        }
+
+        const quote = textarea.value.slice(startOffset, endOffset).trim()
+        if (!quote) {
+            setTextSelection(null)
+            return
+        }
+
+        setTextSelection({
+            sourceNodeId: nodeId,
+            field,
+            quote,
+            startOffset,
+            endOffset,
+            origin: "editor",
+        })
+    }
+
+    const renderForkSelectionButton = (field: ConversationTextField) => {
+        if (!textSelection || textSelection.field !== field) {
+            return null
+        }
+
+        return (
+            <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                title="基于当前选区创建追问"
+                onPointerDown={(event) => {
+                    // 保持 textarea 选区直到 click 完成
+                    event.preventDefault()
+                }}
+                onClick={() => {
+                    onForkTextSelection(textSelection)
+                    setTextSelection(null)
+                }}
+            >
+                <GitFork className="h-3 w-3" />
+                追问选区
+            </Button>
+        )
+    }
 
     return (
         <aside className="flex h-full flex-col bg-background/95 backdrop-blur-sm">
@@ -226,6 +306,17 @@ export function RightEditorSidebar({
                     </div>
                 ) : activeNode.cardType === "chat" ? (
                     <div ref={chatEditorContainerRef} className="flex h-full min-h-0 flex-col">
+                        {activeNode.sourceAnchor ? (
+                            <div className="mb-2 shrink-0 rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2">
+                                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-600 theme-dark:text-sky-400">
+                                    <GitFork className="h-3 w-3" />
+                                    Anchored from {activeNode.sourceAnchor.field}
+                                </div>
+                                <p className="line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed text-foreground/70">
+                                    {activeNode.sourceAnchor.quote}
+                                </p>
+                            </div>
+                        ) : null}
                         <section
                             className="flex min-h-0 shrink-0 flex-col"
                             style={{ flexBasis: `${chatPromptRatio * 100}%` }}
@@ -234,6 +325,7 @@ export function RightEditorSidebar({
                                 icon={<UserRound className="h-3 w-3" />}
                                 title="Prompt"
                                 accent="bg-sky-500/15 text-sky-600 theme-dark:text-sky-400"
+                                action={renderForkSelectionButton("userPrompt")}
                             />
                             <Textarea
                                 className="h-full min-h-0 w-full resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-sky-500/40"
@@ -246,6 +338,9 @@ export function RightEditorSidebar({
                                 onBlur={onEndTextEdit}
                                 onChange={(event) => {
                                     onUpdateChatPrompt(activeNode.id, event.target.value)
+                                }}
+                                onSelect={(event) => {
+                                    captureTextareaSelection(event, activeNode.id, "userPrompt")
                                 }}
                             />
                         </section>
@@ -264,31 +359,36 @@ export function RightEditorSidebar({
                                 icon={<Sparkles className="h-3 w-3" />}
                                 title="AI Response"
                                 accent="bg-violet-500/15 text-violet-600 theme-dark:text-violet-400"
-                                action={isActiveNodeStreaming ? (
-                                    <Button
-                                        type="button"
-                                        size="xs"
-                                        variant="destructive"
-                                        onClick={() => {
-                                            onCancelAIRequest(activeNode.id)
-                                        }}
-                                    >
-                                        <Square className="h-3 w-3 fill-current" />
-                                        Stop
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        type="button"
-                                        size="xs"
-                                        variant="secondary"
-                                        disabled={!canStartAIRequest}
-                                        onClick={() => {
-                                            onStartAIRequest(activeNode.id)
-                                        }}
-                                    >
-                                        <Send className="h-3 w-3" />
-                                        {activeNode.aiResponse.trim().length > 0 ? "Regenerate" : "Send"}
-                                    </Button>
+                                action={(
+                                    <div className="flex items-center gap-1">
+                                        {renderForkSelectionButton("aiResponse")}
+                                        {isActiveNodeStreaming ? (
+                                            <Button
+                                                type="button"
+                                                size="xs"
+                                                variant="destructive"
+                                                onClick={() => {
+                                                    onCancelAIRequest(activeNode.id)
+                                                }}
+                                            >
+                                                <Square className="h-3 w-3 fill-current" />
+                                                Stop
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                type="button"
+                                                size="xs"
+                                                variant="secondary"
+                                                disabled={!canStartAIRequest}
+                                                onClick={() => {
+                                                    onStartAIRequest(activeNode.id)
+                                                }}
+                                            >
+                                                <Send className="h-3 w-3" />
+                                                {activeNode.aiResponse.trim().length > 0 ? "Regenerate" : "Send"}
+                                            </Button>
+                                        )}
+                                    </div>
                                 )}
                             />
                             <Textarea
@@ -302,6 +402,9 @@ export function RightEditorSidebar({
                                 onBlur={onEndTextEdit}
                                 onChange={(event) => {
                                     onUpdateChatResponse(activeNode.id, event.target.value)
+                                }}
+                                onSelect={(event) => {
+                                    captureTextareaSelection(event, activeNode.id, "aiResponse")
                                 }}
                             />
                             {aiErrorMessage ? (
@@ -320,6 +423,7 @@ export function RightEditorSidebar({
                             icon={<FileText className="h-3 w-3" />}
                             title="Note"
                             accent="bg-amber-400/20 text-amber-600 theme-dark:text-amber-400"
+                            action={renderForkSelectionButton("noteContent")}
                         />
                         <Textarea
                             className="h-full min-h-0 flex-1 resize-none rounded-xl border-border/70 bg-card/80 text-sm leading-relaxed shadow-inner focus-visible:ring-amber-400/40"
@@ -331,6 +435,9 @@ export function RightEditorSidebar({
                             onBlur={onEndTextEdit}
                             onChange={(event) => {
                                 onUpdateNoteContent(activeNode.id, event.target.value)
+                            }}
+                            onSelect={(event) => {
+                                captureTextareaSelection(event, activeNode.id, "noteContent")
                             }}
                         />
                     </div>

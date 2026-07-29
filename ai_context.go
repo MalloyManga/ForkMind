@@ -177,6 +177,9 @@ func buildOpenAIMessages(
 
 	backgroundSections := make([]string, 0)
 	for _, card := range mainChain {
+		if card.SourceAnchor != nil {
+			backgroundSections = append(backgroundSections, formatTextAnchor(*card.SourceAnchor))
+		}
 		if card.CardType == "note" && strings.TrimSpace(card.NoteContent) != "" {
 			backgroundSections = append(
 				backgroundSections,
@@ -220,6 +223,18 @@ func buildOpenAIMessages(
 	}
 
 	return messages
+}
+
+// formatTextAnchor 把子节点保存的源文本选区转换为明确的背景资料标签
+// anchor 来自已通过 validateConversationThread 的主链节点 返回值不会伪装成用户消息
+// AI 请求包含锚点追问节点时由 buildOpenAIMessages 触发
+func formatTextAnchor(anchor TextAnchorDTO) string {
+	return fmt.Sprintf(
+		"[文本锚点 | 来源 %s | 字段 %s]\n%s",
+		anchor.SourceNodeID,
+		anchor.Field,
+		strings.TrimSpace(anchor.Quote),
+	)
 }
 
 // formatReferenceCard 把 chat note 节点转换为参考资料文本

@@ -35,6 +35,24 @@ export interface ConversationCardSize {
 }
 
 /**
+ * 可被编辑器或画布 Markdown 选区引用的业务文本字段
+ */
+export type ConversationTextField = "userPrompt" | "aiResponse" | "noteContent"
+
+/**
+ * 子 Chat 对源卡片文本选区的稳定引用
+ * editor 来源保留精确 offset canvas 来源只保证 quote 快照可复现
+ */
+export interface ConversationTextAnchor {
+    sourceNodeId: string
+    field: ConversationTextField
+    quote: string
+    startOffset: number | null
+    endOffset: number | null
+    origin: "editor" | "canvas"
+}
+
+/**
  * 全局唯一卡片类型源
  * key->NodeType value: Node obj interface
  */
@@ -61,6 +79,8 @@ export interface BaseNode {
      * 主链继续使用 parentId；参考节点在提示词里作为“补充参考资料”注入。
      */
     referenceNodeIds?: string[]
+    // 用户基于某段文本创建追问时 子节点保存该选区快照
+    sourceAnchor?: ConversationTextAnchor
     // 画布布局数据：卡片渲染依赖此字段 不依赖数组顺序
     position: ConversationCardPosition
     size: ConversationCardSize

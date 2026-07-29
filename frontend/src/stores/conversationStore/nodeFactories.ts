@@ -9,6 +9,7 @@ import {
     findNodeById,
     normalizeParentId,
     normalizeReferenceIds,
+    normalizeTextAnchor,
 } from "./helpers"
 
 /**
@@ -51,6 +52,11 @@ export function createChatNode(
         nodeId,
         [...nodes, nextNode],
     )
+    nextNode.sourceAnchor = normalizeTextAnchor(
+        input.sourceAnchor,
+        nodeId,
+        [...nodes, nextNode],
+    )
 
     return nextNode
 }
@@ -90,6 +96,11 @@ export function createNoteNode(
     // 构造完成后做 reference 规范化，避免脏数据写入 store。
     nextNode.referenceNodeIds = normalizeReferenceIds(
         input.referenceNodeIds,
+        nodeId,
+        [...nodes, nextNode],
+    )
+    nextNode.sourceAnchor = normalizeTextAnchor(
+        input.sourceAnchor,
         nodeId,
         [...nodes, nextNode],
     )

@@ -11,6 +11,7 @@ import type {
     ChatNode,
     ConversationCard,
     ConversationNodeStatus,
+    ConversationTextAnchor,
     ConversationThread,
     NoteNode,
 } from "../conversation/types"
@@ -68,6 +69,65 @@ function normalizeTimestamp(value: unknown, fallback: string): string {
     }
 
     return new Date(value).toISOString()
+}
+
+/**
+ * 解析外部 JSON 中可选的文本锚点
+ * @param input 入参来自单张卡片的 sourceAnchor 未知字段
+ * @returns 返回字段级合法的锚点 源节点与字段兼容性在关系归一化阶段确认
+ * 工作区导入和系统剪贴板解析时触发
+ */
+function parseTextAnchor(input: unknown): ConversationTextAnchor | undefined {
+    if (!isUnknownRecord(input)) {
+        return undefined
+    }
+
+    const sourceNodeId = readString(input.sourceNodeId).trim()
+    const quote = readString(input.quote).trim()
+    const field = input.field
+    const origin = input.origin
+    if (
+        !sourceNodeId ||
+        !quote ||
+        (field !== "userPrompt" && field !== "aiResponse" && field !== "noteContent") ||
+        (origin !== "editor" && origin !== "canvas")
+    ) {
+        return undefined
+    }
+
+    const startOffset = isFiniteNumber(input.startOffset) ? Math.floor(input.startOffset) : null
+    const endOffset = isFiniteNumber(input.endOffset) ? Math.floor(input.endOffset) : null
+    const hasValidEditorOffsets =
+        origin === "editor" &&
+        startOffset !== null &&
+        endOffset !== null &&
+        startOffset >= 0 &&
+        endOffset > startOffset
+    const hasValidCanvasOffsets = origin === "canvas" && startOffset === null && endOffset === null
+    if (!hasValidEditorOffsets && !hasValidCanvasOffsets) {
+        return undefined
+    }
+
+    return {
+        sourceNodeId,
+        field,
+        quote,
+        startOffset,
+        endOffset,
+        origin,
+    }
+}
+
+function isTextAnchorFieldCompatible(
+    sourceCard: ConversationCard,
+    anchor: ConversationTextAnchor,
+): boolean {
+    switch (sourceCard.cardType) {
+        case "chat":
+            return anchor.field === "userPrompt" || anchor.field === "aiResponse"
+        case "note":
+            return anchor.field === "noteContent"
+    }
 }
 
 /**
@@ -147,6 +207,7 @@ function parseCard(
         cardType,
         parentId: typeof input.parentId === "string" ? input.parentId : null,
         referenceNodeIds: requestedReferences,
+        sourceAnchor: parseTextAnchor(input.sourceAnchor),
         position: {
             x: isFiniteNumber(position.x) ? position.x : 0,
             y: isFiniteNumber(position.y) ? position.y : 0,
@@ -220,8 +281,20 @@ function normalizeCardRelations(cards: ConversationCard[]): ConversationCard[] {
             cursorParentId = cardById.get(cursorParentId)?.parentId ?? null
         }
 
+        const anchorSourceCard = card.sourceAnchor
+            ? cardById.get(card.sourceAnchor.sourceNodeId)
+            : undefined
+        const sourceAnchor =
+            card.sourceAnchor &&
+                anchorSourceCard &&
+                anchorSourceCard.id !== card.id &&
+                isTextAnchorFieldCompatible(anchorSourceCard, card.sourceAnchor)
+                ? { ...card.sourceAnchor }
+                : undefined
+
         return {
             ...card,
+            sourceAnchor,
             referenceNodeIds:
                 card.referenceNodeIds && card.referenceNodeIds.length > 0
                     ? card.referenceNodeIds

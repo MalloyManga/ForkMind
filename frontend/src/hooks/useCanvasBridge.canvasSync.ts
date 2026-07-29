@@ -28,6 +28,7 @@ function isForkMindCardShapeSynced(
     nextProps: ForkMindCardShape["props"],
 ): boolean {
     return (
+        currentShape.props.nodeId === nextProps.nodeId &&
         currentShape.x === nextX &&
         currentShape.y === nextY &&
         currentShape.props.w === nextProps.w &&
@@ -91,6 +92,7 @@ function getProjectedCardHeight(card: ConversationCard): number {
 function createForkMindCardShapeProps(card: ConversationCard): ForkMindCardShape["props"] {
     const projectedHeight = getProjectedCardHeight(card)
     const baseProps = {
+        nodeId: card.id,
         w: card.size.width,
         h: Math.max(card.size.minHeight, projectedHeight),
     }

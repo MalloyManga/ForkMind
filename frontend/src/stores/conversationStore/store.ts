@@ -37,6 +37,7 @@ import {
     isSameStringArrayShallow,
     normalizeParentId,
     normalizeReferenceIds,
+    normalizeTextAnchor,
     willCreateParentCycle,
 } from "./helpers"
 import { createChatNode, createNoteNode } from "./nodeFactories"
@@ -44,6 +45,7 @@ import { createChatNode, createNoteNode } from "./nodeFactories"
 interface RemappedClipboardRelations {
     parentId: string | null
     referenceNodeIds?: string[]
+    sourceAnchor?: BaseNode["sourceAnchor"]
 }
 
 interface CreatePastedNodesResult {
@@ -207,9 +209,21 @@ function remapClipboardRelations(
         ?.filter((referenceNodeId) => copiedOriginalIdSet.has(referenceNodeId))
         .map((referenceNodeId) => getRequiredPastedNodeId(referenceNodeId, pastedIdByOriginalId))
 
+    const sourceAnchor = clipboardNode.sourceAnchor &&
+        copiedOriginalIdSet.has(clipboardNode.sourceAnchor.sourceNodeId)
+        ? {
+            ...clipboardNode.sourceAnchor,
+            sourceNodeId: getRequiredPastedNodeId(
+                clipboardNode.sourceAnchor.sourceNodeId,
+                pastedIdByOriginalId,
+            ),
+        }
+        : undefined
+
     return {
         parentId,
         referenceNodeIds: referenceNodeIds && referenceNodeIds.length > 0 ? referenceNodeIds : undefined,
+        sourceAnchor,
     }
 }
 
@@ -238,6 +252,7 @@ function createPastedNodesFromPayload(
             cardType: clipboardNode.cardType,
             parentId: nextRelations.parentId,
             referenceNodeIds: nextRelations.referenceNodeIds,
+            sourceAnchor: nextRelations.sourceAnchor,
             position: {
                 x: pastePoint.x + (clipboardNode.position.x - payload.sourceTopLeft.x),
                 y: pastePoint.y + (clipboardNode.position.y - payload.sourceTopLeft.y),
@@ -267,9 +282,14 @@ function createPastedNodesFromPayload(
         return assertNever(clipboardNode)
     })
 
+    const normalizedPastedNodes = pastedNodes.map((pastedNode) => ({
+        ...pastedNode,
+        sourceAnchor: normalizeTextAnchor(pastedNode.sourceAnchor, pastedNode.id, pastedNodes),
+    }))
+
     return {
         pastedNodeIds,
-        pastedNodes,
+        pastedNodes: normalizedPastedNodes,
     }
 }
 
@@ -492,6 +512,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                     userPrompt: input.userPrompt,
                     aiResponse: input.aiResponse,
                     referenceNodeIds: input.referenceNodeIds,
+                    sourceAnchor: input.sourceAnchor,
                     position: createForkPosition(sourceNode),
                 },
                 state.activeThread.cards,

@@ -3,9 +3,12 @@
     ConversationCardPosition,
     ConversationCardSize,
     ConversationNodeType,
+    ConversationTextAnchor,
+    ConversationTextField,
     ConversationThread,
 } from "../../domain/conversation/types"
 export type { DistributiveOmit } from "../../types/typeUtils"
+export type { ConversationTextField } from "../../domain/conversation/types"
 import type { DistributiveOmit } from "../../types/typeUtils"
 
 /**
@@ -92,6 +95,7 @@ export interface ForkChatNodeInput {
     userPrompt?: string
     aiResponse?: string
     referenceNodeIds?: string[]
+    sourceAnchor?: ConversationTextAnchor
 }
 
 /**
@@ -116,8 +120,6 @@ export interface ConversationSnapshot {
  * 右侧编辑栏可修改的文本字段
  * 该联合类型用于把 focus blur 生命周期和具体 Store 字段绑定
  */
-export type ConversationTextField = "userPrompt" | "aiResponse" | "noteContent"
-
 /**
  * 当前连续文本编辑事务
  * hasChanges 为 false 表示已经 focus 但用户还没有真正修改内容

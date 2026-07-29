@@ -20,6 +20,13 @@ import { assertNever } from "./utils"
 import { PersonIcon } from "../components/icons/PersonIcon"
 import { RobotIcon } from "../components/icons/RobotIcon"
 import { NotePlusIcon } from "../components/icons/NotePlusIcon"
+import {
+    CANVAS_CARD_ACTIVATE_EVENT,
+    CANVAS_TEXT_SELECTION_EVENT,
+    type CanvasCardActivateEventDetail,
+    type CanvasTextSelectionEventDetail,
+} from "../domain/conversation/textSelection"
+import type { ConversationTextField } from "../domain/conversation/types"
 
 /**
  * 卡片唯一身份标识
@@ -33,6 +40,7 @@ type CardShapeOwnProps = DistributiveOmit<ConversationCard, keyof Omit<BaseNode,
  * 每种卡片独有字段
  */
 export type ForkMindCardShapeProps = {
+    nodeId: string
     w: number
     h: number
 } & CardShapeOwnProps
@@ -58,6 +66,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         // T 为 tldraw 内部的数据校验器
         w: T.number,
         h: T.number,
+        nodeId: T.string,
         cardType: T.literalEnum("chat", "note"),
         userPrompt: T.string.optional(),
         aiResponse: T.string.optional(),
@@ -71,6 +80,7 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         return {
             w: 320,
             h: 220,
+            nodeId: "preview",
             cardType: "note",
             noteContent: "",
         }
@@ -116,6 +126,63 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
     }
 
     override component(shape: ForkMindCardShape) {
+        const activateCard = () => {
+            window.dispatchEvent(new CustomEvent<CanvasCardActivateEventDetail>(
+                CANVAS_CARD_ACTIVATE_EVENT,
+                { detail: { nodeId: shape.props.nodeId } },
+            ))
+        }
+
+        const captureCanvasTextSelection = (
+            event: React.PointerEvent<HTMLDivElement>,
+            field: ConversationTextField,
+        ) => {
+            const selection = window.getSelection()
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                return
+            }
+
+            const range = selection.getRangeAt(0)
+            const selectionHost = event.currentTarget
+            if (!selectionHost.contains(range.commonAncestorContainer)) {
+                return
+            }
+
+            const quote = selection.toString().trim()
+            if (!quote) {
+                return
+            }
+
+            window.dispatchEvent(new CustomEvent<CanvasTextSelectionEventDetail>(
+                CANVAS_TEXT_SELECTION_EVENT,
+                {
+                    detail: {
+                        anchor: {
+                            sourceNodeId: shape.props.nodeId,
+                            field,
+                            quote,
+                            startOffset: null,
+                            endOffset: null,
+                            origin: "canvas",
+                        },
+                        clientX: event.clientX,
+                        clientY: event.clientY,
+                    },
+                },
+            ))
+        }
+
+        const createSelectableTextProps = (field: ConversationTextField) => ({
+            onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
+                activateCard()
+                event.stopPropagation()
+            },
+            onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
+                captureCanvasTextSelection(event, field)
+                event.stopPropagation()
+            },
+        })
+
         const cardContent = (() => {
             switch (shape.props.cardType) {
                 case "chat":
@@ -127,7 +194,10 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 text-sky-600 theme-dark:text-sky-400">
                                             <PersonIcon className="h-3.5 w-3.5" />
                                         </span>
-                                        <div className="min-w-0 flex-1 pt-0.5">
+                                        <div
+                                            className="min-w-0 flex-1 select-text pt-0.5"
+                                            {...createSelectableTextProps("userPrompt")}
+                                        >
                                             <ReactMarkdown
                                                 components={markdownComponents} // 识别公式和表格
                                                 remarkPlugins={markdownRemarkPlugins} // 杀毒防 XSS + 渲染数学符号
@@ -146,7 +216,10 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 theme-dark:text-violet-400">
                                             <RobotIcon className="h-3.5 w-3.5" />
                                         </span>
-                                        <div className="min-w-0 flex-1 pt-0.5">
+                                        <div
+                                            className="min-w-0 flex-1 select-text pt-0.5"
+                                            {...createSelectableTextProps("aiResponse")}
+                                        >
                                             <ReactMarkdown
                                                 components={markdownComponents}
                                                 remarkPlugins={markdownRemarkPlugins}
@@ -168,7 +241,10 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
                                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-400/15 text-amber-600 theme-dark:text-amber-400">
                                         <NotePlusIcon className="h-3.5 w-3.5" />
                                     </span>
-                                    <div className="min-w-0 flex-1 pt-0.5">
+                                    <div
+                                        className="min-w-0 flex-1 select-text pt-0.5"
+                                        {...createSelectableTextProps("noteContent")}
+                                    >
                                         <ReactMarkdown
                                             components={markdownComponents}
                                             remarkPlugins={markdownRemarkPlugins}

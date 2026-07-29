@@ -274,6 +274,7 @@ export function useCanvasBridgeLinkDrag({
                     y: ghostPosition.y,
                     opacity: GHOST_NODE_OPACITY_VISIBLE, // 半透明材质
                     props: {
+                        nodeId: "preview",
                         w: DEFAULT_CARD_WIDTH,
                         h: session.ghostHeight,
                         cardType: session.ghostCardType,
@@ -474,6 +475,7 @@ export function useCanvasBridgeLinkDrag({
                     y: initialGhostPosition.y,
                     opacity: GHOST_NODE_OPACITY_VISIBLE,
                     props: {
+                        nodeId: "preview",
                         w: DEFAULT_CARD_WIDTH,
                         h: currentGhostHeight,
                         cardType: currentCreationType,

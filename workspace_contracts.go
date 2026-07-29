@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -77,6 +78,17 @@ type CardSizeDTO struct {
 	MinHeight float64 `json:"minHeight"`
 }
 
+// TextAnchorDTO 表示子节点创建时引用的源文本选区
+// Editor 来源拥有精确字符 offset Canvas 来源只保存渲染后 quote 快照
+type TextAnchorDTO struct {
+	SourceNodeID string `json:"sourceNodeId"`
+	Field        string `json:"field"`
+	Quote        string `json:"quote"`
+	StartOffset  *int   `json:"startOffset"`
+	EndOffset    *int   `json:"endOffset"`
+	Origin       string `json:"origin"`
+}
+
 // ConversationCardDTO 是 chat note 判别联合在 Go Bridge 中的扁平表示
 // CardType 决定 UserPrompt AIResponse NoteContent 中哪些字段具有业务意义
 type ConversationCardDTO struct {
@@ -84,6 +96,7 @@ type ConversationCardDTO struct {
 	CardType         string          `json:"cardType"`
 	ParentID         *string         `json:"parentId"`
 	ReferenceNodeIDs []string        `json:"referenceNodeIds,omitempty"`
+	SourceAnchor     *TextAnchorDTO  `json:"sourceAnchor,omitempty"`
 	Position         CardPositionDTO `json:"position"`
 	Size             CardSizeDTO     `json:"size"`
 	Status           string          `json:"status"`
@@ -245,6 +258,36 @@ func validateConversationThread(thread ConversationThreadDTO) error {
 			referenceSet[referenceNodeID] = struct{}{}
 		}
 
+		if card.SourceAnchor != nil {
+			anchor := card.SourceAnchor
+			if anchor.SourceNodeID == card.ID {
+				return fmt.Errorf("cards[%d].sourceAnchor cannot reference itself", cardIndex)
+			}
+			sourceCard, exists := cardByID[anchor.SourceNodeID]
+			if !exists {
+				return fmt.Errorf("cards[%d].sourceAnchor.sourceNodeId %q does not exist", cardIndex, anchor.SourceNodeID)
+			}
+			if strings.TrimSpace(anchor.Quote) == "" {
+				return fmt.Errorf("cards[%d].sourceAnchor.quote cannot be empty", cardIndex)
+			}
+			if !isTextAnchorFieldCompatible(sourceCard.CardType, anchor.Field) {
+				return fmt.Errorf("cards[%d].sourceAnchor.field %q is invalid for %s", cardIndex, anchor.Field, sourceCard.CardType)
+			}
+
+			switch anchor.Origin {
+			case "editor":
+				if anchor.StartOffset == nil || anchor.EndOffset == nil || *anchor.StartOffset < 0 || *anchor.EndOffset <= *anchor.StartOffset {
+					return fmt.Errorf("cards[%d].sourceAnchor editor offsets are invalid", cardIndex)
+				}
+			case "canvas":
+				if anchor.StartOffset != nil || anchor.EndOffset != nil {
+					return fmt.Errorf("cards[%d].sourceAnchor canvas offsets must be null", cardIndex)
+				}
+			default:
+				return fmt.Errorf("cards[%d].sourceAnchor.origin %q is invalid", cardIndex, anchor.Origin)
+			}
+		}
+
 		visited := map[string]struct{}{card.ID: {}}
 		cursor := card.ParentID
 		for cursor != nil {
@@ -258,6 +301,20 @@ func validateConversationThread(thread ConversationThreadDTO) error {
 	}
 
 	return nil
+}
+
+// isTextAnchorFieldCompatible 校验源卡片类型是否真正拥有指定文本字段
+// cardType 和 field 来自已解码工作区 返回 false 时调用方必须拒绝该锚点
+// 工作区保存 导入和 AI 上下文构造前的领域校验会触发
+func isTextAnchorFieldCompatible(cardType string, field string) bool {
+	switch cardType {
+	case "chat":
+		return field == "userPrompt" || field == "aiResponse"
+	case "note":
+		return field == "noteContent"
+	default:
+		return false
+	}
 }
 
 func isValidNodeStatus(status string) bool {

@@ -92,6 +92,37 @@ func TestBuildAIRuntimeContextIsolatesNotesAndReferences(t *testing.T) {
 	}
 }
 
+// TestBuildAIRuntimeContextIncludesTextAnchor 验证文本选区作为背景资料注入而不是伪造 user 消息
+func TestBuildAIRuntimeContextIncludesTextAnchor(t *testing.T) {
+	t.Parallel()
+
+	thread := createContextTestThread()
+	childIndex := findContextTestCardIndex(thread.Cards, "child-chat")
+	thread.Cards[childIndex].SourceAnchor = createEditorTextAnchor("root-chat", "aiResponse")
+
+	context, err := BuildAIRuntimeContext(BuildAIContextInput{
+		Thread:       thread,
+		ActiveNodeID: "child-chat",
+		SystemPrompt: "system",
+	})
+	if err != nil {
+		t.Fatalf("BuildAIRuntimeContext() error = %v", err)
+	}
+
+	anchorFound := false
+	for _, message := range context.Messages {
+		if message.Role == openAIRoleSystem &&
+			strings.Contains(message.Content, "文本锚点") &&
+			strings.Contains(message.Content, "字段 aiResponse") &&
+			strings.Contains(message.Content, "quote") {
+			anchorFound = true
+		}
+	}
+	if !anchorFound {
+		t.Fatalf("messages do not contain text anchor: %#v", context.Messages)
+	}
+}
+
 // TestBuildAIRuntimeContextRejectsNonChatActiveNode 验证 Note 不能直接发起模型请求
 func TestBuildAIRuntimeContextRejectsNonChatActiveNode(t *testing.T) {
 	t.Parallel()
@@ -224,6 +255,22 @@ func TestFormatReferenceCardVariants(t *testing.T) {
 	}
 	if content := formatReferenceCard(ConversationCardDTO{CardType: "future"}); content != "" {
 		t.Fatalf("unknown reference = %q", content)
+	}
+}
+
+// TestFormatTextAnchor 验证锚点标签会保留来源 字段和去空白后的 quote
+func TestFormatTextAnchor(t *testing.T) {
+	t.Parallel()
+
+	formatted := formatTextAnchor(TextAnchorDTO{
+		SourceNodeID: "source",
+		Field:        "noteContent",
+		Quote:        "  selected text  ",
+	})
+	for _, fragment := range []string{"来源 source", "字段 noteContent", "selected text"} {
+		if !strings.Contains(formatted, fragment) {
+			t.Fatalf("formatTextAnchor() = %q, want %q", formatted, fragment)
+		}
 	}
 }
 

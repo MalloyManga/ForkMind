@@ -71,6 +71,47 @@ func TestValidateConversationThreadBoundaries(t *testing.T) {
 			thread.Cards = append(thread.Cards, secondCard)
 			thread.Cards[0].ReferenceNodeIDs = []string{secondCard.ID, secondCard.ID}
 		}, errorFragment: "is duplicated"},
+		{name: "anchor self", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].SourceAnchor = createEditorTextAnchor(thread.Cards[0].ID, "userPrompt")
+		}, errorFragment: "sourceAnchor cannot reference itself"},
+		{name: "anchor missing source", mutate: func(thread *ConversationThreadDTO) {
+			thread.Cards[0].SourceAnchor = createEditorTextAnchor("missing", "userPrompt")
+		}, errorFragment: "sourceAnchor.sourceNodeId"},
+		{name: "anchor empty quote", mutate: func(thread *ConversationThreadDTO) {
+			secondCard := createSecondTestCard(*thread)
+			thread.Cards = append(thread.Cards, secondCard)
+			thread.Cards[0].SourceAnchor = createEditorTextAnchor(secondCard.ID, "userPrompt")
+			thread.Cards[0].SourceAnchor.Quote = "  "
+		}, errorFragment: "quote cannot be empty"},
+		{name: "anchor incompatible field", mutate: func(thread *ConversationThreadDTO) {
+			secondCard := createSecondTestCard(*thread)
+			secondCard.CardType = "note"
+			thread.Cards = append(thread.Cards, secondCard)
+			thread.Cards[0].SourceAnchor = createEditorTextAnchor(secondCard.ID, "userPrompt")
+		}, errorFragment: "field"},
+		{name: "anchor editor offsets", mutate: func(thread *ConversationThreadDTO) {
+			secondCard := createSecondTestCard(*thread)
+			thread.Cards = append(thread.Cards, secondCard)
+			thread.Cards[0].SourceAnchor = createEditorTextAnchor(secondCard.ID, "userPrompt")
+			thread.Cards[0].SourceAnchor.EndOffset = intPointer(0)
+		}, errorFragment: "editor offsets"},
+		{name: "anchor canvas offsets", mutate: func(thread *ConversationThreadDTO) {
+			secondCard := createSecondTestCard(*thread)
+			thread.Cards = append(thread.Cards, secondCard)
+			thread.Cards[0].SourceAnchor = &TextAnchorDTO{
+				SourceNodeID: secondCard.ID,
+				Field:        "userPrompt",
+				Quote:        "quote",
+				StartOffset:  intPointer(0),
+				Origin:       "canvas",
+			}
+		}, errorFragment: "canvas offsets"},
+		{name: "anchor origin", mutate: func(thread *ConversationThreadDTO) {
+			secondCard := createSecondTestCard(*thread)
+			thread.Cards = append(thread.Cards, secondCard)
+			thread.Cards[0].SourceAnchor = createEditorTextAnchor(secondCard.ID, "userPrompt")
+			thread.Cards[0].SourceAnchor.Origin = "unknown"
+		}, errorFragment: "sourceAnchor.origin"},
 		{name: "parent cycle", mutate: func(thread *ConversationThreadDTO) {
 			secondCard := createSecondTestCard(*thread)
 			thread.Cards = append(thread.Cards, secondCard)
@@ -103,6 +144,13 @@ func TestWorkspaceContractHelpers(t *testing.T) {
 	if !isFinite(1.5) || isFinite(math.Inf(-1)) || isFinite(math.NaN()) {
 		t.Fatal("isFinite() returned an invalid result")
 	}
+	if !isTextAnchorFieldCompatible("chat", "userPrompt") ||
+		!isTextAnchorFieldCompatible("chat", "aiResponse") ||
+		!isTextAnchorFieldCompatible("note", "noteContent") ||
+		isTextAnchorFieldCompatible("note", "userPrompt") ||
+		isTextAnchorFieldCompatible("future", "noteContent") {
+		t.Fatal("isTextAnchorFieldCompatible() returned an invalid result")
+	}
 	if bridgeError := newBridgeError("code", nil, false); bridgeError != nil {
 		t.Fatalf("newBridgeError(nil) = %#v, want nil", bridgeError)
 	}
@@ -110,6 +158,22 @@ func TestWorkspaceContractHelpers(t *testing.T) {
 	if bridgeError.Code != "code" || bridgeError.Message != "message" || !bridgeError.Retryable {
 		t.Fatalf("newBridgeError() = %#v", bridgeError)
 	}
+}
+
+// createEditorTextAnchor 构造字段级合法的编辑器文本锚点
+func createEditorTextAnchor(sourceNodeID string, field string) *TextAnchorDTO {
+	return &TextAnchorDTO{
+		SourceNodeID: sourceNodeID,
+		Field:        field,
+		Quote:        "quote",
+		StartOffset:  intPointer(0),
+		EndOffset:    intPointer(5),
+		Origin:       "editor",
+	}
+}
+
+func intPointer(value int) *int {
+	return &value
 }
 
 // createSecondTestCard 基于合法测试会话生成具有唯一 id 的第二张卡片

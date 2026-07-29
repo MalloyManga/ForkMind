@@ -41,6 +41,13 @@ import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
 import { useWorkspaceTransfer } from "./hooks/useWorkspaceTransfer"
 import { buildRootNodesWarningMessage } from "./domain/conversation/rules"
 import {
+    CANVAS_CARD_ACTIVATE_EVENT,
+    CANVAS_TEXT_SELECTION_EVENT,
+    type CanvasCardActivateEventDetail,
+    type CanvasTextSelectionEventDetail,
+} from "./domain/conversation/textSelection"
+import type { ConversationTextAnchor } from "./domain/conversation/types"
+import {
     selectActiveNode,
     selectActiveNodeId,
     selectActiveThreadCards,
@@ -59,6 +66,8 @@ interface CanvasContextMenuState {
     context: CanvasContextMenuContext
     items: CanvasContextMenuItem[]
 }
+
+interface CanvasTextSelectionState extends CanvasTextSelectionEventDetail {}
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
@@ -82,6 +91,7 @@ function App() {
     const [clipboardPayload, setClipboardPayload] = useState<CanvasClipboardPayload | null>(null) // 当前页面级剪贴板 payload
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
     const [isAISettingsOpen, setIsAISettingsOpen] = useState(false)
+    const [canvasTextSelection, setCanvasTextSelection] = useState<CanvasTextSelectionState | null>(null)
 
     const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
     const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH)
@@ -110,6 +120,7 @@ function App() {
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
     const addNode = useConversationStore((state) => state.addNode)
+    const forkChatNode = useConversationStore((state) => state.forkChatNode)
     const deleteNodes = useConversationStore((state) => state.deleteNodes)
     const moveNode = useConversationStore((state) => state.moveNode)
     const resizeNode = useConversationStore((state) => state.resizeNode)
@@ -194,6 +205,15 @@ function App() {
     const closeContextMenu = useCallback(() => {
         setContextMenuState(null)
     }, [])
+
+    const handleForkTextSelection = useCallback((anchor: ConversationTextAnchor) => {
+        forkChatNode({
+            sourceNodeId: anchor.sourceNodeId,
+            sourceAnchor: anchor,
+        })
+        setCanvasTextSelection(null)
+        window.getSelection()?.removeAllRanges()
+    }, [forkChatNode])
 
     const handleAppCanvasMount = useCallback((editor: Editor) => {
         // App 自己留 editor 是为了给右键菜单 executor 提供视口中心和 page 坐标能力
@@ -347,6 +367,33 @@ function App() {
         }
     }, [closeContextMenu, executeCanvasCommand])
 
+    useEffect(() => {
+        const handleCanvasCardActivate = (event: Event) => {
+            const customEvent = event as CustomEvent<CanvasCardActivateEventDetail>
+            setActiveNodeId(customEvent.detail.nodeId)
+        }
+        const handleCanvasTextSelection = (event: Event) => {
+            const customEvent = event as CustomEvent<CanvasTextSelectionEventDetail>
+            setCanvasTextSelection(customEvent.detail)
+        }
+        const clearCanvasTextSelection = (event: PointerEvent) => {
+            const target = event.target
+            if (target instanceof Element && target.closest("[data-fm-selection-action='true']")) {
+                return
+            }
+            setCanvasTextSelection(null)
+        }
+
+        window.addEventListener(CANVAS_CARD_ACTIVATE_EVENT, handleCanvasCardActivate)
+        window.addEventListener(CANVAS_TEXT_SELECTION_EVENT, handleCanvasTextSelection)
+        window.addEventListener("pointerdown", clearCanvasTextSelection, true)
+        return () => {
+            window.removeEventListener(CANVAS_CARD_ACTIVATE_EVENT, handleCanvasCardActivate)
+            window.removeEventListener(CANVAS_TEXT_SELECTION_EVENT, handleCanvasTextSelection)
+            window.removeEventListener("pointerdown", clearCanvasTextSelection, true)
+        }
+    }, [setActiveNodeId])
+
     const tldrawLicenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY as string | undefined
 
     return (
@@ -489,6 +536,7 @@ function App() {
                             onCancelAIRequest={(nodeId) => {
                                 void aiCompletion.cancelCompletion(nodeId)
                             }}
+                            onForkTextSelection={handleForkTextSelection}
                         />
                     </div>
                 ) : null}
@@ -505,6 +553,24 @@ function App() {
                         closeContextMenu()
                     }}
                 />
+            ) : null}
+
+            {canvasTextSelection ? (
+                <button
+                    type="button"
+                    data-fm-selection-action="true"
+                    className="fixed z-50 inline-flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-background/95 px-2.5 py-1.5 text-xs font-medium text-sky-600 shadow-xl backdrop-blur theme-dark:text-sky-400"
+                    style={{
+                        left: Math.min(canvasTextSelection.clientX + 10, window.innerWidth - 130),
+                        top: Math.min(canvasTextSelection.clientY + 10, window.innerHeight - 40),
+                    }}
+                    onClick={() => {
+                        handleForkTextSelection(canvasTextSelection.anchor)
+                    }}
+                >
+                    <GitFork className="h-3.5 w-3.5" />
+                    追问选区
+                </button>
             ) : null}
 
             <AISettingsSheet

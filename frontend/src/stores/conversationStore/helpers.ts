@@ -10,6 +10,7 @@ import type {
     ConversationCard,
     ConversationCardPosition,
     ConversationCardSize,
+    ConversationTextAnchor,
     ConversationThread,
 } from "../../domain/conversation/types"
 import type { ConversationSnapshot } from "./contracts"
@@ -52,6 +53,7 @@ export function cloneNode(node: ConversationCard): ConversationCard {
     const base: BaseNode = {
         ...node,
         referenceNodeIds: node.referenceNodeIds ? [...node.referenceNodeIds] : undefined,
+        sourceAnchor: node.sourceAnchor ? { ...node.sourceAnchor } : undefined,
         position: { ...node.position },
         size: { ...node.size },
     }
@@ -147,6 +149,59 @@ export function normalizeReferenceIds(
     )
 
     return normalized.length > 0 ? normalized : undefined
+}
+
+/**
+ * 规范化文本锚点
+ * @param anchor 入参来自编辑器选区 画布选区或外部 JSON
+ * @param selfId 入参是即将持有锚点的子节点 id 用于拒绝自引用
+ * @param nodes 入参是当前会话节点集合 用于确认源节点及字段真实存在
+ * @returns 返回可持久化的独立锚点对象 无效或悬空锚点返回 undefined
+ * 创建锚点追问 粘贴和外部数据恢复时触发
+ */
+export function normalizeTextAnchor(
+    anchor: ConversationTextAnchor | undefined,
+    selfId: string,
+    nodes: readonly ConversationCard[],
+): ConversationTextAnchor | undefined {
+    if (!anchor || anchor.sourceNodeId === selfId || anchor.quote.trim().length === 0) {
+        return undefined
+    }
+
+    const sourceNode = findNodeById(nodes, anchor.sourceNodeId)
+    if (!sourceNode) {
+        return undefined
+    }
+
+    const isFieldCompatible = (() => {
+        switch (sourceNode.cardType) {
+            case "chat":
+                return anchor.field === "userPrompt" || anchor.field === "aiResponse"
+            case "note":
+                return anchor.field === "noteContent"
+        }
+
+        return assertNever(sourceNode)
+    })()
+    if (!isFieldCompatible) {
+        return undefined
+    }
+
+    const hasValidEditorOffsets =
+        anchor.origin === "editor" &&
+        anchor.startOffset !== null &&
+        anchor.endOffset !== null &&
+        anchor.startOffset >= 0 &&
+        anchor.endOffset > anchor.startOffset
+    const hasValidCanvasOffsets =
+        anchor.origin === "canvas" &&
+        anchor.startOffset === null &&
+        anchor.endOffset === null
+    if (!hasValidEditorOffsets && !hasValidCanvasOffsets) {
+        return undefined
+    }
+
+    return { ...anchor, quote: anchor.quote.trim() }
 }
 
 /**
