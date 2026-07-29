@@ -55,9 +55,6 @@ export interface OpenAICompletionConfig {
     baseUrl: string
     apiKey: string
     model: string
-    systemPrompt: string
-    temperature: number
-    maxTokens: number
 }
 
 export interface StartChatCompletionInput {

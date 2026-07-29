@@ -2,10 +2,7 @@ import { cloneConversationCard } from "../conversation/helpers"
 import type { ConversationCard } from "../conversation/types"
 import {
     DEFAULT_OPENAI_BASE_URL,
-    DEFAULT_OPENAI_MAX_TOKENS,
     DEFAULT_OPENAI_MODEL,
-    DEFAULT_OPENAI_SYSTEM_PROMPT,
-    DEFAULT_OPENAI_TEMPERATURE,
     FORKMIND_WORKSPACE_FORMAT,
     FORKMIND_WORKSPACE_VERSION,
     validateAndNormalizeWorkspace,
@@ -145,9 +142,6 @@ export function parseForkMindClipboard(content: string): ForkMindClipboardParseR
         settings: {
             baseUrl: DEFAULT_OPENAI_BASE_URL,
             model: DEFAULT_OPENAI_MODEL,
-            systemPrompt: DEFAULT_OPENAI_SYSTEM_PROMPT,
-            temperature: DEFAULT_OPENAI_TEMPERATURE,
-            maxTokens: DEFAULT_OPENAI_MAX_TOKENS,
         },
         lastModified: now,
     })

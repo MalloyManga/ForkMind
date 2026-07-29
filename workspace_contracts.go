@@ -127,11 +127,8 @@ type ConversationThreadDTO struct {
 // PersistedOpenAISettingsDTO 是允许写入本地 JSON 的 OpenAI-compatible 设置
 // API Key 不在该结构中 因此不会通过工作区自动保存落盘
 type PersistedOpenAISettingsDTO struct {
-	BaseURL      string  `json:"baseUrl"`
-	Model        string  `json:"model"`
-	SystemPrompt string  `json:"systemPrompt"`
-	Temperature  float64 `json:"temperature"`
-	MaxTokens    int     `json:"maxTokens"`
+	BaseURL string `json:"baseUrl"`
+	Model   string `json:"model"`
 }
 
 // WorkspaceDocumentDTO 是 React 与 Go 之间传输的完整工作区快照
@@ -161,17 +158,11 @@ func validateWorkspaceDocument(document WorkspaceDocumentDTO) error {
 	if _, err := time.Parse(time.RFC3339Nano, document.LastModified); err != nil {
 		return fmt.Errorf("lastModified is invalid: %w", err)
 	}
-	if document.Settings.BaseURL == "" {
+	if strings.TrimSpace(document.Settings.BaseURL) == "" {
 		return fmt.Errorf("settings.baseUrl cannot be empty")
 	}
-	if math.IsNaN(document.Settings.Temperature) || math.IsInf(document.Settings.Temperature, 0) {
-		return fmt.Errorf("settings.temperature must be finite")
-	}
-	if document.Settings.Temperature < 0 || document.Settings.Temperature > 2 {
-		return fmt.Errorf("settings.temperature must be between 0 and 2")
-	}
-	if document.Settings.MaxTokens <= 0 {
-		return fmt.Errorf("settings.maxTokens must be positive")
+	if strings.TrimSpace(document.Settings.Model) == "" {
+		return fmt.Errorf("settings.model cannot be empty")
 	}
 
 	threadByID := make(map[string]ConversationThreadDTO, len(document.Threads))

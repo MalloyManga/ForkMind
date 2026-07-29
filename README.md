@@ -25,8 +25,9 @@
   - 从对话卡片 A 中引出追问卡片 B。
   - **核心算法**：采用 **树的向上遍历（Upward Tree Traversal）** 算法。卡片 B 仅继承 A 及 A 的祖先节点作为上下文，其他兄弟分支互不干扰。
 - 🔌 **OpenAI-compatible & 本地模型优先**：
-  - 仅依赖标准 `/chat/completions` 流式接口，可连接本地 `Ollama` 或用户自行配置的兼容服务。
+  - 通过标准 `/chat/completions` 流式接口，可连接本地 `Ollama` 或用户自行配置的兼容服务。
   - API Key 只保存在当前运行时内存，不写入工作区文件；Go 网络层规避浏览器 CORS 与 Mixed Content 限制。
+  - 连接配置只保留 Base URL、Model 与 API Key；系统提示词和生成参数由 Go 根据当前画布语境统一管理。
 - 💾 **Local-First 数据流 (JSON 驱动)**：
   - 无需注册，无需云端服务器。画布与对话数据采用最原始的 `.json` 格式存储在本地。
   - **极客友好**：用户可随意导出、分享、甚至使用 VSCode 手动二次编辑对话节点树。

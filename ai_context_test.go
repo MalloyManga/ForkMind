@@ -15,7 +15,6 @@ func TestBuildAIRuntimeContextOrdersMainChain(t *testing.T) {
 	context, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       thread,
 		ActiveNodeID: "child-chat",
-		SystemPrompt: "system",
 	})
 	if err != nil {
 		t.Fatalf("BuildAIRuntimeContext() error = %v", err)
@@ -27,7 +26,7 @@ func TestBuildAIRuntimeContextOrdersMainChain(t *testing.T) {
 	}
 	joined := strings.Join(rolesAndContent, "|")
 	wantFragments := []string{
-		"system:system",
+		"system:" + forkMindSystemIdentity,
 		"user:root prompt",
 		"assistant:root response",
 		"user:child prompt",
@@ -67,7 +66,6 @@ func TestBuildAIRuntimeContextIsolatesNotesAndReferences(t *testing.T) {
 	context, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       thread,
 		ActiveNodeID: "child-chat",
-		SystemPrompt: "system",
 	})
 	if err != nil {
 		t.Fatalf("BuildAIRuntimeContext() error = %v", err)
@@ -103,7 +101,6 @@ func TestBuildAIRuntimeContextIncludesTextAnchor(t *testing.T) {
 	context, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       thread,
 		ActiveNodeID: "child-chat",
-		SystemPrompt: "system",
 	})
 	if err != nil {
 		t.Fatalf("BuildAIRuntimeContext() error = %v", err)
@@ -162,7 +159,6 @@ func TestBuildAIRuntimeContextIncludesLocalMetadataCards(t *testing.T) {
 	context, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       thread,
 		ActiveNodeID: "child-chat",
-		SystemPrompt: "system",
 	})
 	if err != nil {
 		t.Fatalf("BuildAIRuntimeContext() error = %v", err)
@@ -190,7 +186,6 @@ func TestBuildAIRuntimeContextRejectsNonChatActiveNode(t *testing.T) {
 	_, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       thread,
 		ActiveNodeID: "reference-note",
-		SystemPrompt: "system",
 	})
 	if err == nil {
 		t.Fatal("BuildAIRuntimeContext() error = nil, want non-chat active error")
@@ -215,7 +210,7 @@ func TestBuildAIRuntimeContextInputErrors(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			input := BuildAIContextInput{Thread: createContextTestThread(), ActiveNodeID: "child-chat", SystemPrompt: "system"}
+			input := BuildAIContextInput{Thread: createContextTestThread(), ActiveNodeID: "child-chat"}
 			testCase.mutate(&input)
 			_, err := BuildAIRuntimeContext(input)
 			if err == nil || !strings.Contains(err.Error(), testCase.errorFragment) {
@@ -271,9 +266,9 @@ func TestCollectDirectReferencesBoundaries(t *testing.T) {
 	}
 }
 
-// TestBuildOpenAIMessagesWithoutSystemPrompt 验证空 system prompt 不生成空消息
+// TestBuildOpenAIMessagesUsesInternalSystemPrompt 验证系统提示词始终由后端内部生成
 // Note 背景与历史 chat 仍保持正确角色顺序
-func TestBuildOpenAIMessagesWithoutSystemPrompt(t *testing.T) {
+func TestBuildOpenAIMessagesUsesInternalSystemPrompt(t *testing.T) {
 	t.Parallel()
 
 	mainChain := []ConversationCardDTO{
@@ -281,16 +276,50 @@ func TestBuildOpenAIMessagesWithoutSystemPrompt(t *testing.T) {
 		{ID: "history", CardType: "chat", UserPrompt: " old question ", AIResponse: " old answer "},
 		{ID: "active", CardType: "chat", UserPrompt: " current question ", AIResponse: " ignored answer "},
 	}
-	messages := buildOpenAIMessages("   ", mainChain, "active", nil)
-	if len(messages) != 4 {
-		t.Fatalf("len(messages) = %d, want 4: %#v", len(messages), messages)
+	messages := buildOpenAIMessages(mainChain, "active", nil)
+	if len(messages) != 5 {
+		t.Fatalf("len(messages) = %d, want 5: %#v", len(messages), messages)
 	}
-	roles := []string{messages[0].Role, messages[1].Role, messages[2].Role, messages[3].Role}
-	if strings.Join(roles, ",") != "system,user,assistant,user" {
+	roles := []string{messages[0].Role, messages[1].Role, messages[2].Role, messages[3].Role, messages[4].Role}
+	if strings.Join(roles, ",") != "system,system,user,assistant,user" {
 		t.Fatalf("roles = %v", roles)
 	}
 	if strings.Contains(messages[len(messages)-1].Content, "ignored answer") {
 		t.Fatalf("active response leaked into messages: %#v", messages)
+	}
+}
+
+// TestBuildForkMindSystemPromptAdaptsToRootAndContext 验证根问题不会被空资料约束拒答
+// 同时验证主链 引用和文本锚点存在时才注入对应使用说明
+func TestBuildForkMindSystemPromptAdaptsToRootAndContext(t *testing.T) {
+	t.Parallel()
+
+	rootPrompt := buildForkMindSystemPrompt(
+		[]ConversationCardDTO{{ID: "root", CardType: "chat", UserPrompt: "HTTP 是什么"}},
+		nil,
+	)
+	for _, fragment := range []string{forkMindSystemIdentity, forkMindContextPolicy, forkMindAccuracyPolicy} {
+		if !strings.Contains(rootPrompt, fragment) {
+			t.Fatalf("root prompt = %q, want %q", rootPrompt, fragment)
+		}
+	}
+	for _, unexpected := range []string{"存在主对话历史", "附带补充参考卡片", "由文本选区发起", "资料为空"} {
+		if strings.Contains(rootPrompt, unexpected) {
+			t.Fatalf("root prompt = %q, unexpected %q", rootPrompt, unexpected)
+		}
+	}
+
+	contextualPrompt := buildForkMindSystemPrompt(
+		[]ConversationCardDTO{
+			{ID: "root", CardType: "chat"},
+			{ID: "child", CardType: "chat", SourceAnchor: createEditorTextAnchor("root", "aiResponse")},
+		},
+		[]AIReferenceDTO{{NodeID: "reference", CardType: "note", Content: "background"}},
+	)
+	for _, fragment := range []string{"存在主对话历史", "附带补充参考卡片", "由文本选区发起"} {
+		if !strings.Contains(contextualPrompt, fragment) {
+			t.Fatalf("contextual prompt = %q, want %q", contextualPrompt, fragment)
+		}
 	}
 }
 

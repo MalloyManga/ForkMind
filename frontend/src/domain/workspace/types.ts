@@ -11,9 +11,6 @@ import {
 export interface PersistedOpenAISettings {
     baseUrl: string
     model: string
-    systemPrompt: string
-    temperature: number
-    maxTokens: number
 }
 
 /**

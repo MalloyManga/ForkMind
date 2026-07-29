@@ -113,7 +113,6 @@ func (a *App) StartChatCompletion(input StartChatCompletionInput) OperationRespo
 	runtimeContext, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       input.Thread,
 		ActiveNodeID: input.ActiveNodeID,
-		SystemPrompt: input.Config.SystemPrompt,
 	})
 	if err != nil {
 		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
@@ -161,8 +160,8 @@ func (a *App) runChatCompletion(
 			APIKey:      input.Config.APIKey,
 			Model:       input.Config.Model,
 			Messages:    runtimeContext.Messages,
-			Temperature: input.Config.Temperature,
-			MaxTokens:   input.Config.MaxTokens,
+			Temperature: defaultOpenAITemperature,
+			MaxTokens:   defaultOpenAIMaxTokens,
 		},
 		func(content string) error {
 			emitWailsEvent(a.ctx, aiEventChunk, AIStreamChunkEvent{

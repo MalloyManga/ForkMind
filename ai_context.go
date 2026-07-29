@@ -9,6 +9,10 @@ const (
 	openAIRoleSystem    = "system"
 	openAIRoleUser      = "user"
 	openAIRoleAssistant = "assistant"
+
+	forkMindSystemIdentity = "你是 ForkMind 无限画布中的 AI 助手 请直接回答当前用户问题"
+	forkMindContextPolicy  = "画布资料只用于补充语境而不是限制知识来源 相关时优先结合 不相关或不足时可以使用通用知识继续回答"
+	forkMindAccuracyPolicy = "不要虚构未提供的画布内容 若需要推测请明确说明"
 )
 
 // OpenAIMessageDTO 对应 OpenAI-compatible messages 数组中的单条消息
@@ -38,7 +42,6 @@ type AIRuntimeContextDTO struct {
 type BuildAIContextInput struct {
 	Thread       ConversationThreadDTO `json:"thread"`
 	ActiveNodeID string                `json:"activeNodeId"`
-	SystemPrompt string                `json:"systemPrompt"`
 }
 
 // BuildAIRuntimeContext 根据 parent 主链和当前节点直接 reference 构造 OpenAI messages
@@ -78,7 +81,7 @@ func BuildAIRuntimeContext(input BuildAIContextInput) (AIRuntimeContextDTO, erro
 	if err != nil {
 		return AIRuntimeContextDTO{}, err
 	}
-	messages := buildOpenAIMessages(input.SystemPrompt, mainChain, activeCard.ID, references)
+	messages := buildOpenAIMessages(mainChain, activeCard.ID, references)
 
 	return AIRuntimeContextDTO{
 		ActiveNodeID: activeCard.ID,
@@ -161,19 +164,15 @@ func collectDirectReferences(
 // activeNodeID 用于排除当前节点旧 aiResponse 避免 Retry 时把旧答案当成历史
 // Note 主链和 reference 统一进入 system 背景区 不伪造 user assistant 角色
 func buildOpenAIMessages(
-	systemPrompt string,
 	mainChain []ConversationCardDTO,
 	activeNodeID string,
 	references []AIReferenceDTO,
 ) []OpenAIMessageDTO {
 	messages := make([]OpenAIMessageDTO, 0, len(mainChain)*2+2)
-	normalizedSystemPrompt := strings.TrimSpace(systemPrompt)
-	if normalizedSystemPrompt != "" {
-		messages = append(messages, OpenAIMessageDTO{
-			Role:    openAIRoleSystem,
-			Content: normalizedSystemPrompt,
-		})
-	}
+	messages = append(messages, OpenAIMessageDTO{
+		Role:    openAIRoleSystem,
+		Content: buildForkMindSystemPrompt(mainChain, references),
+	})
 
 	backgroundSections := make([]string, 0)
 	for _, card := range mainChain {
@@ -227,6 +226,33 @@ func buildOpenAIMessages(
 	}
 
 	return messages
+}
+
+// buildForkMindSystemPrompt 根据当前 Chat 所处的画布语境生成内部系统提示词
+// mainChain 来自当前节点的 parentId 主链 references 来自当前节点的一层引用卡片
+// 返回值始终是不可由用户编辑的非空系统指令 根节点不会因为缺少历史资料而拒绝回答
+// 用户发送或重新生成 Chat 时由 buildOpenAIMessages 触发
+func buildForkMindSystemPrompt(
+	mainChain []ConversationCardDTO,
+	references []AIReferenceDTO,
+) string {
+	instructions := []string{
+		forkMindSystemIdentity,
+		forkMindContextPolicy,
+		forkMindAccuracyPolicy,
+	}
+
+	if len(mainChain) > 1 {
+		instructions = append(instructions, "当前问题存在主对话历史 请保持回答与已有对话连续")
+	}
+	if len(references) > 0 {
+		instructions = append(instructions, "当前问题附带补充参考卡片 请在确实相关时引用这些资料")
+	}
+	if len(mainChain) > 0 && mainChain[len(mainChain)-1].SourceAnchor != nil {
+		instructions = append(instructions, "当前问题由文本选区发起 请把文本锚点视为追问对象")
+	}
+
+	return strings.Join(instructions, "\n")
 }
 
 // formatTextAnchor 把子节点保存的源文本选区转换为明确的背景资料标签

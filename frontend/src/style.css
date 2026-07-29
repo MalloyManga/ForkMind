@@ -4,6 +4,14 @@
 @import "@fontsource-variable/geist";
 
 @custom-variant theme-dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --fm-layer-modal: 400;
+}
+
+.fm-modal-layer {
+  z-index: var(--fm-layer-modal);
+}
 @custom-variant theme-light (&:where([data-theme="light"], [data-theme="light"] *));
 
 * {

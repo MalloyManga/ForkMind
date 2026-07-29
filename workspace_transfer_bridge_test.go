@@ -165,7 +165,7 @@ func TestWorkspaceTransferFileHelperErrors(t *testing.T) {
 	t.Parallel()
 
 	invalidDocument := createTestWorkspaceDocument()
-	invalidDocument.Settings.Temperature = math.NaN()
+	invalidDocument.Threads[0].Cards[0].Position.X = math.NaN()
 	if err := writeWorkspaceExportFile(
 		filepath.Join(t.TempDir(), "invalid.json"),
 		workspaceExportDocumentDTO{WorkspaceDocumentDTO: invalidDocument},

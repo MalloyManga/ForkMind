@@ -18,17 +18,16 @@ import (
 const (
 	openAIChatCompletionsPath = "/chat/completions"
 	maxOpenAIErrorBodyBytes   = 1024 * 1024
+	defaultOpenAITemperature  = 0.7
+	defaultOpenAIMaxTokens    = 4096
 )
 
 // OpenAICompletionConfigDTO 是一次请求使用的 OpenAI-compatible 配置
 // APIKey 只通过本次 Bridge 调用存在于 Go 内存 不会进入 WorkspaceDocumentDTO
 type OpenAICompletionConfigDTO struct {
-	BaseURL      string  `json:"baseUrl"`
-	APIKey       string  `json:"apiKey"`
-	Model        string  `json:"model"`
-	SystemPrompt string  `json:"systemPrompt"`
-	Temperature  float64 `json:"temperature"`
-	MaxTokens    int     `json:"maxTokens"`
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey"`
+	Model   string `json:"model"`
 }
 
 type openAIStreamRequest struct {
@@ -195,6 +194,14 @@ func (client *OpenAIClient) StreamCompletion(
 // resolveOpenAIChatCompletionsURL 把用户 Base URL 规范为完整端点
 // Base URL 可以是 http://localhost:11434/v1 或已经包含 /chat/completions 的完整地址
 func resolveOpenAIChatCompletionsURL(baseURL string) (string, error) {
+	return resolveOpenAIEndpointURL(baseURL, openAIChatCompletionsPath)
+}
+
+// resolveOpenAIEndpointURL 在同一个 OpenAI-compatible Base URL 下切换标准端点
+// baseURL 来自用户连接配置 endpointPath 由内部调用方传入 /chat/completions
+// 返回经过 scheme host 校验的完整 URL Base URL 为空或不是 HTTP(S) 时返回错误
+// 流式生成在创建 HTTP request 前调用
+func resolveOpenAIEndpointURL(baseURL string, endpointPath string) (string, error) {
 	normalizedBaseURL := strings.TrimSpace(baseURL)
 	if normalizedBaseURL == "" {
 		return "", fmt.Errorf("baseUrl cannot be empty")
@@ -212,10 +219,13 @@ func resolveOpenAIChatCompletionsURL(baseURL string) (string, error) {
 	}
 
 	trimmedPath := strings.TrimRight(parsedURL.Path, "/")
-	if !strings.HasSuffix(trimmedPath, openAIChatCompletionsPath) {
-		trimmedPath += openAIChatCompletionsPath
+	for _, knownEndpointPath := range []string{openAIChatCompletionsPath} {
+		if strings.HasSuffix(trimmedPath, knownEndpointPath) {
+			trimmedPath = strings.TrimSuffix(trimmedPath, knownEndpointPath)
+			break
+		}
 	}
-	parsedURL.Path = trimmedPath
+	parsedURL.Path = strings.TrimRight(trimmedPath, "/") + endpointPath
 
 	return parsedURL.String(), nil
 }

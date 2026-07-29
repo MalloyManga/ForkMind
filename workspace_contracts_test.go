@@ -21,10 +21,8 @@ func TestValidateWorkspaceDocumentBoundaries(t *testing.T) {
 		{name: "version", mutate: func(document *WorkspaceDocumentDTO) { document.Version = "2" }, errorFragment: "unsupported workspace version"},
 		{name: "threads", mutate: func(document *WorkspaceDocumentDTO) { document.Threads = nil }, errorFragment: "at least one thread"},
 		{name: "last modified", mutate: func(document *WorkspaceDocumentDTO) { document.LastModified = "invalid" }, errorFragment: "lastModified is invalid"},
-		{name: "base url", mutate: func(document *WorkspaceDocumentDTO) { document.Settings.BaseURL = "" }, errorFragment: "baseUrl cannot be empty"},
-		{name: "temperature nan", mutate: func(document *WorkspaceDocumentDTO) { document.Settings.Temperature = math.NaN() }, errorFragment: "temperature must be finite"},
-		{name: "temperature range", mutate: func(document *WorkspaceDocumentDTO) { document.Settings.Temperature = 3 }, errorFragment: "between 0 and 2"},
-		{name: "max tokens", mutate: func(document *WorkspaceDocumentDTO) { document.Settings.MaxTokens = 0 }, errorFragment: "maxTokens must be positive"},
+		{name: "base url", mutate: func(document *WorkspaceDocumentDTO) { document.Settings.BaseURL = "   " }, errorFragment: "baseUrl cannot be empty"},
+		{name: "model", mutate: func(document *WorkspaceDocumentDTO) { document.Settings.Model = "   " }, errorFragment: "model cannot be empty"},
 		{name: "duplicate thread", mutate: func(document *WorkspaceDocumentDTO) { document.Threads = append(document.Threads, document.Threads[0]) }, errorFragment: "is duplicated"},
 		{name: "active thread", mutate: func(document *WorkspaceDocumentDTO) { document.ActiveThreadID = "missing" }, errorFragment: "does not exist"},
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -146,7 +147,14 @@ func TestStartAndRunChatCompletionEvents(t *testing.T) {
 			events <- eventRecord{name: name, payload: payload[0]}
 		}
 	}
-	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		var requestBody openAIChatCompletionsRequest
+		if err := json.NewDecoder(request.Body).Decode(&requestBody); err != nil {
+			t.Errorf("decode chat request: %v", err)
+		}
+		if requestBody.Model != "test-model" || requestBody.Temperature != defaultOpenAITemperature || requestBody.MaxTokens != defaultOpenAIMaxTokens {
+			t.Errorf("chat defaults = %#v", requestBody)
+		}
 		responseWriter.Header().Set("Content-Type", "text/event-stream")
 		_, _ = responseWriter.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
 	}))
@@ -253,12 +261,9 @@ func createAIStartInput(requestID string) StartChatCompletionInput {
 		Thread:       createContextTestThread(),
 		ActiveNodeID: "child-chat",
 		Config: OpenAICompletionConfigDTO{
-			BaseURL:      "http://localhost:11434/v1",
-			APIKey:       "test-key",
-			Model:        "test-model",
-			SystemPrompt: "test-system",
-			Temperature:  0.7,
-			MaxTokens:    128,
+			BaseURL: "http://localhost:11434/v1",
+			APIKey:  "test-key",
+			Model:   "test-model",
 		},
 	}
 }

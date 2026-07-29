@@ -22,10 +22,7 @@ import type {
 } from "../conversation/types"
 import {
     DEFAULT_OPENAI_BASE_URL,
-    DEFAULT_OPENAI_MAX_TOKENS,
     DEFAULT_OPENAI_MODEL,
-    DEFAULT_OPENAI_SYSTEM_PROMPT,
-    DEFAULT_OPENAI_TEMPERATURE,
     FORKMIND_WORKSPACE_FORMAT,
     FORKMIND_WORKSPACE_VERSION,
 } from "./constants"
@@ -452,19 +449,10 @@ function parseThread(
 
 function parseSettings(input: unknown): PersistedOpenAISettings {
     const settings = isUnknownRecord(input) ? input : {}
-    const temperature = isFiniteNumber(settings.temperature)
-        ? Math.min(Math.max(settings.temperature, 0), 2)
-        : DEFAULT_OPENAI_TEMPERATURE
-    const maxTokens = isFiniteNumber(settings.maxTokens) && settings.maxTokens > 0
-        ? Math.floor(settings.maxTokens)
-        : DEFAULT_OPENAI_MAX_TOKENS
 
     return {
         baseUrl: readString(settings.baseUrl, DEFAULT_OPENAI_BASE_URL).trim() || DEFAULT_OPENAI_BASE_URL,
-        model: readString(settings.model, DEFAULT_OPENAI_MODEL).trim(),
-        systemPrompt: readString(settings.systemPrompt, DEFAULT_OPENAI_SYSTEM_PROMPT),
-        temperature,
-        maxTokens,
+        model: readString(settings.model, DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL,
     }
 }
 

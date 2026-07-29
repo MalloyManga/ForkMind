@@ -197,9 +197,6 @@ export function useAICompletion(): UseAICompletionResult {
                 baseUrl: persistedSettings.baseUrl.trim(),
                 apiKey,
                 model: persistedSettings.model.trim(),
-                systemPrompt: persistedSettings.systemPrompt,
-                temperature: persistedSettings.temperature,
-                maxTokens: persistedSettings.maxTokens,
             },
         })
 

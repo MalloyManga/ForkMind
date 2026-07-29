@@ -136,11 +136,8 @@ func createTestWorkspaceDocument() WorkspaceDocumentDTO {
 		ActiveThreadID: "thread-1",
 		LastModified:   now,
 		Settings: PersistedOpenAISettingsDTO{
-			BaseURL:      "http://localhost:11434/v1",
-			Model:        "test-model",
-			SystemPrompt: "test system prompt",
-			Temperature:  0.7,
-			MaxTokens:    1024,
+			BaseURL: "http://localhost:11434/v1",
+			Model:   "test-model",
 		},
 		Threads: []ConversationThreadDTO{
 			{
