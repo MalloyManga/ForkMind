@@ -602,7 +602,7 @@ function App() {
                 {!isLeftSidebarCollapsed && !isCanvasUiHidden ? (
                     <div
                         ref={leftSidebarHostRef}
-                        className="relative h-full shrink-0 overflow-hidden bg-background"
+                        className="relative isolate h-full shrink-0 overflow-hidden border-0 bg-background shadow-none outline-none"
                         style={{ width: leftSidebarWidth }}
                     >
                         <div
@@ -657,18 +657,15 @@ function App() {
                             }}
                             />
                         </div>
-                    </div>
-                ) : null}
-
-                {!isLeftSidebarCollapsed && !isCanvasUiHidden ? (
-                    <div
-                        className="group relative z-20 w-0 shrink-0 cursor-col-resize"
-                        onPointerDown={startResizeLeftSidebar}
-                        role="separator"
-                        aria-label="调整左侧栏宽度"
-                    >
-                        <div className="absolute inset-y-0 -left-1.5 -right-1.5 transition-colors group-hover:bg-sky-400/15" />
-                        <div className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent transition-all group-hover:bg-sky-400/80" />
+                        <div
+                            className="group absolute inset-y-0 right-0 z-30 w-3 cursor-col-resize border-0 bg-transparent outline-none"
+                            onPointerDown={startResizeLeftSidebar}
+                            role="separator"
+                            aria-label="调整左侧栏宽度"
+                        >
+                            <div className="absolute inset-y-0 right-0 w-3 bg-transparent transition-colors group-hover:bg-sky-400/15" />
+                            <div className="absolute right-0 top-1/2 h-10 w-1 -translate-y-1/2 rounded-full bg-transparent transition-colors group-hover:bg-sky-400/80" />
+                        </div>
                     </div>
                 ) : null}
 

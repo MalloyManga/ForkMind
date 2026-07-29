@@ -143,7 +143,7 @@ export function LeftConversationSidebar({
     })()
 
     return (
-        <aside className="flex h-full flex-col bg-background/95 backdrop-blur-sm">
+        <aside className="flex h-full flex-col bg-background">
             {/* 品牌头部 */}
             <header className="flex h-14 shrink-0 items-center justify-between px-4">
                 <div className="flex items-center gap-2.5">
