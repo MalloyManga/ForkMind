@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -167,7 +165,7 @@ func (a *App) runChatCompletion(
 			MaxTokens:   input.Config.MaxTokens,
 		},
 		func(content string) error {
-			runtime.EventsEmit(a.ctx, aiEventChunk, AIStreamChunkEvent{
+			emitWailsEvent(a.ctx, aiEventChunk, AIStreamChunkEvent{
 				RequestID: input.RequestID,
 				NodeID:    input.ActiveNodeID,
 				Delta:     content,
@@ -177,7 +175,7 @@ func (a *App) runChatCompletion(
 	)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			runtime.EventsEmit(a.ctx, aiEventDone, AIStreamDoneEvent{
+			emitWailsEvent(a.ctx, aiEventDone, AIStreamDoneEvent{
 				RequestID:    input.RequestID,
 				NodeID:       input.ActiveNodeID,
 				FinishReason: "cancelled",
@@ -187,7 +185,7 @@ func (a *App) runChatCompletion(
 		}
 
 		bridgeError := classifyOpenAIError(err)
-		runtime.EventsEmit(a.ctx, aiEventError, AIStreamErrorEvent{
+		emitWailsEvent(a.ctx, aiEventError, AIStreamErrorEvent{
 			RequestID: input.RequestID,
 			NodeID:    input.ActiveNodeID,
 			Error:     *bridgeError,
@@ -195,7 +193,7 @@ func (a *App) runChatCompletion(
 		return
 	}
 
-	runtime.EventsEmit(a.ctx, aiEventDone, AIStreamDoneEvent{
+	emitWailsEvent(a.ctx, aiEventDone, AIStreamDoneEvent{
 		RequestID:    input.RequestID,
 		NodeID:       input.ActiveNodeID,
 		FinishReason: result.FinishReason,

@@ -49,7 +49,7 @@ type WorkspaceRepository struct {
 // NewDefaultWorkspaceRepository 创建生产环境 Repository
 // 返回错误表示操作系统没有提供可用的用户配置目录 调用方必须通过 Bridge 返回该错误
 func NewDefaultWorkspaceRepository() (*WorkspaceRepository, error) {
-	userConfigDir, err := os.UserConfigDir()
+	userConfigDir, err := resolveUserConfigDirectory()
 	if err != nil {
 		return nil, fmt.Errorf("resolve user config directory: %w", err)
 	}

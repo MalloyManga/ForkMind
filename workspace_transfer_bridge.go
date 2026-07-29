@@ -40,7 +40,7 @@ func (a *App) ExportWorkspace(document WorkspaceDocumentDTO) WorkspaceExportResp
 		}
 	}
 
-	selectedPath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+	selectedPath, err := showWorkspaceSaveDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:                "Export ForkMind Workspace",
 		DefaultFilename:      workspaceExportDefaultFileName,
 		Filters:              workspaceJSONFilters,
@@ -75,7 +75,7 @@ func (a *App) ImportWorkspace() WorkspaceImportResponse {
 		}
 	}
 
-	selectedPath, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+	selectedPath, err := showWorkspaceOpenDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:   "Import ForkMind Workspace",
 		Filters: workspaceJSONFilters,
 	})
