@@ -14,7 +14,7 @@ import (
 
 const (
 	workspaceExportDefaultFileName = "ForkMind-workspace.json"
-	workspaceTransferMaxBytes      = 32 * 1024 * 1024
+	workspaceTransferMaxBytes      = 256 * 1024 * 1024
 )
 
 var workspaceJSONFilters = []runtime.FileFilter{
@@ -56,7 +56,13 @@ func (a *App) ExportWorkspace(document WorkspaceDocumentDTO) WorkspaceExportResp
 	}
 
 	exportPath := ensureJSONFileExtension(selectedPath)
-	if err := writeWorkspaceExportFile(exportPath, document); err != nil {
+	exportDocument, err := buildWorkspaceExportDocument(document, a.workspaceRepository)
+	if err != nil {
+		return WorkspaceExportResponse{
+			Error: newBridgeError(errorCodeReadFailed, fmt.Errorf("prepare workspace export: %w", err), false),
+		}
+	}
+	if err := writeWorkspaceExportFile(exportPath, exportDocument); err != nil {
 		return WorkspaceExportResponse{
 			Error: newBridgeError(errorCodeWriteFailed, err, true),
 		}
@@ -95,9 +101,27 @@ func (a *App) ImportWorkspace() WorkspaceImportResponse {
 		}
 	}
 
+	document, embeddedAssets, err := decodeWorkspaceExportDocument(content)
+	if err != nil {
+		return WorkspaceImportResponse{
+			Error: newBridgeError(errorCodeInvalidData, err, false),
+		}
+	}
+	if err := storeEmbeddedManagedAssets(a.workspaceRepository, embeddedAssets); err != nil {
+		return WorkspaceImportResponse{
+			Error: newBridgeError(errorCodeWriteFailed, err, true),
+		}
+	}
+	normalizedContent, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return WorkspaceImportResponse{
+			Error: newBridgeError(errorCodeInternal, fmt.Errorf("encode normalized workspace import: %w", err), false),
+		}
+	}
+
 	return WorkspaceImportResponse{
 		Path:    selectedPath,
-		Content: content,
+		Content: string(append(normalizedContent, '\n')),
 	}
 }
 
@@ -116,7 +140,7 @@ func ensureJSONFileExtension(selectedPath string) string {
 // filePath 来自系统保存对话框 document 已在 Bridge 入口完成领域校验
 // 返回 nil 表示文件已经完成写入 非 nil 错误会被 Bridge 转换为 write_failed
 // ExportWorkspace 获得用户明确目标路径后触发
-func writeWorkspaceExportFile(filePath string, document WorkspaceDocumentDTO) error {
+func writeWorkspaceExportFile(filePath string, document workspaceExportDocumentDTO) error {
 	encodedDocument, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode workspace export: %w", err)

@@ -33,7 +33,7 @@ func TestWorkspaceTransferFileHelpers(t *testing.T) {
 
 	document := createTestWorkspaceDocument()
 	filePath := filepath.Join(t.TempDir(), "workspace.json")
-	if err := writeWorkspaceExportFile(filePath, document); err != nil {
+	if err := writeWorkspaceExportFile(filePath, workspaceExportDocumentDTO{WorkspaceDocumentDTO: document}); err != nil {
 		t.Fatalf("write export: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestExportWorkspaceBridgeScenarios(t *testing.T) {
 	previousDialog := showWorkspaceSaveDialog
 	defer func() { showWorkspaceSaveDialog = previousDialog }()
 
-	app := &App{ctx: context.Background()}
+	app := &App{ctx: context.Background(), workspaceRepository: NewWorkspaceRepository(t.TempDir())}
 	invalidDocument := createTestWorkspaceDocument()
 	invalidDocument.Format = "invalid"
 	assertBridgeErrorCode(t, app.ExportWorkspace(invalidDocument).Error, errorCodeInvalidData)
@@ -123,7 +123,7 @@ func TestImportWorkspaceBridgeScenarios(t *testing.T) {
 	previousDialog := showWorkspaceOpenDialog
 	defer func() { showWorkspaceOpenDialog = previousDialog }()
 
-	app := &App{ctx: context.Background()}
+	app := &App{ctx: context.Background(), workspaceRepository: NewWorkspaceRepository(t.TempDir())}
 	showWorkspaceOpenDialog = func(context.Context, runtime.OpenDialogOptions) (string, error) {
 		return "", errors.New("dialog failed")
 	}
@@ -143,7 +143,9 @@ func TestImportWorkspaceBridgeScenarios(t *testing.T) {
 	assertBridgeErrorCode(t, app.ImportWorkspace().Error, errorCodeReadFailed)
 
 	importPath := filepath.Join(t.TempDir(), "workspace.json")
-	if err := os.WriteFile(importPath, []byte(`{"format":"forkmind-workspace"}`), 0o600); err != nil {
+	if err := writeWorkspaceExportFile(importPath, workspaceExportDocumentDTO{
+		WorkspaceDocumentDTO: createTestWorkspaceDocument(),
+	}); err != nil {
 		t.Fatalf("write import fixture: %v", err)
 	}
 	showWorkspaceOpenDialog = func(_ context.Context, dialogOptions runtime.OpenDialogOptions) (string, error) {
@@ -164,7 +166,10 @@ func TestWorkspaceTransferFileHelperErrors(t *testing.T) {
 
 	invalidDocument := createTestWorkspaceDocument()
 	invalidDocument.Settings.Temperature = math.NaN()
-	if err := writeWorkspaceExportFile(filepath.Join(t.TempDir(), "invalid.json"), invalidDocument); err == nil {
+	if err := writeWorkspaceExportFile(
+		filepath.Join(t.TempDir(), "invalid.json"),
+		workspaceExportDocumentDTO{WorkspaceDocumentDTO: invalidDocument},
+	); err == nil {
 		t.Fatal("writeWorkspaceExportFile() error = nil for NaN")
 	}
 
