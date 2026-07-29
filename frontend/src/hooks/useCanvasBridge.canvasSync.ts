@@ -8,7 +8,7 @@ import {
     type ArrowAnchorOverride,
     areSameShapeIdSet,
     createStableArrowProjections,
-    getDefaultHeightByType,
+    getCardShapeHeight,
     type LinkDragSession,
 } from "./useCanvasBridge.helpers"
 import {
@@ -90,10 +90,6 @@ function areSameForkMindCardShapeProps(
  * @returns 返回 tldraw 自定义 shape 本轮同步时应使用的默认高度
  * 只影响显示高度 不改 Store 原文内容
  */
-function getProjectedCardHeight(card: ConversationCard): number {
-    return getDefaultHeightByType(card.cardType)
-}
-
 /**
  * 将 Store 业务节点转换为 tldraw 自定义 shape props
  * @param card Store 中的 ConversationCard 是业务层唯一事实源
@@ -101,7 +97,7 @@ function getProjectedCardHeight(card: ConversationCard): number {
  * 新增卡片类型时必须在这里补齐投影规则
  */
 function createForkMindCardShapeProps(card: ConversationCard): ForkMindCardShape["props"] {
-    const projectedHeight = getProjectedCardHeight(card)
+    const projectedHeight = getCardShapeHeight(card)
     const baseProps = {
         nodeId: card.id,
         w: card.size.width,

@@ -4,6 +4,7 @@ import type { ConversationCard } from "../domain/conversation/types"
 import { FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
 import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
+    getCardShapeHeight,
     type ArrowAnchorOverride,
     closestAnchorSideToNormalizedAnchor,
     createStableArrowProjections,
@@ -402,6 +403,17 @@ export function useCanvasBridgeInteractions({
                 }
 
                 if (selectedShape.type !== FORK_MIND_CARD_SHAPE_TYPE) {
+                    continue
+                }
+
+                const projectedHeightBeforeResize = getCardShapeHeight(sourceNode)
+                const hasCanvasSizeChanged =
+                    selectedShape.props.w !== sourceNode.size.width ||
+                    selectedShape.props.h !== projectedHeightBeforeResize
+
+                // 普通点击和拖动位置不会把 auto 误写成 fixed
+                // 只有 tldraw resize 真正改变投影宽高时才提交用户尺寸
+                if (!hasCanvasSizeChanged) {
                     continue
                 }
 

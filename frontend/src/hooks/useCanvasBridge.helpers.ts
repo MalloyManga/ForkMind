@@ -11,7 +11,12 @@ import {
     toCanvasNodeShapeId,
 } from "./canvasNodeIds"
 
-export const CHAT_CARD_HEIGHT = 280
+export const CHAT_CARD_HEIGHT = 220
+export const CHAT_CARD_MAX_AUTO_HEIGHT = 640
+export const CHAT_CARD_CONTENT_HORIZONTAL_PADDING = 72
+export const CHAT_CARD_CONTENT_VERTICAL_PADDING = 48
+export const CHAT_CARD_TEXT_LINE_HEIGHT = 22
+export const CHAT_CARD_MIN_CHARACTERS_PER_LINE = 16
 export const NOTE_CARD_HEIGHT = 220
 export const IMAGE_CARD_HEIGHT = 280
 export const LINK_CARD_HEIGHT = 220
@@ -98,10 +103,65 @@ const ANCHOR_SIDE_ALL: AnchorSide[] = [
 ]
 
 /**
+ * 估算 Markdown 文本在指定卡片宽度内需要的视觉行数
+ * @param content 入参来自 Chat 节点的 Prompt 或 Response Markdown
+ * @param cardWidth 入参来自 Store 中的 card.size.width 用于推算自动换行
+ * @returns 返回至少一行的估算行数 空文本也为占位内容保留一行
+ * AI 流式片段或用户编辑文本后会触发 用于在 DOM 测量之外稳定投影 shape 高度
+ */
+function estimateMarkdownLineCount(content: string, cardWidth: number): number {
+    const availableTextWidth = Math.max(
+        cardWidth - CHAT_CARD_CONTENT_HORIZONTAL_PADDING,
+        CHAT_CARD_MIN_CHARACTERS_PER_LINE * 7,
+    )
+    const charactersPerLine = Math.max(
+        CHAT_CARD_MIN_CHARACTERS_PER_LINE,
+        Math.floor(availableTextWidth / 7),
+    )
+    const logicalLines = content.trim().split(/\r?\n/)
+
+    return logicalLines.reduce((lineCount, line) => {
+        // CJK 字符通常接近一个完整字宽 ASCII 字符按约半个字宽估算
+        const visualCharacterCount = Array.from(line).reduce(
+            (characterCount, character) => characterCount + (character.charCodeAt(0) > 0xff ? 1 : 0.55),
+            0,
+        )
+        return lineCount + Math.max(1, Math.ceil(visualCharacterCount / charactersPerLine))
+    }, 0)
+}
+
+/**
+ * 计算 Chat 卡片跟随内容增长时的目标高度
+ * @param card Store 中的 Chat card 提供宽度 Prompt Response 和用户尺寸模式
+ * @returns fixed 模式返回用户指定高度 auto 模式返回经过上下限约束的内容估算高度
+ * AI 流式响应每次写入 Store 后由 Canvas Bridge 调用 达到上限后高度保持不变
+ */
+function getChatCardShapeHeight(card: Extract<ConversationCard, { cardType: "chat" }>): number {
+    if (card.size.mode === "fixed") {
+        return card.size.minHeight
+    }
+
+    const promptHeight = estimateMarkdownLineCount(card.userPrompt, card.size.width) * CHAT_CARD_TEXT_LINE_HEIGHT
+    const responseHeight = estimateMarkdownLineCount(card.aiResponse, card.size.width) * CHAT_CARD_TEXT_LINE_HEIGHT
+    const contentHeight = promptHeight + responseHeight + CHAT_CARD_CONTENT_VERTICAL_PADDING
+
+    return Math.min(
+        CHAT_CARD_MAX_AUTO_HEIGHT,
+        Math.max(card.size.minHeight, CHAT_CARD_HEIGHT, contentHeight),
+    )
+}
+
+/**
  * 统一计算画布卡片高度
- * 阶段三先落地“固定宽度 + 固定高度上限 + 内部滚动”，避免长 Markdown 把画布排版撑坏
+ * @param card Store 中的业务卡片 包含类型 内容和用户尺寸策略
+ * @returns 返回 tldraw shape 本轮投影高度 Chat auto 会随内容增长 其余类型保持预设高度
+ * Store 同步和箭头锚点计算都会调用 保证卡片边界与连线几何使用同一高度
  */
 export function getCardShapeHeight(card: ConversationCard): number {
+    if (card.cardType === "chat") {
+        return getChatCardShapeHeight(card)
+    }
+
     const baseHeight = getDefaultHeightByType(card.cardType)
     return Math.max(card.size.minHeight, baseHeight)
 }

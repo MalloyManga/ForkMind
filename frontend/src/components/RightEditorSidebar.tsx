@@ -29,9 +29,11 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { assertNever } from "@/lib/utils"
 import {
+    CHAT_EDITOR_ESTIMATED_LINE_HEIGHT,
+    CHAT_EDITOR_SECTION_CHROME_HEIGHT,
+    CHAT_PROMPT_AUTO_MAX_RATIO,
     CHAT_PROMPT_MAX_RATIO,
     CHAT_PROMPT_MIN_RATIO,
-    DEFAULT_CHAT_PROMPT_RATIO,
 } from "../constants/layout"
 import type {
     ConversationCard,
@@ -133,6 +135,42 @@ function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
 
+/**
+ * 估算右侧 Chat 编辑器中一个字段的内容高度
+ * @param content 入参来自当前 Chat 节点的 Prompt 或 Response 文本
+ * @returns 返回包含标题区域和文本行的估算高度 空内容仍保留一行输入空间
+ * 当前节点内容变化且用户尚未手动拖动分隔条时用于自动分配上下区域
+ */
+function estimateChatEditorSectionHeight(content: string): number {
+    const visualLineCount = content.trim().split(/\r?\n/).reduce((lineCount, line) => {
+        const visualCharacterCount = Array.from(line).reduce(
+            (characterCount, character) => characterCount + (character.charCodeAt(0) > 0xff ? 1 : 0.55),
+            0,
+        )
+        return lineCount + Math.max(1, Math.ceil(visualCharacterCount / 36))
+    }, 0)
+
+    return CHAT_EDITOR_SECTION_CHROME_HEIGHT + visualLineCount * CHAT_EDITOR_ESTIMATED_LINE_HEIGHT
+}
+
+/**
+ * 根据 Prompt 和 Response 的内容量计算右侧编辑器自动分区比例
+ * @param userPrompt 入参来自当前 Chat 节点的用户输入
+ * @param aiResponse 入参来自当前 Chat 节点的 AI 回答 包含流式追加中的中间状态
+ * @returns 返回经过自动模式上下限约束的 Prompt 占比 短 Prompt 会把更多空间留给 Response
+ * 切换 Chat 节点或内容变化时触发 手动拖动后的当前节点不会继续采用此结果
+ */
+function getAutoChatPromptRatio(userPrompt: string, aiResponse: string): number {
+    const promptHeight = estimateChatEditorSectionHeight(userPrompt)
+    const responseHeight = estimateChatEditorSectionHeight(aiResponse)
+
+    return clamp(
+        promptHeight / (promptHeight + responseHeight),
+        CHAT_PROMPT_MIN_RATIO,
+        CHAT_PROMPT_AUTO_MAX_RATIO,
+    )
+}
+
 function formatAssetSize(sizeBytes: number): string {
     if (sizeBytes < 1024) {
         return `${sizeBytes} B`
@@ -190,7 +228,7 @@ export function RightEditorSidebar({
     onAcceptCanvasPlan,
     onRejectCanvasPlan,
 }: RightEditorSidebarProps) {
-    const [chatPromptRatio, setChatPromptRatio] = useState(DEFAULT_CHAT_PROMPT_RATIO)
+    const [manualChatPromptRatio, setManualChatPromptRatio] = useState<number | null>(null)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
     const chatResizeStateRef = useRef<ChatEditorResizeState | null>(null)
     const [textSelection, setTextSelection] = useState<ConversationTextAnchor | null>(null)
@@ -203,7 +241,12 @@ export function RightEditorSidebar({
 
     useEffect(() => {
         setTextSelection(null)
+        setManualChatPromptRatio(null)
     }, [activeNode?.id])
+
+    const chatPromptRatio = activeNode?.cardType === "chat"
+        ? manualChatPromptRatio ?? getAutoChatPromptRatio(activeNode.userPrompt, activeNode.aiResponse)
+        : CHAT_PROMPT_MIN_RATIO
 
     useEffect(() => {
         const handlePointerMove = (event: PointerEvent) => {
@@ -226,7 +269,7 @@ export function RightEditorSidebar({
                 CHAT_PROMPT_MAX_RATIO,
             )
 
-            setChatPromptRatio(nextPromptRatio)
+            setManualChatPromptRatio(nextPromptRatio)
         }
 
         const handlePointerUp = () => {
@@ -252,6 +295,7 @@ export function RightEditorSidebar({
 
     const startResizeChatEditors = (event: ReactPointerEvent<HTMLDivElement>) => {
         event.preventDefault()
+        event.currentTarget.setPointerCapture(event.pointerId)
 
         chatResizeStateRef.current = {
             startY: event.clientY,
@@ -389,7 +433,7 @@ export function RightEditorSidebar({
                         </section>
 
                         <div
-                            className="group flex h-4 shrink-0 cursor-row-resize items-center justify-center"
+                            className="group flex h-4 shrink-0 touch-none cursor-row-resize items-center justify-center"
                             onPointerDown={startResizeChatEditors}
                             role="separator"
                             aria-label="调整 Prompt 与 AI Response 区域高度"
