@@ -9,5 +9,12 @@
   "author": {
     "name": "Malloy",
     "email": "li3210361050@gmail.com"
+  },
+  "info": {
+    "companyName": "ForkMind Contributors",
+    "productName": "ForkMind",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 Malloy and ForkMind contributors",
+    "comments": "Open-source local-first AI infinite canvas using OpenAI-compatible chat completions"
   }
 }
