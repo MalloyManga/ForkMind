@@ -564,6 +564,14 @@ function App() {
             const customEvent = event as CustomEvent<CanvasTextSelectionEventDetail>
             setCanvasTextSelection(customEvent.detail)
         }
+        const clearCanvasTextSelectionWhenCollapsed = () => {
+            const selection = window.getSelection()
+            if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+                return
+            }
+
+            setCanvasTextSelection(null)
+        }
         const clearCanvasTextSelection = (event: PointerEvent) => {
             const target = event.target
             if (target instanceof Element && target.closest("[data-fm-selection-action='true']")) {
@@ -574,10 +582,12 @@ function App() {
 
         window.addEventListener(CANVAS_CARD_ACTIVATE_EVENT, handleCanvasCardActivate)
         window.addEventListener(CANVAS_TEXT_SELECTION_EVENT, handleCanvasTextSelection)
+        document.addEventListener("selectionchange", clearCanvasTextSelectionWhenCollapsed)
         window.addEventListener("pointerdown", clearCanvasTextSelection, true)
         return () => {
             window.removeEventListener(CANVAS_CARD_ACTIVATE_EVENT, handleCanvasCardActivate)
             window.removeEventListener(CANVAS_TEXT_SELECTION_EVENT, handleCanvasTextSelection)
+            document.removeEventListener("selectionchange", clearCanvasTextSelectionWhenCollapsed)
             window.removeEventListener("pointerdown", clearCanvasTextSelection, true)
         }
     }, [setActiveNodeId])
@@ -789,6 +799,10 @@ function App() {
                     style={{
                         left: Math.min(canvasTextSelection.clientX + 10, window.innerWidth - 130),
                         top: Math.min(canvasTextSelection.clientY + 10, window.innerHeight - 40),
+                    }}
+                    onPointerDown={(event) => {
+                        // 防止点击操作按钮时浏览器先折叠原文本选区
+                        event.preventDefault()
                     }}
                     onClick={() => {
                         handleForkTextSelection(canvasTextSelection.anchor)
