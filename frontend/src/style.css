@@ -345,6 +345,11 @@ html {
 }
 
 /* 画布点阵网格背景：覆盖 tldraw 默认底色，营造无限画布质感 */
+.fm-canvas-surface .tl-container__focused {
+  /* tldraw 默认焦点框会在画布左边缘暴露成 1px 白线 */
+  outline: none;
+}
+
 .fm-canvas-surface .tl-background {
   background-color: var(--fm-canvas-bg) !important;
   background-image: radial-gradient(

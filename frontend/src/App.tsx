@@ -207,11 +207,21 @@ function App() {
         document.documentElement.classList.toggle("dark", themeMode === "dark")
     }, [themeMode])
 
+    /**
+     * 同步写入侧栏外壳与内容宽度
+     * @param side 入参来自当前拖拽会话 用于选择左栏或右栏对应 DOM
+     * @param nextWidth 入参来自 pointermove 计算结果 表示当前帧应显示的像素宽度
+     * @returns 无返回值 高频拖拽只写 DOM ref pointerup 再提交 React state
+     * 用户拖动任一侧栏分隔条或收回动画结算时触发
+     */
     const applySidebarWidth = (side: ResizeDragState["side"], nextWidth: number) => {
         if (side === "left") {
             leftSidebarWidthRef.current = nextWidth
             if (leftSidebarHostRef.current) {
                 leftSidebarHostRef.current.style.width = `${nextWidth}px`
+            }
+            if (leftSidebarContentRef.current) {
+                leftSidebarContentRef.current.style.width = `${nextWidth}px`
             }
             return
         }
@@ -219,6 +229,9 @@ function App() {
         rightSidebarWidthRef.current = nextWidth
         if (rightSidebarHostRef.current) {
             rightSidebarHostRef.current.style.width = `${nextWidth}px`
+        }
+        if (rightSidebarContentRef.current) {
+            rightSidebarContentRef.current.style.width = `${nextWidth}px`
         }
     }
 
@@ -602,7 +615,7 @@ function App() {
                 {!isLeftSidebarCollapsed && !isCanvasUiHidden ? (
                     <div
                         ref={leftSidebarHostRef}
-                        className="relative isolate h-full shrink-0 overflow-hidden border-0 bg-background shadow-none outline-none"
+                        className="relative h-full shrink-0 overflow-hidden bg-background"
                         style={{ width: leftSidebarWidth }}
                     >
                         <div
@@ -657,15 +670,18 @@ function App() {
                             }}
                             />
                         </div>
-                        <div
-                            className="group absolute inset-y-0 right-0 z-30 w-3 cursor-col-resize border-0 bg-transparent outline-none"
-                            onPointerDown={startResizeLeftSidebar}
-                            role="separator"
-                            aria-label="调整左侧栏宽度"
-                        >
-                            <div className="absolute inset-y-0 right-0 w-3 bg-transparent transition-colors group-hover:bg-sky-400/15" />
-                            <div className="absolute right-0 top-1/2 h-10 w-1 -translate-y-1/2 rounded-full bg-transparent transition-colors group-hover:bg-sky-400/80" />
-                        </div>
+                    </div>
+                ) : null}
+
+                {!isLeftSidebarCollapsed && !isCanvasUiHidden ? (
+                    <div
+                        className="group relative z-20 w-0 shrink-0 cursor-col-resize"
+                        onPointerDown={startResizeLeftSidebar}
+                        role="separator"
+                        aria-label="调整左侧栏宽度"
+                    >
+                        <div className="absolute inset-y-0 -left-1.5 -right-1.5 transition-colors group-hover:bg-sky-400/15" />
+                        <div className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent transition-all group-hover:bg-sky-400/80" />
                     </div>
                 ) : null}
 
