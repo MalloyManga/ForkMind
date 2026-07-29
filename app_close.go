@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const appBeforeCloseEvent = "forkmind:app:before-close"
@@ -25,7 +23,7 @@ func NewAppCloseCoordinator() *AppCloseCoordinator {
 }
 
 // BeginClose 判断当前关闭动作是否需要拦截
-// 返回 prevent=true 表示 Wails 本轮不能退出 notify=true 表示需要首次通知 React 刷盘
+// 返回 prevent=true 表示 Wails 本轮不能退出 notify=true 表示需要通知 React 刷盘
 // 用户点击窗口关闭按钮或系统请求退出时触发
 func (coordinator *AppCloseCoordinator) BeginClose() (prevent bool, notify bool) {
 	coordinator.mutex.Lock()
@@ -35,7 +33,9 @@ func (coordinator *AppCloseCoordinator) BeginClose() (prevent bool, notify bool)
 		return false, false
 	}
 	if coordinator.pending {
-		return true, false
+		// 首次事件可能发生在 React 监听器挂载前 后续关闭请求需要再次发送通知
+		// React 持久化层会对进行中的握手去重 因此重复通知不会并发写盘
+		return true, true
 	}
 
 	coordinator.pending = true
@@ -70,7 +70,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 
 	preventClose, shouldNotify := a.closeCoordinator.BeginClose()
 	if shouldNotify {
-		runtime.EventsEmit(ctx, appBeforeCloseEvent)
+		emitWailsEvent(ctx, appBeforeCloseEvent)
 	}
 
 	return preventClose
@@ -92,7 +92,7 @@ func (a *App) CompleteAppClose() OperationResponse {
 	}
 
 	a.closeCoordinator.ConfirmClose()
-	runtime.Quit(a.ctx)
+	quitWailsApplication(a.ctx)
 	return OperationResponse{}
 }
 

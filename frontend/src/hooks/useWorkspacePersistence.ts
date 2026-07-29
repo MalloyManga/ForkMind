@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
     FORKMIND_WORKSPACE_FORMAT,
     FORKMIND_WORKSPACE_VERSION,
@@ -6,8 +6,11 @@ import {
     validateAndNormalizeWorkspace,
 } from "../domain/workspace"
 import {
+    abortAppCloseFromBridge,
+    completeAppCloseFromBridge,
     loadWorkspaceFromBridge,
     saveWorkspaceToBridge,
+    subscribeAppBeforeClose,
     type BridgeErrorPayload,
 } from "../bridge"
 import { useAISettingsStore } from "../stores/useAISettingsStore"
@@ -15,6 +18,12 @@ import { useConversationStore } from "../stores/useConversationStore"
 import { useWorkspaceStore } from "../stores/useWorkspaceStore"
 
 const WORKSPACE_SAVE_DEBOUNCE_MS = 800
+const WORKSPACE_CLOSE_ERROR_CODE = "workspace_close_failed"
+const WORKSPACE_NOT_READY_ERROR: BridgeErrorPayload = {
+    code: WORKSPACE_CLOSE_ERROR_CODE,
+    message: "工作区尚未完成初始化 当前关闭请求已取消",
+    retryable: true,
+}
 
 export type WorkspacePersistenceStatus =
     | "loading"
@@ -29,6 +38,20 @@ interface WorkspaceHydrationOutcome {
     canSave: boolean
     status: WorkspacePersistenceStatus
     error: BridgeErrorPayload | null
+}
+
+/**
+ * 把关闭流程中的未知异常转换为稳定的 Bridge 错误结构
+ * @param error 入参来自快照构造 保存队列或关闭 Bridge 的未知异常
+ * @returns 返回可直接展示给用户的持久化错误 不会返回 null
+ * 用户关闭窗口且正常错误响应之外仍出现异常时触发
+ */
+function normalizeWorkspaceCloseError(error: unknown): BridgeErrorPayload {
+    return {
+        code: WORKSPACE_CLOSE_ERROR_CODE,
+        message: error instanceof Error ? error.message : String(error),
+        retryable: true,
+    }
 }
 
 let workspaceHydrationPromise: Promise<WorkspaceHydrationOutcome> | null = null
@@ -114,6 +137,65 @@ export function useWorkspacePersistence() {
     const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
     const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
     const latestSaveRevisionRef = useRef(0)
+    const saveTimerRef = useRef<number | null>(null)
+    const isCloseHandshakeRunningRef = useRef(false)
+
+    /**
+     * 把工作区快照追加到单线程保存队列
+     * @param document 入参来自调度时刻的 Store 完整快照
+     * @param revision 入参是该快照对应的单调递增版本号
+     * @returns 返回本次保存错误 null 表示磁盘写入成功
+     * 防抖到期 手动 flush 或应用关闭前最终保存时触发
+     */
+    const enqueueWorkspaceSave = useCallback((
+        document: ForkMindWorkspaceDocument,
+        revision: number,
+    ): Promise<BridgeErrorPayload | null> => {
+        const saveResultPromise = saveQueueRef.current.then(async () => {
+            setStatus("saving")
+            const response = await saveWorkspaceToBridge(document)
+            if (response.error) {
+                setStatus("error")
+                setError(response.error)
+                return response.error
+            }
+
+            if (revision === latestSaveRevisionRef.current) {
+                setStatus("saved")
+                setLastSavedAt(document.lastModified)
+            }
+            return null
+        })
+
+        // 队列本身始终恢复为 fulfilled 防止一次失败阻断后续保存
+        saveQueueRef.current = saveResultPromise.then(() => undefined, () => undefined)
+        return saveResultPromise
+    }, [])
+
+    /**
+     * 立即保存当前最新工作区并等待此前排队任务完成
+     * @returns 返回最终保存错误 null 表示可以安全继续关闭应用
+     * Wails before-close 事件触发时会跳过 800ms 防抖直接调用
+     */
+    const flushWorkspaceNow = useCallback(async (): Promise<BridgeErrorPayload | null> => {
+        // 关闭可能发生在首次磁盘读取完成前 必须先确定内存 Store 已完成水合
+        workspaceHydrationPromise ??= hydrateWorkspaceOnce()
+        const hydrationOutcome = await workspaceHydrationPromise
+        if (!hydrationOutcome.canSave) {
+            return hydrationOutcome.error ?? WORKSPACE_NOT_READY_ERROR
+        }
+        if (saveTimerRef.current !== null) {
+            window.clearTimeout(saveTimerRef.current)
+            saveTimerRef.current = null
+        }
+
+        const revision = latestSaveRevisionRef.current + 1
+        latestSaveRevisionRef.current = revision
+        setStatus("dirty")
+        setError(null)
+
+        return enqueueWorkspaceSave(createWorkspaceDocumentSnapshot(), revision)
+    }, [enqueueWorkspaceSave])
 
     useEffect(() => {
         let isMounted = true
@@ -148,28 +230,54 @@ export function useWorkspacePersistence() {
         setError(null)
 
         const saveTimer = window.setTimeout(() => {
+            saveTimerRef.current = null
             const document = createWorkspaceDocumentSnapshot()
-
-            saveQueueRef.current = saveQueueRef.current.then(async () => {
-                setStatus("saving")
-                const response = await saveWorkspaceToBridge(document)
-                if (response.error) {
-                    setStatus("error")
-                    setError(response.error)
-                    return
-                }
-
-                if (revision === latestSaveRevisionRef.current) {
-                    setStatus("saved")
-                    setLastSavedAt(document.lastModified)
-                }
-            })
+            void enqueueWorkspaceSave(document, revision)
         }, WORKSPACE_SAVE_DEBOUNCE_MS)
+        saveTimerRef.current = saveTimer
 
         return () => {
             window.clearTimeout(saveTimer)
+            if (saveTimerRef.current === saveTimer) {
+                saveTimerRef.current = null
+            }
         }
-    }, [activeThreadId, canSave, persistedSettings, threads])
+    }, [activeThreadId, canSave, enqueueWorkspaceSave, persistedSettings, threads])
+
+    useEffect(() => subscribeAppBeforeClose(() => {
+        if (isCloseHandshakeRunningRef.current) {
+            return
+        }
+        isCloseHandshakeRunningRef.current = true
+
+        void (async () => {
+            let closeError: BridgeErrorPayload | null = null
+
+            try {
+                closeError = await flushWorkspaceNow()
+                if (!closeError) {
+                    const closeResponse = await completeAppCloseFromBridge()
+                    closeError = closeResponse.error ?? null
+                }
+            } catch (error) {
+                closeError = normalizeWorkspaceCloseError(error)
+            }
+
+            if (!closeError) {
+                return
+            }
+
+            setStatus("error")
+            setError(closeError)
+
+            // 只要最终保存或退出确认失败 就必须恢复为可重试关闭状态
+            const abortResponse = await abortAppCloseFromBridge()
+            if (abortResponse.error) {
+                setError(abortResponse.error)
+            }
+            isCloseHandshakeRunningRef.current = false
+        })()
+    }), [flushWorkspaceNow])
 
     return {
         status,

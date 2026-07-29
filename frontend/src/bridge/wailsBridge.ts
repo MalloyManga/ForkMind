@@ -117,6 +117,38 @@ export async function importWorkspaceFromBridge(): Promise<WorkspaceImportBridge
 }
 
 /**
+ * 确认最终工作区保存完成并允许 Wails 真正退出
+ */
+export async function completeAppCloseFromBridge(): Promise<OperationBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.CompleteAppClose()
+    } catch (error) {
+        return { error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 最终保存失败时取消本轮关闭握手
+ */
+export async function abortAppCloseFromBridge(): Promise<OperationBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.AbortAppClose()
+    } catch (error) {
+        return { error: normalizeBridgeException(error) }
+    }
+}
+
+/**
  * 启动 OpenAI-compatible 流式请求
  * 成功返回只表示后台任务已经开始 后续结果通过 Wails Events 发送
  */

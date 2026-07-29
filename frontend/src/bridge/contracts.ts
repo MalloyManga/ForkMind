@@ -80,6 +80,8 @@ export interface ForkMindAppBridge {
     GetDataDirectory: () => Promise<DataDirectoryBridgeResponse>
     ExportWorkspace: (document: ForkMindWorkspaceDocument) => Promise<WorkspaceExportBridgeResponse>
     ImportWorkspace: () => Promise<WorkspaceImportBridgeResponse>
+    CompleteAppClose: () => Promise<OperationBridgeResponse>
+    AbortAppClose: () => Promise<OperationBridgeResponse>
     StartChatCompletion: (input: StartChatCompletionInput) => Promise<OperationBridgeResponse>
     CancelChatCompletion: (input: CancelChatCompletionInput) => Promise<OperationBridgeResponse>
 }
