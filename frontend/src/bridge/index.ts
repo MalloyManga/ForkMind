@@ -8,7 +8,9 @@ export {
     cancelChatCompletionFromBridge,
     exportWorkspaceFromBridge,
     importWorkspaceFromBridge,
+    importManagedAssetFromBridge,
     loadWorkspaceFromBridge,
+    readManagedAssetDataURLFromBridge,
     saveWorkspaceToBridge,
     startChatCompletionFromBridge,
 } from "./wailsBridge"

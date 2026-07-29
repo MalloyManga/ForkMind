@@ -16,5 +16,6 @@ var (
 	quitWailsApplication       = runtime.Quit
 	showWorkspaceSaveDialog    = runtime.SaveFileDialog
 	showWorkspaceOpenDialog    = runtime.OpenFileDialog
+	showManagedAssetOpenDialog = runtime.OpenFileDialog
 	resolveUserConfigDirectory = os.UserConfigDir
 )

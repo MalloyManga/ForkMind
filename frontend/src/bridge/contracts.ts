@@ -35,6 +35,26 @@ export interface WorkspaceImportBridgeResponse {
     error?: BridgeErrorPayload
 }
 
+export type ManagedAssetKind = "image" | "file"
+
+export interface ManagedAsset {
+    id: string
+    name: string
+    mimeType: string
+    sizeBytes: number
+}
+
+export interface ManagedAssetImportBridgeResponse {
+    cancelled: boolean
+    asset?: ManagedAsset
+    error?: BridgeErrorPayload
+}
+
+export interface ManagedAssetDataBridgeResponse {
+    dataUrl?: string
+    error?: BridgeErrorPayload
+}
+
 export interface OpenAICompletionConfig {
     baseUrl: string
     apiKey: string
@@ -80,6 +100,8 @@ export interface ForkMindAppBridge {
     GetDataDirectory: () => Promise<DataDirectoryBridgeResponse>
     ExportWorkspace: (document: ForkMindWorkspaceDocument) => Promise<WorkspaceExportBridgeResponse>
     ImportWorkspace: () => Promise<WorkspaceImportBridgeResponse>
+    ImportManagedAsset: (kind: ManagedAssetKind) => Promise<ManagedAssetImportBridgeResponse>
+    ReadManagedAssetDataURL: (assetId: string) => Promise<ManagedAssetDataBridgeResponse>
     CompleteAppClose: () => Promise<OperationBridgeResponse>
     AbortAppClose: () => Promise<OperationBridgeResponse>
     StartChatCompletion: (input: StartChatCompletionInput) => Promise<OperationBridgeResponse>

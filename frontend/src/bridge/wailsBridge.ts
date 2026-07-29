@@ -9,6 +9,9 @@ import type {
     WorkspaceImportBridgeResponse,
     StartChatCompletionInput,
     CancelChatCompletionInput,
+    ManagedAssetDataBridgeResponse,
+    ManagedAssetImportBridgeResponse,
+    ManagedAssetKind,
 } from "./contracts"
 
 const BRIDGE_UNAVAILABLE_ERROR: BridgeErrorPayload = {
@@ -113,6 +116,48 @@ export async function importWorkspaceFromBridge(): Promise<WorkspaceImportBridge
         return await appBridge.ImportWorkspace()
     } catch (error) {
         return { cancelled: false, error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 通过系统对话框把图片或文件复制到 ForkMind 管理目录
+ * @param kind 入参来自 image 或 file 卡片编辑器 用于应用不同文件过滤与 MIME 约束
+ * @returns 返回取消态或稳定资产元数据 Bridge 异常会被归一化
+ * 用户点击选择本地资产时触发
+ */
+export async function importManagedAssetFromBridge(
+    kind: ManagedAssetKind,
+): Promise<ManagedAssetImportBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { cancelled: false, error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.ImportManagedAsset(kind)
+    } catch (error) {
+        return { cancelled: false, error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 读取 ForkMind 管理图片的临时 data URL
+ * @param assetId 入参来自节点持久化的内容哈希 id
+ * @returns 返回仅用于当前渲染进程的 data URL 不写回 Zustand
+ * 图片卡片挂载或资产变更时触发
+ */
+export async function readManagedAssetDataURLFromBridge(
+    assetId: string,
+): Promise<ManagedAssetDataBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.ReadManagedAssetDataURL(assetId)
+    } catch (error) {
+        return { error: normalizeBridgeException(error) }
     }
 }
 
