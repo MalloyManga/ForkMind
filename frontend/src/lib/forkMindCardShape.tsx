@@ -214,13 +214,11 @@ export class ForkMindCardShapeUtil extends ShapeUtil<ForkMindCardShape> {
         }
 
         const createSelectableTextProps = (field: ConversationTextField) => ({
-            onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
+            onPointerDown: () => {
                 activateCard()
-                event.stopPropagation()
             },
             onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
                 captureCanvasTextSelection(event, field)
-                event.stopPropagation()
             },
         })
 

@@ -1,4 +1,10 @@
-import { useCallback, useMemo } from "react"
+import {
+    type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
+    useCallback,
+    useMemo,
+    useRef,
+} from "react"
 import { type Editor, useEditor, useValue, type Box } from "tldraw"
 import { FORK_MIND_CARD_SHAPE_TYPE, type ForkMindCardShape } from "../lib/forkMindCardShape"
 import type { ConversationNodeType } from "../domain/conversation/types"
@@ -22,6 +28,12 @@ interface MinimapProjection {
     scale: number
     offsetX: number
     offsetY: number
+}
+
+interface MinimapViewportDragSession {
+    pointerId: number
+    pointerOffsetX: number
+    pointerOffsetY: number
 }
 
 /**
@@ -112,6 +124,8 @@ function projectToMinimap(editor: Editor): MinimapProjection | null {
  */
 export function CanvasMinimap() {
     const editor = useEditor()
+    const viewportDragSessionRef = useRef<MinimapViewportDragSession | null>(null)
+    const suppressNextClickRef = useRef(false)
 
     const projection = useValue<MinimapProjection | null>(
         "forkmind minimap projection",
@@ -119,24 +133,101 @@ export function CanvasMinimap() {
         [editor],
     )
 
+    /**
+     * 把 minimap 局部坐标立即转换成画布视口中心
+     * @param localX 入参来自 minimap 内 pointer 或 click 的水平坐标
+     * @param localY 入参来自 minimap 内 pointer 或 click 的垂直坐标
+     * @returns 无返回值 projection 不可用时不改变 camera
+     * 用户点击缩略图或拖拽视口框时触发 不使用动画以避免跟手延迟
+     */
+    const navigateToLocalPoint = useCallback((localX: number, localY: number) => {
+        if (!projection) {
+            return
+        }
+
+        const pageX = (localX - projection.offsetX) / projection.scale
+        const pageY = (localY - projection.offsetY) / projection.scale
+        editor.centerOnPoint({ x: pageX, y: pageY })
+    }, [editor, projection])
+
     const handleNavigate = useCallback(
-        (event: React.MouseEvent<HTMLDivElement>) => {
+        (event: ReactMouseEvent<HTMLDivElement>) => {
             if (!projection) {
+                return
+            }
+            if (suppressNextClickRef.current) {
+                suppressNextClickRef.current = false
                 return
             }
 
             const rect = event.currentTarget.getBoundingClientRect()
             const localX = event.clientX - rect.left
             const localY = event.clientY - rect.top
-
-            // minimap 局部坐标反解回 page 坐标
-            const pageX = (localX - projection.offsetX) / projection.scale
-            const pageY = (localY - projection.offsetY) / projection.scale
-
-            editor.centerOnPoint({ x: pageX, y: pageY }, { animation: { duration: 220 } })
+            navigateToLocalPoint(localX, localY)
         },
-        [editor, projection],
+        [navigateToLocalPoint, projection],
     )
+
+    /**
+     * 建立 minimap 视口框拖拽会话
+     * @param event 入参来自当前视口框 pointerdown 用于记录指针 id 与抓取点偏移
+     * @returns 无返回值 projection 不可用时不建立会话
+     * 用户直接抓住右下角视口框时触发 并阻止事件落到 tldraw 画布
+     */
+    const startViewportDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+        if (!projection) {
+            return
+        }
+
+        const minimapElement = event.currentTarget.parentElement
+        if (!minimapElement) {
+            return
+        }
+
+        const minimapRect = minimapElement.getBoundingClientRect()
+        const localX = event.clientX - minimapRect.left
+        const localY = event.clientY - minimapRect.top
+        viewportDragSessionRef.current = {
+            pointerId: event.pointerId,
+            pointerOffsetX: localX - (projection.viewport.x + projection.viewport.w / 2),
+            pointerOffsetY: localY - (projection.viewport.y + projection.viewport.h / 2),
+        }
+        event.currentTarget.setPointerCapture(event.pointerId)
+        event.preventDefault()
+        event.stopPropagation()
+    }, [projection])
+
+    const updateViewportDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+        const dragSession = viewportDragSessionRef.current
+        const minimapElement = event.currentTarget.parentElement
+        if (!dragSession || dragSession.pointerId !== event.pointerId || !minimapElement) {
+            return
+        }
+
+        const minimapRect = minimapElement.getBoundingClientRect()
+        navigateToLocalPoint(
+            event.clientX - minimapRect.left - dragSession.pointerOffsetX,
+            event.clientY - minimapRect.top - dragSession.pointerOffsetY,
+        )
+        suppressNextClickRef.current = true
+        event.preventDefault()
+        event.stopPropagation()
+    }, [navigateToLocalPoint])
+
+    const finishViewportDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+        const dragSession = viewportDragSessionRef.current
+        if (!dragSession || dragSession.pointerId !== event.pointerId) {
+            return
+        }
+
+        viewportDragSessionRef.current = null
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+        suppressNextClickRef.current = event.type === "pointerup"
+        event.preventDefault()
+        event.stopPropagation()
+    }, [])
 
     const dotColor = useMemo<Record<ConversationNodeType, string>>(
         () => ({
@@ -181,13 +272,17 @@ export function CanvasMinimap() {
 
                 {/* 当前视口框 */}
                 <div
-                    className="absolute rounded-[3px] border border-sky-500/70 bg-sky-400/10"
+                    className="absolute cursor-grab touch-none rounded-[3px] border border-sky-500/80 bg-sky-400/15 active:cursor-grabbing"
                     style={{
                         left: projection.viewport.x,
                         top: projection.viewport.y,
                         width: projection.viewport.w,
                         height: projection.viewport.h,
                     }}
+                    onPointerDown={startViewportDrag}
+                    onPointerMove={updateViewportDrag}
+                    onPointerUp={finishViewportDrag}
+                    onPointerCancel={finishViewportDrag}
                 />
             </div>
         </div>

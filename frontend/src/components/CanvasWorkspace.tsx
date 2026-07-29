@@ -22,6 +22,7 @@ interface CanvasWorkspaceProps {
     onSelectCanvasTool: (canvasTool: CanvasTool) => void
     isCanvasUiVisible: boolean
     isContextMenuOpen: boolean
+    areLinkHandlesBlocked: boolean
     creationPreviewRect: {
         // 创建工具拖拽中的蓝色预创建框
         x: number
@@ -44,6 +45,7 @@ export function CanvasWorkspace({
     onSelectCanvasTool,
     isCanvasUiVisible,
     isContextMenuOpen,
+    areLinkHandlesBlocked,
     creationPreviewRect,
     licenseKey,
 }: CanvasWorkspaceProps) {
@@ -78,6 +80,7 @@ export function CanvasWorkspace({
                         isVisible={
                             isCanvasUiVisible &&
                             !isContextMenuOpen &&
+                            !areLinkHandlesBlocked &&
                             currentCanvasTool !== "hand-tool" &&
                             !isCanvasResizing
                         }
@@ -86,7 +89,7 @@ export function CanvasWorkspace({
                 </>
             ),
         }),
-        [currentCanvasTool, isCanvasResizing, isCanvasUiVisible, isContextMenuOpen, onStartLinkDrag],
+        [areLinkHandlesBlocked, currentCanvasTool, isCanvasResizing, isCanvasUiVisible, isContextMenuOpen, onStartLinkDrag],
     )
 
     const handleWorkspaceContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>) => {

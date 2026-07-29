@@ -373,7 +373,7 @@ export function LeftConversationSidebar({
                     </span>
                     <span className="flex-1">
                         <span className="block text-xs font-medium text-foreground">AI Connection</span>
-                        <span className="block text-[10px] text-muted-foreground/60">模型与运行时密钥</span>
+                        <span className="block text-[10px] text-muted-foreground/60">Base URL 与运行时密钥</span>
                     </span>
                 </button>
                 <button

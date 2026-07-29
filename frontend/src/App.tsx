@@ -22,6 +22,8 @@ import {
     LEFT_SIDEBAR_MIN_WIDTH,
     RIGHT_SIDEBAR_MAX_WIDTH,
     RIGHT_SIDEBAR_MIN_WIDTH,
+    SIDEBAR_COLLAPSE_DURATION_MS,
+    SIDEBAR_COLLAPSE_DRAG_THRESHOLD,
 } from "./constants/layout"
 import {
     resolveCanvasCommandByKeyboardEvent,
@@ -61,6 +63,7 @@ interface ResizeDragState {
     side: "left" | "right"
     startX: number
     startWidth: number
+    collapseOvershoot: number
 }
 
 interface CanvasContextMenuState {
@@ -74,6 +77,32 @@ function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
 
+/**
+ * 计算侧栏拖过最小宽度后的阻尼结果
+ * @param rawWidth 入参来自 pointermove 根据起始宽度和水平位移得到的未限制宽度
+ * @param minWidth 入参来自当前左栏或右栏的布局最小值
+ * @param maxWidth 入参来自当前左栏或右栏的布局最大值
+ * @returns width 是当帧显示宽度 collapseOvershoot 是越过最小阈值的原始拖拽距离
+ * 用户把任一侧栏向外缘收窄时由全局 pointermove 触发
+ */
+function resolveSidebarDragWidth(
+    rawWidth: number,
+    minWidth: number,
+    maxWidth: number,
+): { width: number; collapseOvershoot: number } {
+    if (rawWidth >= minWidth) {
+        return {
+            width: clamp(rawWidth, minWidth, maxWidth),
+            collapseOvershoot: 0,
+        }
+    }
+
+    return {
+        width: minWidth,
+        collapseOvershoot: minWidth - rawWidth,
+    }
+}
+
 function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
     if (!(eventTarget instanceof HTMLElement)) {
         return false
@@ -85,7 +114,8 @@ function isTextEditingTarget(eventTarget: EventTarget | null): boolean {
 
 function App() {
     const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
-    const [areSidebarsHidden, setAreSidebarsHidden] = useState(false)
+    const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false)
+    const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false)
     const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
     const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvasTool 唯一状态源
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
@@ -99,8 +129,11 @@ function App() {
     const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH)
 
     const resizeDragStateRef = useRef<ResizeDragState | null>(null)
+    const collapsingSidebarRef = useRef<ResizeDragState["side"] | null>(null)
     const leftSidebarHostRef = useRef<HTMLDivElement | null>(null)
     const rightSidebarHostRef = useRef<HTMLDivElement | null>(null)
+    const leftSidebarContentRef = useRef<HTMLDivElement | null>(null)
+    const rightSidebarContentRef = useRef<HTMLDivElement | null>(null)
     const leftSidebarWidthRef = useRef(leftSidebarWidth)
     const rightSidebarWidthRef = useRef(rightSidebarWidth)
 
@@ -119,6 +152,23 @@ function App() {
     const workspacePersistence = useWorkspacePersistence()
     const workspaceTransfer = useWorkspaceTransfer()
     const aiCompletion = useAICompletion()
+    const areSidebarsHidden = isLeftSidebarCollapsed && isRightSidebarCollapsed
+
+    /**
+     * 同步切换两侧面板
+     * @param nextHidden 入参来自面板按钮 快捷键或右键命令 可以是目标布尔值或基于当前双侧状态的更新函数
+     * @returns 无返回值 左右侧栏会在同一次 React 批处理中同步显示或隐藏
+     * 用户使用全局 Toggle Panels 命令时触发 单侧拖拽收回不会经过这里
+     */
+    const setAreSidebarsHidden = useCallback((
+        nextHidden: boolean | ((previousHidden: boolean) => boolean),
+    ) => {
+        const resolvedHidden = typeof nextHidden === "function"
+            ? nextHidden(areSidebarsHidden)
+            : nextHidden
+        setIsLeftSidebarCollapsed(resolvedHidden)
+        setIsRightSidebarCollapsed(resolvedHidden)
+    }, [areSidebarsHidden])
 
     const setActiveNodeId = useConversationStore((state) => state.setActiveNodeId)
     const addNode = useConversationStore((state) => state.addNode)
@@ -150,6 +200,12 @@ function App() {
         () => buildRootNodesWarningMessage(cards),
         [cards],
     )
+
+    useEffect(() => {
+        // Radix Portal 挂在 body 下 将主题放到 html 才能让弹窗继承同一套亮暗变量
+        document.documentElement.dataset.theme = themeMode
+        document.documentElement.classList.toggle("dark", themeMode === "dark")
+    }, [themeMode])
 
     const applySidebarWidth = (side: ResizeDragState["side"], nextWidth: number) => {
         if (side === "left") {
@@ -263,12 +319,16 @@ function App() {
      * 拖拽缩放左侧栏
      */
     const startResizeLeftSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (collapsingSidebarRef.current !== null) {
+            return
+        }
         event.preventDefault()
 
         resizeDragStateRef.current = {
             side: "left",
             startX: event.clientX,
             startWidth: leftSidebarWidthRef.current,
+            collapseOvershoot: 0,
         }
 
         document.body.style.cursor = "col-resize"
@@ -279,12 +339,16 @@ function App() {
      * 拖拽缩放右侧栏
      */
     const startResizeRightSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (collapsingSidebarRef.current !== null) {
+            return
+        }
         event.preventDefault()
 
         resizeDragStateRef.current = {
             side: "right",
             startX: event.clientX,
             startWidth: rightSidebarWidthRef.current,
+            collapseOvershoot: 0,
         }
 
         document.body.style.cursor = "col-resize"
@@ -292,6 +356,71 @@ function App() {
     }
 
     useEffect(() => {
+        /**
+         * 播放单侧侧栏收回动画
+         * @param side 入参来自当前 ResizeDragState 表示本次只收回左栏或右栏
+         * @param minWidth 入参是目标侧栏锁住后的最小宽度 动画从该宽度收至 0
+         * @returns 无返回值 动画完成后只更新目标侧栏的 collapsed 状态
+         * pointermove 越过额外收回距离时立即触发 不等待 pointerup
+         */
+        const collapseSidebar = (side: ResizeDragState["side"], minWidth: number) => {
+            if (collapsingSidebarRef.current !== null) {
+                return
+            }
+
+            collapsingSidebarRef.current = side
+            resizeDragStateRef.current = null
+            document.body.style.removeProperty("cursor")
+            document.body.style.removeProperty("user-select")
+
+            const hostElement = side === "left"
+                ? leftSidebarHostRef.current
+                : rightSidebarHostRef.current
+            const contentElement = side === "left"
+                ? leftSidebarContentRef.current
+                : rightSidebarContentRef.current
+            const finishCollapse = () => {
+                applySidebarWidth(side, minWidth)
+                if (side === "left") {
+                    setLeftSidebarWidth(minWidth)
+                    setIsLeftSidebarCollapsed(true)
+                } else {
+                    setRightSidebarWidth(minWidth)
+                    setIsRightSidebarCollapsed(true)
+                }
+                collapsingSidebarRef.current = null
+            }
+
+            const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            if (prefersReducedMotion || !hostElement) {
+                finishCollapse()
+                return
+            }
+
+            // Host 只改变宽度并保持不透明背景 Content 独立淡出 避免画布透过侧栏闪烁
+            const animations = [
+                hostElement.animate(
+                    [{ width: `${minWidth}px` }, { width: "0px" }],
+                    {
+                        duration: SIDEBAR_COLLAPSE_DURATION_MS,
+                        easing: "cubic-bezier(0.4, 0, 1, 1)",
+                        fill: "forwards",
+                    },
+                ),
+                contentElement?.animate(
+                    [{ opacity: 1 }, { opacity: 0 }],
+                    {
+                        duration: SIDEBAR_COLLAPSE_DURATION_MS,
+                        easing: "ease-in",
+                        fill: "forwards",
+                    },
+                ),
+            ].filter((animation): animation is Animation => animation !== undefined)
+
+            void Promise.allSettled(animations.map((animation) => animation.finished))
+                .then(finishCollapse)
+        }
+
         const handlePointerMove = (event: PointerEvent) => {
             const resizeState = resizeDragStateRef.current
             if (!resizeState) {
@@ -299,21 +428,29 @@ function App() {
             }
 
             if (resizeState.side === "left") {
-                const nextWidth = clamp(
+                const dragResult = resolveSidebarDragWidth(
                     resizeState.startWidth + (event.clientX - resizeState.startX),
                     LEFT_SIDEBAR_MIN_WIDTH,
                     LEFT_SIDEBAR_MAX_WIDTH,
                 )
-                applySidebarWidth("left", nextWidth)
+                resizeState.collapseOvershoot = dragResult.collapseOvershoot
+                applySidebarWidth("left", dragResult.width)
+                if (dragResult.collapseOvershoot >= SIDEBAR_COLLAPSE_DRAG_THRESHOLD) {
+                    collapseSidebar("left", LEFT_SIDEBAR_MIN_WIDTH)
+                }
                 return
             }
 
-            const nextWidth = clamp(
+            const dragResult = resolveSidebarDragWidth(
                 resizeState.startWidth - (event.clientX - resizeState.startX),
                 RIGHT_SIDEBAR_MIN_WIDTH,
                 RIGHT_SIDEBAR_MAX_WIDTH,
             )
-            applySidebarWidth("right", nextWidth)
+            resizeState.collapseOvershoot = dragResult.collapseOvershoot
+            applySidebarWidth("right", dragResult.width)
+            if (dragResult.collapseOvershoot >= SIDEBAR_COLLAPSE_DRAG_THRESHOLD) {
+                collapseSidebar("right", RIGHT_SIDEBAR_MIN_WIDTH)
+            }
         }
 
         const handlePointerUp = () => {
@@ -322,23 +459,25 @@ function App() {
                 return
             }
 
+            resizeDragStateRef.current = null
+            document.body.style.removeProperty("cursor")
+            document.body.style.removeProperty("user-select")
+
             if (resizeState.side === "left") {
                 setLeftSidebarWidth(leftSidebarWidthRef.current)
             } else {
                 setRightSidebarWidth(rightSidebarWidthRef.current)
             }
-
-            resizeDragStateRef.current = null
-            document.body.style.removeProperty("cursor")
-            document.body.style.removeProperty("user-select")
         }
 
         window.addEventListener("pointermove", handlePointerMove, true)
         window.addEventListener("pointerup", handlePointerUp, true)
+        window.addEventListener("pointercancel", handlePointerUp, true)
 
         return () => {
             window.removeEventListener("pointermove", handlePointerMove, true)
             window.removeEventListener("pointerup", handlePointerUp, true)
+            window.removeEventListener("pointercancel", handlePointerUp, true)
             document.body.style.removeProperty("cursor")
             document.body.style.removeProperty("user-select")
         }
@@ -426,7 +565,7 @@ function App() {
         <div
             data-theme={themeMode}
             className={`h-screen w-screen overflow-hidden bg-zinc-100 text-zinc-900 theme-dark:bg-zinc-950 theme-dark:text-zinc-100 ${themeMode === "dark" ? "dark" : ""}`}>
-            {areSidebarsHidden && !isCanvasUiHidden ? (
+            {isLeftSidebarCollapsed && !isCanvasUiHidden ? (
                 <div className="pointer-events-none absolute left-4 top-4 z-40">
                     <div className="pointer-events-auto inline-flex items-center gap-2.5 rounded-2xl border border-border/60 bg-background/80 py-1.5 pl-2 pr-1.5 shadow-[0_8px_32px_-8px_rgba(15,23,42,0.24)] backdrop-blur-xl transition-all duration-200">
                         <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-indigo-500 text-white">
@@ -434,9 +573,25 @@ function App() {
                         </span>
                         <div className="max-w-56 truncate text-sm font-medium">{activeThread.title}</div>
                         <PanelsToggleButton
-                            isMinimized={areSidebarsHidden}
+                            isMinimized
                             onToggle={() => {
-                                setAreSidebarsHidden(false)
+                                setIsLeftSidebarCollapsed(false)
+                                if (areSidebarsHidden) {
+                                    setIsRightSidebarCollapsed(false)
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+            ) : null}
+
+            {isRightSidebarCollapsed && !areSidebarsHidden && !isCanvasUiHidden ? (
+                <div className="pointer-events-none absolute right-4 top-4 z-40">
+                    <div className="pointer-events-auto rounded-xl border border-border/60 bg-background/90 p-1 shadow-lg backdrop-blur-xl">
+                        <PanelsToggleButton
+                            isMinimized
+                            onToggle={() => {
+                                setIsRightSidebarCollapsed(false)
                             }}
                         />
                     </div>
@@ -444,13 +599,18 @@ function App() {
             ) : null}
 
             <div className="flex h-full w-full overflow-hidden">
-                {!areSidebarsHidden && !isCanvasUiHidden ? (
+                {!isLeftSidebarCollapsed && !isCanvasUiHidden ? (
                     <div
                         ref={leftSidebarHostRef}
-                        className="h-full shrink-0 overflow-visible"
+                        className="relative h-full shrink-0 overflow-hidden bg-background"
                         style={{ width: leftSidebarWidth }}
                     >
-                        <LeftConversationSidebar
+                        <div
+                            ref={leftSidebarContentRef}
+                            className="absolute inset-y-0 left-0"
+                            style={{ width: leftSidebarWidth }}
+                        >
+                            <LeftConversationSidebar
                             threadTitle={activeThread.title}
                             cardCount={cards.length}
                             rootNodeCount={rootNodeCount}
@@ -495,13 +655,14 @@ function App() {
                             onToggleTheme={() => {
                                 setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
                             }}
-                        />
+                            />
+                        </div>
                     </div>
                 ) : null}
 
-                {!areSidebarsHidden && !isCanvasUiHidden ? (
+                {!isLeftSidebarCollapsed && !isCanvasUiHidden ? (
                     <div
-                        className="group relative w-px shrink-0 cursor-col-resize bg-zinc-200/70 theme-dark:bg-zinc-800"
+                        className="group relative z-20 w-0 shrink-0 cursor-col-resize"
                         onPointerDown={startResizeLeftSidebar}
                         role="separator"
                         aria-label="调整左侧栏宽度"
@@ -520,13 +681,14 @@ function App() {
                     // UI 全隐藏时 画布内部的 hover handle 和 mode bar 也要一起隐藏
                     isCanvasUiVisible={!isCanvasUiHidden}
                     isContextMenuOpen={contextMenuState !== null}
+                    areLinkHandlesBlocked={isAISettingsOpen}
                     creationPreviewRect={creationPreviewRect}
                     licenseKey={tldrawLicenseKey}
                 />
 
-                {!areSidebarsHidden && !isCanvasUiHidden ? (
+                {!isRightSidebarCollapsed && !isCanvasUiHidden ? (
                     <div
-                        className="group relative w-px shrink-0 cursor-col-resize bg-zinc-200/70 theme-dark:bg-zinc-800"
+                        className="group relative z-20 w-0 shrink-0 cursor-col-resize"
                         onPointerDown={startResizeRightSidebar}
                         role="separator"
                         aria-label="调整右侧栏宽度"
@@ -536,13 +698,18 @@ function App() {
                     </div>
                 ) : null}
 
-                {!areSidebarsHidden && !isCanvasUiHidden ? (
+                {!isRightSidebarCollapsed && !isCanvasUiHidden ? (
                     <div
                         ref={rightSidebarHostRef}
-                        className="h-full shrink-0 overflow-hidden"
+                        className="relative h-full shrink-0 overflow-hidden bg-background"
                         style={{ width: rightSidebarWidth }}
                     >
-                        <RightEditorSidebar
+                        <div
+                            ref={rightSidebarContentRef}
+                            className="absolute inset-y-0 right-0"
+                            style={{ width: rightSidebarWidth }}
+                        >
+                            <RightEditorSidebar
                             activeNode={activeNode}
                             onUpdateChatPrompt={updateChatPrompt}
                             onUpdateChatResponse={updateChatResponse}
@@ -570,7 +737,8 @@ function App() {
                                 void aiCompletion.cancelCompletion(nodeId)
                             }}
                             onForkTextSelection={handleForkTextSelection}
-                        />
+                            />
+                        </div>
                     </div>
                 ) : null}
             </div>
