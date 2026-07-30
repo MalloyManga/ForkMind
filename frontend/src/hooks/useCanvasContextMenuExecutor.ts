@@ -1,8 +1,10 @@
 ﻿import { useCallback } from "react"
 import type { Editor } from "tldraw"
 import type { ConversationCard } from "../domain/conversation/types"
+import { importClipboardImagesFromBridge } from "../bridge"
 import {
     createCanvasClipboardPayload,
+    createClipboardImagePayload,
     parseForkMindClipboard,
     readSystemClipboardText,
     serializeForkMindClipboard,
@@ -43,6 +45,28 @@ async function readForkMindSystemClipboardPayload(): Promise<CanvasClipboardPayl
     }
 
     return parseResult.value
+}
+
+/**
+ * 优先读取桌面系统剪贴板中的真实图片
+ * @returns 有图片时返回 Store payload 无图片或 Web 环境返回 null
+ * @throws Win32 读取或 Managed Asset 写入失败时抛出用户可读错误
+ * Paste Here 与 Paste to Replace 在文本解析前触发
+ */
+async function readSystemClipboardImagePayload(): Promise<CanvasClipboardPayload | null> {
+    const response = await importClipboardImagesFromBridge()
+    if (response.error) {
+        throw new Error(response.error.message)
+    }
+    if (!response.available) {
+        return null
+    }
+
+    const payload = createClipboardImagePayload(response.assets ?? [])
+    if (!payload) {
+        throw new Error("系统剪贴板报告了图片格式 但没有返回可用图片")
+    }
+    return payload
 }
 
 /**
@@ -146,7 +170,9 @@ export function useCanvasContextMenuExecutor({
                 }
 
                 try {
-                    const clipboardPayload = await readForkMindSystemClipboardPayload()
+                    const clipboardPayload =
+                        await readSystemClipboardImagePayload() ??
+                        await readForkMindSystemClipboardPayload()
                     const pastedNodeIds = pasteNodesFromClipboard({
                         payload: clipboardPayload,
                         pastePoint,
@@ -164,7 +190,9 @@ export function useCanvasContextMenuExecutor({
                 }
 
                 try {
-                    const clipboardPayload = await readForkMindSystemClipboardPayload()
+                    const clipboardPayload =
+                        await readSystemClipboardImagePayload() ??
+                        await readForkMindSystemClipboardPayload()
                     const pastedNodeIds = replaceNodesFromClipboard({
                         payload: clipboardPayload,
                         targetNodeIds,

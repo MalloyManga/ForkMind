@@ -22,6 +22,14 @@ type ManagedAssetImportResponse struct {
 	Error     *BridgeError     `json:"error,omitempty"`
 }
 
+// ClipboardImageImportResponse 返回系统剪贴板中已进入 Managed Asset Repository 的图片集合
+// Available=false 表示剪贴板没有图片 前端应继续尝试文本粘贴而不是展示错误
+type ClipboardImageImportResponse struct {
+	Available bool              `json:"available"`
+	Assets    []ManagedAssetDTO `json:"assets,omitempty"`
+	Error     *BridgeError      `json:"error,omitempty"`
+}
+
 // ManagedAssetDataResponse 返回图片预览使用的 data URL
 // DataURL 只在调用期间进入渲染进程 不会写回 Workspace JSON
 type ManagedAssetDataResponse struct {
