@@ -212,8 +212,8 @@ File Card reference
 - [ ] PDF 文本提取
 - [ ] DOCX 文本提取
 - [ ] 文件读取权限和大小限制 UI
-- [ ] 多模态 message content
-- [ ] 图片引用到 vision 模型
+- [x] 多模态 message content
+- [x] 图片引用到 vision 模型 Provider 能力自动发现留待模型能力分支
 - [ ] `fetch_url` 安全封装
 - [ ] `web_search` 独立工具和权限
 

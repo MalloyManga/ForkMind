@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -18,8 +19,45 @@ const (
 
 // OpenAIMessageDTO 对应 OpenAI-compatible messages 数组中的单条消息
 type OpenAIMessageDTO struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role          string   `json:"role"`
+	Content       string   `json:"-"`
+	ImageDataURLs []string `json:"-"`
+}
+
+type openAIMessageContentPart struct {
+	Type     string                 `json:"type"`
+	Text     string                 `json:"text,omitempty"`
+	ImageURL *openAIImageURLContent `json:"image_url,omitempty"`
+}
+
+type openAIImageURLContent struct {
+	URL string `json:"url"`
+}
+
+// MarshalJSON 把纯文本消息保持为 string 把带图片的消息编码为 OpenAI-compatible content blocks
+// 接收方是 OpenAI-compatible /chat/completions Provider
+// 返回值只包含 role 和 content 不暴露 ForkMind 内部 ImageDataURLs 辅助字段
+// HTTP 请求 json.Marshal openAIChatCompletionsRequest 时自动触发
+func (message OpenAIMessageDTO) MarshalJSON() ([]byte, error) {
+	if len(message.ImageDataURLs) == 0 {
+		return json.Marshal(struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		}{Role: message.Role, Content: message.Content})
+	}
+
+	contentParts := make([]openAIMessageContentPart, 0, len(message.ImageDataURLs)+1)
+	contentParts = append(contentParts, openAIMessageContentPart{Type: "text", Text: message.Content})
+	for _, dataURL := range message.ImageDataURLs {
+		contentParts = append(contentParts, openAIMessageContentPart{
+			Type:     "image_url",
+			ImageURL: &openAIImageURLContent{URL: dataURL},
+		})
+	}
+	return json.Marshal(struct {
+		Role    string                     `json:"role"`
+		Content []openAIMessageContentPart `json:"content"`
+	}{Role: message.Role, Content: contentParts})
 }
 
 // AIReferenceDTO 表示从 referenceNodeIds 提取出的直接参考资料
