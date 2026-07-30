@@ -3,7 +3,7 @@ import type { Editor } from "tldraw"
 import type { ConversationCard } from "../domain/conversation/types"
 import {
     createCanvasClipboardPayload,
-    parseForkMindClipboard,
+    parseSystemClipboardContent,
     readSystemClipboardText,
     serializeForkMindClipboard,
     writeSystemClipboardText,
@@ -35,9 +35,9 @@ interface UseCanvasContextMenuExecutorParams {
  * @throws 系统剪贴板不可用或内容不是合法 ForkMind JSON 时抛出用户可读错误
  * Paste Here 与 Paste to Replace 每次执行时调用 保证系统剪贴板是唯一事实源
  */
-async function readForkMindSystemClipboardPayload(): Promise<CanvasClipboardPayload> {
+async function readSystemClipboardPayload(): Promise<CanvasClipboardPayload> {
     const clipboardContent = await readSystemClipboardText()
-    const parseResult = parseForkMindClipboard(clipboardContent)
+    const parseResult = parseSystemClipboardContent(clipboardContent)
     if (!parseResult.ok) {
         throw new Error(parseResult.error)
     }
@@ -146,7 +146,7 @@ export function useCanvasContextMenuExecutor({
                 }
 
                 try {
-                    const clipboardPayload = await readForkMindSystemClipboardPayload()
+                    const clipboardPayload = await readSystemClipboardPayload()
                     const pastedNodeIds = pasteNodesFromClipboard({
                         payload: clipboardPayload,
                         pastePoint,
@@ -164,7 +164,7 @@ export function useCanvasContextMenuExecutor({
                 }
 
                 try {
-                    const clipboardPayload = await readForkMindSystemClipboardPayload()
+                    const clipboardPayload = await readSystemClipboardPayload()
                     const pastedNodeIds = replaceNodesFromClipboard({
                         payload: clipboardPayload,
                         targetNodeIds,
