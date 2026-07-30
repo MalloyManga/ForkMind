@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	workspaceIndexFileName = "workspace.json"
-	threadsDirectoryName   = "threads"
+	workspaceIndexFileName       = "workspace.json"
+	threadsDirectoryName         = "threads"
+	workspaceDataDirectoryName   = "data"
+	developmentDataDirectoryName = ".forkmind-dev-data"
 )
 
 type workspaceThreadIndexEntry struct {
@@ -41,20 +43,52 @@ type threadFileDocument struct {
 }
 
 // WorkspaceRepository 管理 ForkMind 本地工作区文件
-// rootDir 通常位于 os.UserConfigDir/ForkMind 测试中可以注入临时目录
+// rootDir 在生产版位于可执行文件同级 data 目录 开发版位于项目内隔离目录
 type WorkspaceRepository struct {
 	rootDir string
 }
 
-// NewDefaultWorkspaceRepository 创建生产环境 Repository
-// 返回错误表示操作系统没有提供可用的用户配置目录 调用方必须通过 Bridge 返回该错误
+// NewDefaultWorkspaceRepository 创建当前 Wails 运行模式对应的 Repository
+// 生产版数据跟随可执行文件 开发版数据跟随项目工作目录且避开 build/bin
+// 返回错误表示操作系统无法解析所需目录 调用方必须通过 Bridge 返回该错误
 func NewDefaultWorkspaceRepository() (*WorkspaceRepository, error) {
-	userConfigDir, err := resolveUserConfigDirectory()
+	executablePath, err := resolveExecutablePath()
 	if err != nil {
-		return nil, fmt.Errorf("resolve user config directory: %w", err)
+		return nil, fmt.Errorf("resolve executable path: %w", err)
+	}
+	if strings.TrimSpace(executablePath) == "" {
+		return nil, errors.New("resolve executable path: path is empty")
 	}
 
-	return NewWorkspaceRepository(filepath.Join(userConfigDir, "ForkMind")), nil
+	workingDirectory := ""
+	if isDevelopmentBuild {
+		workingDirectory, err = resolveWorkingDirectory()
+		if err != nil {
+			return nil, fmt.Errorf("resolve development working directory: %w", err)
+		}
+	}
+
+	rootDir, err := resolveDefaultWorkspaceRoot(executablePath, workingDirectory, isDevelopmentBuild)
+	if err != nil {
+		return nil, err
+	}
+	return NewWorkspaceRepository(rootDir), nil
+}
+
+// resolveDefaultWorkspaceRoot 计算开发版和安装版各自的数据根目录
+// executablePath 来自 os.Executable workingDirectory 仅在 Wails dev 中来自项目启动目录
+// development 表示 Wails 是否通过 dev build tag 构建 返回值不会主动创建任何目录
+func resolveDefaultWorkspaceRoot(executablePath string, workingDirectory string, development bool) (string, error) {
+	if strings.TrimSpace(executablePath) == "" {
+		return "", errors.New("resolve workspace root: executable path is empty")
+	}
+	if development {
+		if strings.TrimSpace(workingDirectory) == "" {
+			return "", errors.New("resolve workspace root: development working directory is empty")
+		}
+		return filepath.Join(workingDirectory, developmentDataDirectoryName), nil
+	}
+	return filepath.Join(filepath.Dir(executablePath), workspaceDataDirectoryName), nil
 }
 
 // NewWorkspaceRepository 使用明确目录创建 Repository

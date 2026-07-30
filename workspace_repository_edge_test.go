@@ -10,24 +10,108 @@ import (
 	"testing"
 )
 
-// TestNewDefaultWorkspaceRepository 验证系统配置目录成功和失败映射
+// TestNewDefaultWorkspaceRepository 验证软件目录 data 映射和可执行文件路径失败分支
 func TestNewDefaultWorkspaceRepository(t *testing.T) {
-	previousResolver := resolveUserConfigDirectory
-	defer func() { resolveUserConfigDirectory = previousResolver }()
+	previousResolver := resolveExecutablePath
+	previousWorkingDirectoryResolver := resolveWorkingDirectory
+	defer func() {
+		resolveExecutablePath = previousResolver
+		resolveWorkingDirectory = previousWorkingDirectoryResolver
+	}()
 
-	configRoot := filepath.Join(t.TempDir(), "config")
-	resolveUserConfigDirectory = func() (string, error) { return configRoot, nil }
+	applicationDirectory := filepath.Join(t.TempDir(), "ForkMind")
+	projectDirectory := filepath.Join(t.TempDir(), "project")
+	resolveExecutablePath = func() (string, error) {
+		return filepath.Join(applicationDirectory, "ForkMind.exe"), nil
+	}
+	resolveWorkingDirectory = func() (string, error) { return projectDirectory, nil }
 	repository, err := NewDefaultWorkspaceRepository()
 	if err != nil {
 		t.Fatalf("NewDefaultWorkspaceRepository() error = %v", err)
 	}
-	if repository.RootDir() != filepath.Join(configRoot, "ForkMind") {
+	expectedRoot := filepath.Join(applicationDirectory, workspaceDataDirectoryName)
+	if isDevelopmentBuild {
+		expectedRoot = filepath.Join(projectDirectory, developmentDataDirectoryName)
+	}
+	if repository.RootDir() != expectedRoot {
 		t.Fatalf("RootDir() = %q", repository.RootDir())
 	}
 
-	resolveUserConfigDirectory = func() (string, error) { return "", errors.New("no config") }
-	if _, err := NewDefaultWorkspaceRepository(); err == nil || !strings.Contains(err.Error(), "resolve user config") {
+	resolveExecutablePath = func() (string, error) { return "", errors.New("no executable") }
+	if _, err := NewDefaultWorkspaceRepository(); err == nil || !strings.Contains(err.Error(), "resolve executable path") {
 		t.Fatalf("NewDefaultWorkspaceRepository() error = %v", err)
+	}
+
+	resolveExecutablePath = func() (string, error) { return "", nil }
+	if _, err := NewDefaultWorkspaceRepository(); err == nil || !strings.Contains(err.Error(), "path is empty") {
+		t.Fatalf("NewDefaultWorkspaceRepository() empty path error = %v", err)
+	}
+
+	if isDevelopmentBuild {
+		resolveExecutablePath = func() (string, error) {
+			return filepath.Join(applicationDirectory, "ForkMind.exe"), nil
+		}
+		resolveWorkingDirectory = func() (string, error) { return "", errors.New("no working directory") }
+		if _, err := NewDefaultWorkspaceRepository(); err == nil || !strings.Contains(err.Error(), "resolve development working directory") {
+			t.Fatalf("NewDefaultWorkspaceRepository() working directory error = %v", err)
+		}
+	}
+}
+
+// TestResolveDefaultWorkspaceRoot 验证开发数据不进入 build/bin 且生产数据跟随可执行文件
+func TestResolveDefaultWorkspaceRoot(t *testing.T) {
+	t.Parallel()
+
+	applicationDirectory := filepath.Join(t.TempDir(), "application")
+	executablePath := filepath.Join(applicationDirectory, "ForkMind.exe")
+	projectDirectory := filepath.Join(t.TempDir(), "project")
+
+	testCases := []struct {
+		name             string
+		executablePath   string
+		workingDirectory string
+		development      bool
+		want             string
+		wantError        string
+	}{
+		{
+			name:           "release beside executable",
+			executablePath: executablePath,
+			want:           filepath.Join(applicationDirectory, workspaceDataDirectoryName),
+		},
+		{
+			name:             "development inside project",
+			executablePath:   executablePath,
+			workingDirectory: projectDirectory,
+			development:      true,
+			want:             filepath.Join(projectDirectory, developmentDataDirectoryName),
+		},
+		{name: "empty executable", wantError: "executable path is empty"},
+		{
+			name:           "empty development working directory",
+			executablePath: executablePath,
+			development:    true,
+			wantError:      "development working directory is empty",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual, err := resolveDefaultWorkspaceRoot(
+				testCase.executablePath,
+				testCase.workingDirectory,
+				testCase.development,
+			)
+			if testCase.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), testCase.wantError) {
+					t.Fatalf("resolveDefaultWorkspaceRoot() error = %v", err)
+				}
+				return
+			}
+			if err != nil || actual != testCase.want {
+				t.Fatalf("resolveDefaultWorkspaceRoot() = (%q, %v), want %q", actual, err, testCase.want)
+			}
+		})
 	}
 }
 

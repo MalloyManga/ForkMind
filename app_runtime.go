@@ -17,5 +17,6 @@ var (
 	showWorkspaceSaveDialog    = runtime.SaveFileDialog
 	showWorkspaceOpenDialog    = runtime.OpenFileDialog
 	showManagedAssetOpenDialog = runtime.OpenFileDialog
-	resolveUserConfigDirectory = os.UserConfigDir
+	resolveExecutablePath      = os.Executable
+	resolveWorkingDirectory    = os.Getwd
 )

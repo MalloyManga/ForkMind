@@ -70,14 +70,19 @@ func TestCreateApplicationOptions(t *testing.T) {
 // runner 被替换为内存函数 因此同时覆盖成功和启动失败分支而不打开窗口
 func TestMainDelegatesToWailsRunner(t *testing.T) {
 	previousRunner := runWailsApplication
-	previousResolver := resolveUserConfigDirectory
+	previousResolver := resolveExecutablePath
+	previousWorkingDirectoryResolver := resolveWorkingDirectory
 	defer func() {
 		runWailsApplication = previousRunner
-		resolveUserConfigDirectory = previousResolver
+		resolveExecutablePath = previousResolver
+		resolveWorkingDirectory = previousWorkingDirectoryResolver
 	}()
 
-	resolveUserConfigDirectory = func() (string, error) {
-		return filepath.Join(t.TempDir(), "config"), nil
+	resolveExecutablePath = func() (string, error) {
+		return filepath.Join(t.TempDir(), "ForkMind.exe"), nil
+	}
+	resolveWorkingDirectory = func() (string, error) {
+		return t.TempDir(), nil
 	}
 
 	for _, runnerError := range []error{nil, errors.New("startup failed")} {

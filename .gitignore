@@ -1,4 +1,5 @@
 build/bin
+.forkmind-dev-data/
 build/windows/installer/tmp/
 node_modules
 frontend/dist
