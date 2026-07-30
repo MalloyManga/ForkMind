@@ -1,94 +1,96 @@
+<div align="center">
+
 # ForkMind
+
+**A local-first AI infinite canvas for branching conversations and visual thinking.**
+
+[English](./README.md) | [简体中文](./README.zh-CN.md)
+
+[![Website](https://img.shields.io/badge/Website-ForkMind-0ea5e9)](https://malloymanga.github.io/ForkMind/)
+[![Release](https://img.shields.io/badge/Release-v0.1.0-2563eb)](https://github.com/MalloyManga/ForkMind/releases)
+[![License](https://img.shields.io/badge/License-MIT-16a34a)](./LICENSE)
+[![Wails](https://img.shields.io/badge/Wails-v2-cb3837)](https://wails.io/)
+
+</div>
 
 ![ForkMind Banner](./banner.png)
 
-> Break free from linear chats. Fork your thoughts.
+ForkMind turns linear AI chats into a visual workspace of connected cards. Branch from any idea, attach references, and explore side questions without losing the main conversation context.
 
-[![Project Website](https://img.shields.io/badge/Website-ForkMind-0ea5e9)](https://malloymanga.github.io/ForkMind/)
-![Architecture](https://img.shields.io/badge/Architecture-Local--First-22c55e)
-![Tech Stack](https://img.shields.io/badge/Tech-Wails%20%7C%20React%20%7C%20Go-2563eb)
-[![License](https://img.shields.io/badge/License-MIT-16a34a)](./LICENSE)
+- Website: [malloymanga.github.io/ForkMind](https://malloymanga.github.io/ForkMind/)
+- Releases: [github.com/MalloyManga/ForkMind/releases](https://github.com/MalloyManga/ForkMind/releases)
 
-ForkMind is an open-source, local-first desktop application that turns linear AI conversations into a visual, branching workspace. It combines an infinite canvas with explicit parent and reference relationships, allowing users to explore side questions without losing the main line of thought.
+## Highlights
 
-Project website: [https://malloymanga.github.io/ForkMind/](https://malloymanga.github.io/ForkMind/)
+- **Infinite canvas** powered by tldraw for arranging, resizing, connecting, and selecting cards.
+- **Branch-aware AI context** that follows the active card's parent chain without mixing sibling branches.
+- **Reference relationships** for adding supporting cards without changing the primary conversation path.
+- **Selection follow-ups** that preserve the selected text and its source card.
+- **OpenAI-compatible providers** with model discovery, streaming responses, cancellation, and optional native web search.
+- **Rich reference input** for supported documents, fetched URLs, and vision-capable image references.
+- **Local-first storage** with portable JSON import, export, copy, and paste workflows.
+- **Multiple card types** for chats, notes, images, links, and files.
 
-## Why ForkMind?
+## How Context Works
 
-Long AI conversations are difficult to navigate. A useful side question can pollute the main context, while returning to an earlier idea often requires scrolling through a large transcript.
-
-ForkMind represents conversations as connected cards on an infinite canvas. Each follow-up can become its own branch, preserving the surrounding context while keeping unrelated branches isolated.
-
-## Core Features
-
-- **Infinite canvas**: Move, resize, connect, select, and organize conversation cards in a tldraw-powered workspace.
-- **Branch-aware context**: A card inherits its parent chain without automatically including unrelated sibling branches.
-- **Reference cards**: Attach additional cards as supporting context without changing the primary parent chain.
-- **Selection follow-ups**: Select a specific passage and create a new question anchored to that text.
-- **OpenAI-compatible providers**: Configure a Base URL, model, and API key for compatible chat-completions services.
-- **Local-first persistence**: Store workspaces, conversations, and managed assets on the user's machine.
-- **Portable JSON workflows**: Import, export, copy, and paste ForkMind canvas data using a documented JSON structure.
-- **Extended card types**: Organize chat, note, image, link, and supported file content on the same canvas.
-- **Streaming and cancellation**: Receive incremental AI responses and cancel active generation requests.
-
-## Context Architecture
-
-ForkMind keeps the conversation graph in a Zustand store and uses two explicit relationships:
+ForkMind keeps the conversation graph in Zustand and models context with two relationships:
 
 - `parentId` defines the primary conversation chain.
 - `referenceNodeIds` adds supporting material without changing that chain.
 
-When a user sends a prompt, ForkMind performs the following flow:
+For each AI request, ForkMind traverses the active card's parent chain, resolves its reference cards and optional text selection, injects the internal system identity, and sends the assembled request through the Go network layer. Responses stream back into the same Zustand-managed card tree.
 
-1. Locate the active chat card.
-2. Traverse `parentId` upward until the root card is reached.
-3. Reverse the collected cards into chronological order.
-4. Resolve and append the selected reference cards.
-5. Add selection-anchor context when the question was created from highlighted text.
-6. Inject ForkMind's system identity and send the final request through the Go network layer.
-7. Stream the response back to the card stored in Zustand.
+## Technology
 
-This design keeps the main context predictable while still allowing deliberate cross-branch references.
+| Layer | Technology |
+| --- | --- |
+| Desktop runtime | Wails v2 and Go |
+| Frontend | React 18, TypeScript, and Vite |
+| Canvas | tldraw SDK |
+| State | Zustand |
+| UI | Tailwind CSS and shadcn/ui conventions |
+| AI transport | OpenAI-compatible APIs with SSE streaming |
+| Persistence | Local JSON documents and managed assets |
 
-## Technology Stack
+The React frontend plays a role similar to an Electron renderer process. The Go layer provides the native bridge, filesystem access, persistence, document extraction, and AI network transport.
 
-- **Desktop runtime**: [Wails v2](https://wails.io/) and Go
-- **Frontend**: React 18, TypeScript, and Vite
-- **Canvas**: [tldraw SDK](https://tldraw.dev/)
-- **State management**: Zustand
-- **UI**: Tailwind CSS and shadcn/ui conventions
-- **AI transport**: OpenAI-compatible `/chat/completions` with SSE streaming
-- **Persistence**: Local JSON workspace files and managed local assets
+## Download
 
-The React frontend acts similarly to an Electron renderer process, while the Go application layer provides the native bridge, filesystem access, persistence, and network transport.
+Download the latest Windows installer or portable executable from [GitHub Releases](https://github.com/MalloyManga/ForkMind/releases).
 
-## Privacy and Local-First Behavior
+ForkMind currently targets Windows AMD64. Additional platforms may be added in future releases.
 
-- ForkMind does not require a ForkMind account.
-- Canvas and conversation data are stored in the `data/` directory beside the ForkMind executable.
-- AI API keys are kept in runtime memory and are not written into workspace files.
+## Data and Privacy
+
+ForkMind does not require an account or a ForkMind cloud service.
+
+| Runtime | Data directory |
+| --- | --- |
+| Installed or portable release | `<application directory>/data/` |
+| `wails dev` | `<project directory>/.forkmind-dev-data/` |
+
+- Workspace and conversation data remain on the user's machine.
+- API keys stay in runtime memory and are not written into workspace files.
 - AI requests are sent only to the provider configured by the user.
-- Images and files imported into a workspace are managed locally and deduplicated using SHA-256.
-- Explicit exports may embed referenced assets into a portable JSON document.
+- Managed files are stored locally and deduplicated with SHA-256.
+- Explicit workspace exports can include referenced assets in a portable JSON document.
 
-## Requirements
+## Development
+
+### Requirements
 
 - Node.js 20 or later
 - npm 10 or later
 - Go 1.23 or later
 - Wails CLI v2
-- A tldraw license key for production use
-- NSIS when building a Windows installer
 
-Install the Wails CLI if needed:
+Install Wails if needed:
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
 ```
 
-## Development
-
-Install dependencies:
+Install project dependencies:
 
 ```bash
 go mod tidy
@@ -97,52 +99,52 @@ npm install
 cd ..
 ```
 
-Start the Wails development environment:
+Start the desktop development environment:
 
 ```bash
 wails dev
 ```
 
-Run the backend checks:
-
-```bash
-go test ./...
-go vet ./...
-```
-
-Build the frontend independently:
+Run validation:
 
 ```bash
 cd frontend
 npm run build
+cd ..
+
+go test ./...
+go test -tags dev ./...
+go vet ./...
+go vet -tags dev ./...
 ```
 
-## Windows Production Build
+## Windows Build
 
-The tldraw license key is a client-side production key. Provide it to Vite in the shell used for the build:
+Install [NSIS](https://nsis.sourceforge.io/) and provide a valid tldraw production license key in the build shell:
 
 ```bash
 export VITE_TLDRAW_LICENSE_KEY='tldraw-your-license-key'
 wails build -clean -platform windows/amd64 -nsis
 ```
 
-The generated files are written to `build/bin/`:
+Build artifacts are written to `build/bin/`:
 
-- `ForkMind.exe` is the portable application executable.
-- `ForkMind-amd64-installer.exe` is the Windows installer.
+- `ForkMind.exe`: portable executable.
+- `ForkMind-amd64-installer.exe`: Windows installer.
 
-ForkMind stores `workspace.json`, conversation files, and managed assets under `<installation directory>/data/`. The installer provides a directory picker, so installing to a writable folder on another drive keeps both the application and its workspace data on that drive.
+The installer includes a directory picker. Installing ForkMind on another drive keeps both the application and its `data/` workspace on that drive.
 
-Development builds created by `wails dev` use `<project directory>/.forkmind-dev-data/` instead. This keeps development data separate from installed releases and prevents `wails build -clean` from deleting the development workspace.
+## Contributing
 
-## Project Status
+Issues, feature proposals, documentation improvements, and pull requests are welcome. Before submitting a change:
 
-ForkMind is preparing its first public Windows release. The main canvas, branching context, local persistence, OpenAI-compatible streaming, reference cards, supported file extraction, image context, provider configuration, clipboard import, and release packaging flows are implemented.
+1. Keep conversation state in Zustand and native side effects in the Go/Wails layer.
+2. Add Go unit tests for new backend business logic.
+3. Run the validation commands listed above.
+4. Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
-Future work will focus on broader file compatibility, provider-specific capabilities, deeper web-search integration, performance tuning, and release hardening.
+## License
 
-## Licensing
+ForkMind's original source code is available under the [MIT License](./LICENSE).
 
-ForkMind's original source code is released under the [MIT License](./LICENSE).
-
-The tldraw SDK is a third-party dependency distributed under the [tldraw license](https://tldraw.dev/community/license). A valid trial, commercial, or hobby license key is required to use the tldraw SDK in production. Downstream users and distributors are responsible for complying with the applicable tldraw license terms.
+The tldraw SDK is a third-party dependency distributed under the [tldraw license](https://tldraw.dev/community/license). Production use requires an appropriate trial, commercial, or hobby license key. Downstream users and distributors are responsible for complying with tldraw's terms.
