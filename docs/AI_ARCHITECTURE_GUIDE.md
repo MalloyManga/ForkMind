@@ -190,7 +190,7 @@ AI 回答:
 - Chat：用户问题和 AI 回答。
 - Note：笔记正文。
 - Image：本地资源名称、MIME、大小、Alt Text、Caption。不会把二进制图片直接发送。
-- Link：标题、URL、描述。不会联网抓取页面。
+- Link：标题、URL、描述。父链和当前节点直接引用中的 Link 会由 Go 抓取静态 HTML 正文并临时追加到本轮上下文。
 - File：文件名称、MIME、大小、描述。不会把文件二进制直接发送。
 
 ## 6. 选区追问的架构
@@ -389,7 +389,7 @@ interface BridgeErrorPayload {
 
 AI 返回的文本最终写入 `ConversationCard.aiResponse`，画布使用 `react-markdown` 渲染，并通过 `markdownRendering.tsx` 统一处理 GFM、LaTeX 和 sanitize。
 
-图片和文件卡片目前作为 AI 上下文中的**文本元数据**使用：名称、MIME、大小、Alt Text、Caption 或 Description。系统不会默认读取本地二进制内容，也不会因为 Link 卡片自动联网抓取页面。
+图片和文件卡片目前作为 AI 上下文中的**文本元数据**使用：名称、MIME、大小、Alt Text、Caption 或 Description。Link Card 只有位于父链或当前节点直接引用时才会抓取公开 HTTP(S) 页面 结果只进入本轮临时上下文 不写回工作区。
 
 ## 12. 新成员排查问题时的顺序
 

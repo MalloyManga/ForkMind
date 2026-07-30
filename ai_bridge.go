@@ -222,6 +222,44 @@ func (a *App) runChatCompletion(
 	runtimeContext AIRuntimeContextDTO,
 ) {
 	defer a.aiRequestManager.Complete(input.RequestID)
+	if a.urlContentFetcher != nil {
+		hydratedThread, hydrateErr := hydrateReferencedLinkContent(
+			requestContext,
+			input.Thread,
+			input.ActiveNodeID,
+			a.urlContentFetcher,
+		)
+		if hydrateErr != nil {
+			if errors.Is(hydrateErr, context.Canceled) {
+				emitWailsEvent(a.ctx, aiEventDone, AIStreamDoneEvent{
+					RequestID:    input.RequestID,
+					NodeID:       input.ActiveNodeID,
+					FinishReason: "cancelled",
+					Cancelled:    true,
+				})
+				return
+			}
+			emitWailsEvent(a.ctx, aiEventError, AIStreamErrorEvent{
+				RequestID: input.RequestID,
+				NodeID:    input.ActiveNodeID,
+				Error:     *newBridgeError(errorCodeRequestFailed, hydrateErr, true),
+			})
+			return
+		}
+		hydratedContext, contextErr := BuildAIRuntimeContext(BuildAIContextInput{
+			Thread:       hydratedThread,
+			ActiveNodeID: input.ActiveNodeID,
+		})
+		if contextErr != nil {
+			emitWailsEvent(a.ctx, aiEventError, AIStreamErrorEvent{
+				RequestID: input.RequestID,
+				NodeID:    input.ActiveNodeID,
+				Error:     *newBridgeError(errorCodeInvalidData, contextErr, false),
+			})
+			return
+		}
+		runtimeContext = hydratedContext
+	}
 
 	result, err := a.openAIClient.StreamCompletion(
 		requestContext,
