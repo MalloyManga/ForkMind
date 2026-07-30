@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { KeyRound, ServerCog } from "lucide-react"
+import { KeyRound, LoaderCircle, RefreshCw, ServerCog } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useAISettingsStore } from "../stores/useAISettingsStore"
+import { listOpenAIModelsFromBridge } from "../bridge"
 
 interface AISettingsSheetProps {
     open: boolean
@@ -41,6 +42,9 @@ export function AISettingsSheet({ open, onOpenChange }: AISettingsSheetProps) {
         apiKey,
     }))
     const [validationError, setValidationError] = useState<string | null>(null)
+    const [modelOptions, setModelOptions] = useState<string[]>([])
+    const [modelListError, setModelListError] = useState<string | null>(null)
+    const [isLoadingModels, setIsLoadingModels] = useState(false)
 
     useEffect(() => {
         if (!open) {
@@ -54,6 +58,32 @@ export function AISettingsSheet({ open, onOpenChange }: AISettingsSheetProps) {
         })
         setValidationError(null)
     }, [apiKey, open, persistedSettings])
+
+    /**
+     * 读取当前草稿连接对应的 Provider 模型列表
+     * @returns Promise 完成时只更新下拉候选和错误状态 不会覆盖用户手动输入的模型名
+     * 用户点击模型字段旁的 Refresh 时触发
+     */
+    const refreshModelOptions = async (): Promise<void> => {
+        const normalizedBaseUrl = draft.baseUrl.trim()
+        if (!normalizedBaseUrl || isLoadingModels) {
+            return
+        }
+
+        setIsLoadingModels(true)
+        setModelListError(null)
+        const response = await listOpenAIModelsFromBridge({
+            baseUrl: normalizedBaseUrl,
+            apiKey: draft.apiKey,
+        })
+        setIsLoadingModels(false)
+        if (response.error) {
+            setModelOptions([])
+            setModelListError(response.error.message)
+            return
+        }
+        setModelOptions(response.models)
+    }
 
     /**
      * 校验并保存设置草稿
@@ -122,11 +152,24 @@ export function AISettingsSheet({ open, onOpenChange }: AISettingsSheetProps) {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label htmlFor="ai-model" className="text-xs font-medium text-foreground">
-                                Model
-                            </label>
+                            <div className="flex items-center justify-between gap-2">
+                                <label htmlFor="ai-model" className="text-xs font-medium text-foreground">
+                                    Model
+                                </label>
+                                <Button
+                                    type="button"
+                                    size="xs"
+                                    variant="ghost"
+                                    disabled={!draft.baseUrl.trim() || isLoadingModels}
+                                    onClick={() => void refreshModelOptions()}
+                                >
+                                    {isLoadingModels ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}
+                                    Refresh
+                                </Button>
+                            </div>
                             <Input
                                 id="ai-model"
+                                list="ai-model-options"
                                 value={draft.model}
                                 onChange={(event) => {
                                     setDraft((currentDraft) => ({
@@ -137,6 +180,16 @@ export function AISettingsSheet({ open, onOpenChange }: AISettingsSheetProps) {
                                 placeholder="例如 qwen3:8b"
                                 spellCheck={false}
                             />
+                            <datalist id="ai-model-options">
+                                {modelOptions.map((modelId) => <option key={modelId} value={modelId} />)}
+                            </datalist>
+                            <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                {modelListError
+                                    ? `无法读取模型列表: ${modelListError} 仍可手动输入`
+                                    : modelOptions.length > 0
+                                        ? `已发现 ${modelOptions.length} 个模型 也可以继续手动输入`
+                                        : "点击 Refresh 从 Provider 读取模型列表 或直接手动输入"}
+                            </p>
                         </div>
 
                         <div className="space-y-1.5 rounded-xl border border-border/70 bg-muted/35 p-3">

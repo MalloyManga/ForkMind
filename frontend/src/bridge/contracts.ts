@@ -58,6 +58,16 @@ export interface OpenAICompletionConfig {
     model: string
 }
 
+export interface ListOpenAIModelsInput {
+    baseUrl: string
+    apiKey: string
+}
+
+export interface ListOpenAIModelsResponse {
+    models: string[]
+    error?: BridgeErrorPayload
+}
+
 export interface StartChatCompletionInput {
     requestId: string
     thread: ConversationThread
@@ -107,6 +117,7 @@ export interface ForkMindAppBridge {
     AbortAppClose: () => Promise<OperationBridgeResponse>
     StartChatCompletion: (input: StartChatCompletionInput) => Promise<OperationBridgeResponse>
     CancelChatCompletion: (input: CancelChatCompletionInput) => Promise<OperationBridgeResponse>
+    ListOpenAIModels: (input: ListOpenAIModelsInput) => Promise<ListOpenAIModelsResponse>
 }
 
 declare global {

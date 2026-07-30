@@ -11,12 +11,14 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
 
 const (
 	openAIChatCompletionsPath = "/chat/completions"
+	openAIModelsPath          = "/models"
 	maxOpenAIErrorBodyBytes   = 1024 * 1024
 	defaultOpenAITemperature  = 0.7
 	defaultOpenAIMaxTokens    = 4096
@@ -87,6 +89,12 @@ type openAIErrorEnvelope struct {
 	} `json:"error"`
 }
 
+type openAIModelsResponse struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+}
+
 // OpenAIStreamResult 表示一次 SSE 完成后的结算信息
 type OpenAIStreamResult struct {
 	FinishReason string
@@ -138,6 +146,69 @@ func NewOpenAIClient() *OpenAIClient {
 // httpClient 由 httptest Server 提供 不用于 Wails 生产路径
 func newOpenAIClientWithHTTPClient(httpClient *http.Client) *OpenAIClient {
 	return &OpenAIClient{httpClient: httpClient}
+}
+
+// ListModels 读取 OpenAI-compatible Provider 暴露的模型 ID
+// baseURL 和 apiKey 来自 AI Connection 草稿 仅用于本次只读请求
+// 返回值已经去除空 ID 重复项并按名称排序 Provider 不支持 /models 时返回 HTTP 错误
+// 用户打开设置弹窗或点击刷新模型列表时由 Wails Bridge 调用
+func (client *OpenAIClient) ListModels(ctx context.Context, baseURL string, apiKey string) ([]string, error) {
+	if client == nil || client.httpClient == nil {
+		return nil, fmt.Errorf("OpenAI client is unavailable")
+	}
+
+	endpoint, err := resolveOpenAIEndpointURL(baseURL, openAIModelsPath)
+	if err != nil {
+		return nil, err
+	}
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create OpenAI models request: %w", err)
+	}
+	httpRequest.Header.Set("Accept", "application/json")
+	if normalizedAPIKey := strings.TrimSpace(apiKey); normalizedAPIKey != "" {
+		httpRequest.Header.Set("Authorization", "Bearer "+normalizedAPIKey)
+	}
+
+	response, err := client.httpClient.Do(httpRequest)
+	if err != nil {
+		return nil, fmt.Errorf("send OpenAI models request: %w", err)
+	}
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		providerErr := decodeOpenAIHTTPError(response)
+		if closeErr := response.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("provider error: %v; close models response body: %w", providerErr, closeErr)
+		}
+		return nil, providerErr
+	}
+
+	var payload openAIModelsResponse
+	decoder := json.NewDecoder(io.LimitReader(response.Body, maxOpenAIErrorBodyBytes))
+	if err := decoder.Decode(&payload); err != nil {
+		if closeErr := response.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("decode OpenAI models response: %v; close response body: %w", err, closeErr)
+		}
+		return nil, fmt.Errorf("decode OpenAI models response: %w", err)
+	}
+	if closeErr := response.Body.Close(); closeErr != nil {
+		return nil, fmt.Errorf("close OpenAI models response body: %w", closeErr)
+	}
+
+	modelIDSet := make(map[string]struct{}, len(payload.Data))
+	modelIDs := make([]string, 0, len(payload.Data))
+	for _, model := range payload.Data {
+		modelID := strings.TrimSpace(model.ID)
+		if modelID == "" {
+			continue
+		}
+		if _, exists := modelIDSet[modelID]; exists {
+			continue
+		}
+		modelIDSet[modelID] = struct{}{}
+		modelIDs = append(modelIDs, modelID)
+	}
+	sort.Strings(modelIDs)
+	return modelIDs, nil
 }
 
 // StreamCompletion 发起 OpenAI-compatible SSE 请求
@@ -254,7 +325,7 @@ func resolveOpenAIEndpointURL(baseURL string, endpointPath string) (string, erro
 	}
 
 	trimmedPath := strings.TrimRight(parsedURL.Path, "/")
-	for _, knownEndpointPath := range []string{openAIChatCompletionsPath} {
+	for _, knownEndpointPath := range []string{openAIChatCompletionsPath, openAIModelsPath} {
 		if strings.HasSuffix(trimmedPath, knownEndpointPath) {
 			trimmedPath = strings.TrimSuffix(trimmedPath, knownEndpointPath)
 			break

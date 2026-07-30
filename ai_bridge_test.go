@@ -37,6 +37,27 @@ func TestAIRequestManagerLifecycle(t *testing.T) {
 	}
 }
 
+// TestListOpenAIModelsBridge 验证模型发现 Bridge 的 runtime 缺失和成功返回
+func TestListOpenAIModelsBridge(t *testing.T) {
+	t.Parallel()
+
+	if response := (&App{}).ListOpenAIModels(ListOpenAIModelsInput{BaseURL: "http://provider.example/v1"}); response.Error == nil || response.Error.Code != errorCodeInternal {
+		t.Fatalf("missing runtime ListOpenAIModels() = %#v", response)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, _ *http.Request) {
+		responseWriter.Header().Set("Content-Type", "application/json")
+		_, _ = responseWriter.Write([]byte(`{"data":[{"id":"model-one"}]}`))
+	}))
+	defer server.Close()
+
+	app := &App{openAIClient: newOpenAIClientWithHTTPClient(server.Client())}
+	response := app.ListOpenAIModels(ListOpenAIModelsInput{BaseURL: server.URL})
+	if response.Error != nil || len(response.Models) != 1 || response.Models[0] != "model-one" {
+		t.Fatalf("ListOpenAIModels() = %#v", response)
+	}
+}
+
 // TestCancelChatCompletionScenarios 验证取消入口的字段校验 运行时缺失 未找到与成功路径
 func TestCancelChatCompletionScenarios(t *testing.T) {
 	t.Parallel()
