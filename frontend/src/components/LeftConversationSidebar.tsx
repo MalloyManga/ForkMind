@@ -346,7 +346,7 @@ export function LeftConversationSidebar({
                         className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card/50 px-2 py-2 text-[11px] font-medium text-foreground transition-colors duration-200 hover:border-border hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <Upload className="h-3.5 w-3.5" />
-                        Import
+                        Import cards
                     </button>
                     <button
                         type="button"
