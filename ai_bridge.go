@@ -119,8 +119,26 @@ func (a *App) StartChatCompletion(input StartChatCompletionInput) OperationRespo
 		return OperationResponse{Error: newBridgeError(errorCodeInternal, fmt.Errorf("AI runtime is unavailable"), true)}
 	}
 
+	hydratedThread, err := HydrateAIFileReferences(
+		input.Thread,
+		input.ActiveNodeID,
+		func(asset ManagedAssetDTO) (string, error) {
+			if a.workspaceRepository == nil {
+				return "", fmt.Errorf("workspace repository is unavailable")
+			}
+			content, detectedMimeType, readErr := a.workspaceRepository.ReadManagedAsset(asset.ID)
+			if readErr != nil {
+				return "", readErr
+			}
+			return ExtractManagedAssetText(asset, content, detectedMimeType)
+		},
+	)
+	if err != nil {
+		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
+	}
+
 	runtimeContext, err := BuildAIRuntimeContext(BuildAIContextInput{
-		Thread:       input.Thread,
+		Thread:       hydratedThread,
 		ActiveNodeID: input.ActiveNodeID,
 	})
 	if err != nil {
