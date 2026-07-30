@@ -208,12 +208,11 @@ File Card reference
 - [ ] 模型列表加载失败时的手动输入降级
 - [ ] Provider / 本地注册表 / unknown 三层能力来源
 - [ ] Link Card 确定 URL 抓取 MVP
-- [ ] Markdown 和 TXT 文件提取
-- [ ] PDF 文本提取
-- [ ] DOCX 文本提取
+- [x] Markdown 和 TXT 文件提取
+- [x] PDF 常见文本流提取 扫描 PDF 和复杂字体映射留待后续
+- [x] DOCX 文本提取
 - [ ] 文件读取权限和大小限制 UI
 - [ ] 多模态 message content
 - [ ] 图片引用到 vision 模型
 - [ ] `fetch_url` 安全封装
 - [ ] `web_search` 独立工具和权限
-
