@@ -139,6 +139,54 @@ func (repository *WorkspaceRepository) ImportManagedAsset(sourcePath string, kin
 	}, nil
 }
 
+// ImportManagedAssetContent 把内存中的受控内容写入 ForkMind 管理目录
+// fileName 来自剪贴板文件名或内部生成名称 content 来自 Win32 剪贴板读取 kind 决定 MIME 约束
+// 返回值包含内容哈希 id 展示名称 MIME 和大小 同内容会复用已有资产
+// 用户粘贴截图或资源管理器中的图片文件时由 Clipboard Bridge 触发
+func (repository *WorkspaceRepository) ImportManagedAssetContent(
+	fileName string,
+	content []byte,
+	kind string,
+) (ManagedAssetDTO, error) {
+	if repository == nil {
+		return ManagedAssetDTO{}, fmt.Errorf("workspace repository is unavailable")
+	}
+	if kind != managedAssetKindImage && kind != managedAssetKindFile {
+		return ManagedAssetDTO{}, fmt.Errorf("managed asset kind %q is invalid", kind)
+	}
+	normalizedName := strings.TrimSpace(filepath.Base(fileName))
+	if normalizedName == "" || normalizedName == "." {
+		return ManagedAssetDTO{}, fmt.Errorf("managed asset name cannot be empty")
+	}
+	if len(content) == 0 {
+		return ManagedAssetDTO{}, fmt.Errorf("managed asset content cannot be empty")
+	}
+	if len(content) > managedAssetMaxBytes {
+		return ManagedAssetDTO{}, fmt.Errorf("managed asset exceeds %d bytes", managedAssetMaxBytes)
+	}
+
+	mimeType := detectManagedAssetMimeType(
+		normalizedName,
+		content[:min(len(content), managedAssetHeaderBytes)],
+	)
+	if kind == managedAssetKindImage && !strings.HasPrefix(mimeType, "image/") {
+		return ManagedAssetDTO{}, fmt.Errorf("clipboard content is not a supported image")
+	}
+
+	digest := sha256.Sum256(content)
+	assetID := hex.EncodeToString(digest[:]) + normalizeManagedAssetExtension(normalizedName)
+	if err := repository.storeManagedAssetContent(assetID, content); err != nil {
+		return ManagedAssetDTO{}, fmt.Errorf("store managed asset content: %w", err)
+	}
+
+	return ManagedAssetDTO{
+		ID:        assetID,
+		Name:      normalizedName,
+		MimeType:  mimeType,
+		SizeBytes: int64(len(content)),
+	}, nil
+}
+
 // ReadManagedAsset 读取已由 ForkMind 管理的资产内容
 // assetID 来自已校验节点元数据 返回原始字节和按内容重新识别的 MIME
 // 图片卡片需要生成渲染进程预览时触发 非法路径和超限文件会被拒绝

@@ -52,6 +52,12 @@ export interface ManagedAssetDataBridgeResponse {
     error?: BridgeErrorPayload
 }
 
+export interface ClipboardImageImportBridgeResponse {
+    available: boolean
+    assets?: ManagedAsset[]
+    error?: BridgeErrorPayload
+}
+
 export interface OpenAICompletionConfig {
     baseUrl: string
     apiKey: string
@@ -112,6 +118,7 @@ export interface ForkMindAppBridge {
     ExportWorkspace: (document: ForkMindWorkspaceDocument) => Promise<WorkspaceExportBridgeResponse>
     ImportWorkspace: () => Promise<WorkspaceImportBridgeResponse>
     ImportManagedAsset: (kind: ManagedAssetKind) => Promise<ManagedAssetImportBridgeResponse>
+    ImportClipboardImages: () => Promise<ClipboardImageImportBridgeResponse>
     ReadManagedAssetDataURL: (assetId: string) => Promise<ManagedAssetDataBridgeResponse>
     CompleteAppClose: () => Promise<OperationBridgeResponse>
     AbortAppClose: () => Promise<OperationBridgeResponse>

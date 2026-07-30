@@ -14,6 +14,7 @@ import type {
     ManagedAssetKind,
     ListOpenAIModelsInput,
     ListOpenAIModelsResponse,
+    ClipboardImageImportBridgeResponse,
 } from "./contracts"
 
 const BRIDGE_UNAVAILABLE_ERROR: BridgeErrorPayload = {
@@ -139,6 +140,25 @@ export async function importManagedAssetFromBridge(
         return await appBridge.ImportManagedAsset(kind)
     } catch (error) {
         return { cancelled: false, error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 从桌面系统剪贴板导入真实图片到 Managed Asset Repository
+ * @returns available=false 表示没有图片 调用方应继续文本粘贴
+ * 用户在画布执行 Paste Here 或 Paste to Replace 时优先触发
+ */
+export async function importClipboardImagesFromBridge(): Promise<ClipboardImageImportBridgeResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        // Web 页面没有 Win32 Bridge 不是错误 保留浏览器文本剪贴板降级路径
+        return { available: false }
+    }
+
+    try {
+        return await appBridge.ImportClipboardImages()
+    } catch (error) {
+        return { available: false, error: normalizeBridgeException(error) }
     }
 }
 

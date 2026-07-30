@@ -1,5 +1,10 @@
 import { cloneConversationCard } from "../conversation/helpers"
-import type { ConversationCard } from "../conversation/types"
+import {
+    DEFAULT_CARD_MIN_HEIGHT,
+    DEFAULT_CARD_WIDTH,
+    NODE_STATUS_DONE,
+} from "../conversation/constants"
+import type { ConversationCard, ManagedAssetReference } from "../conversation/types"
 import {
     DEFAULT_OPENAI_BASE_URL,
     DEFAULT_OPENAI_MODEL,
@@ -26,6 +31,7 @@ export const FORKMIND_CLIPBOARD_VERSION = 1
 export const FORKMIND_CLIPBOARD_MAX_TEXT_LENGTH = 8 * 1024 * 1024
 
 const CLIPBOARD_VALIDATION_THREAD_ID = "clipboard-validation-thread"
+const CLIPBOARD_IMAGE_CARD_GAP = 40
 
 type UnknownRecord = Record<string, unknown>
 
@@ -154,6 +160,44 @@ export function createCanvasClipboardPayload(
     return {
         nodes: targetCards.map((card) => createClipboardNodeSnapshot(card)),
         sourceTopLeft,
+    }
+}
+
+/**
+ * 把 Go 已导入的系统剪贴板图片包装成 Store 批量粘贴 payload
+ * @param assets 入参来自 ImportClipboardImages Bridge 每项都已进入 Managed Asset Repository
+ * @returns 空数组返回 null 非空结果按水平方向排列并交给 Store 生成真实节点 id
+ * Paste Here 和 Paste to Replace 检测到真实图片时触发
+ */
+export function createClipboardImagePayload(
+    assets: ManagedAssetReference[],
+): CanvasClipboardPayload | null {
+    if (assets.length === 0) {
+        return null
+    }
+
+    const nodes = assets.map((asset, assetIndex): ClipboardNodeSnapshot => ({
+        originalNodeId: `clipboard-image-${assetIndex}`,
+        cardType: "image",
+        parentId: null,
+        position: {
+            x: assetIndex * (DEFAULT_CARD_WIDTH + CLIPBOARD_IMAGE_CARD_GAP),
+            y: 0,
+        },
+        size: {
+            mode: "auto",
+            width: DEFAULT_CARD_WIDTH,
+            minHeight: DEFAULT_CARD_MIN_HEIGHT,
+        },
+        status: NODE_STATUS_DONE,
+        asset: { ...asset },
+        caption: "",
+        altText: "",
+    }))
+
+    return {
+        nodes,
+        sourceTopLeft: { x: 0, y: 0 },
     }
 }
 

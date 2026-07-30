@@ -9,6 +9,7 @@ export {
     exportWorkspaceFromBridge,
     importWorkspaceFromBridge,
     importManagedAssetFromBridge,
+    importClipboardImagesFromBridge,
     loadWorkspaceFromBridge,
     listOpenAIModelsFromBridge,
     readManagedAssetDataURLFromBridge,
