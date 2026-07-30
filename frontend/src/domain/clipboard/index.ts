@@ -12,6 +12,11 @@ import type {
     ClipboardNodeSnapshot,
 } from "../../stores/conversationStore"
 import {
+    DEFAULT_CARD_MIN_HEIGHT,
+    DEFAULT_CARD_WIDTH,
+    NODE_STATUS_IDLE,
+} from "../conversation/constants"
+import {
     ClipboardGetText,
     ClipboardSetText,
 } from "../../../wailsjs/runtime/runtime"
@@ -27,6 +32,89 @@ type UnknownRecord = Record<string, unknown>
 export type ForkMindClipboardParseResult =
     | { ok: true; value: CanvasClipboardPayload }
     | { ok: false; error: string }
+
+const EXTERNAL_CLIPBOARD_NODE_ID = "external-clipboard-node"
+
+/**
+ * 把单个外部文本内容包装成可复用现有 Store paste 事务的节点 payload
+ * @param content 入参来自系统文本剪贴板 已完成空白和长度校验
+ * @returns HTTP(S) 单链接生成 Link 其余文本生成 Note
+ * Paste Here 和 Paste to Replace 遇到非 ForkMind JSON 时触发
+ */
+function createExternalTextClipboardPayload(content: string): CanvasClipboardPayload {
+    const baseSnapshot = {
+        originalNodeId: EXTERNAL_CLIPBOARD_NODE_ID,
+        parentId: null,
+        position: { x: 0, y: 0 },
+        size: {
+            mode: "auto" as const,
+            width: DEFAULT_CARD_WIDTH,
+            minHeight: DEFAULT_CARD_MIN_HEIGHT,
+        },
+        status: NODE_STATUS_IDLE,
+    } satisfies Pick<
+        ClipboardNodeSnapshot,
+        "originalNodeId" | "parentId" | "position" | "size" | "status"
+    >
+    const normalizedContent = content.trim()
+
+    try {
+        const parsedURL = new URL(normalizedContent)
+        if (
+            (parsedURL.protocol === "http:" || parsedURL.protocol === "https:") &&
+            !/\s/.test(normalizedContent)
+        ) {
+            const linkSnapshot: ClipboardNodeSnapshot = {
+                ...baseSnapshot,
+                cardType: "link",
+                url: parsedURL.toString(),
+                title: parsedURL.hostname,
+                description: "",
+            }
+            return { nodes: [linkSnapshot], sourceTopLeft: { x: 0, y: 0 } }
+        }
+    } catch {
+        // 非 URL 文本继续按 Note 处理
+    }
+
+    const noteSnapshot: ClipboardNodeSnapshot = {
+        ...baseSnapshot,
+        cardType: "note",
+        noteContent: normalizedContent,
+    }
+    return { nodes: [noteSnapshot], sourceTopLeft: { x: 0, y: 0 } }
+}
+
+/**
+ * 解析任意系统文本剪贴板为 ForkMind 画布 payload
+ * @param content 入参来自浏览器或 Wails 系统文本剪贴板
+ * @returns ForkMind JSON 保留节点关系 单 URL 创建 Link 其余非空文本创建 Note
+ * 用户在画布执行 Paste Here 或 Paste to Replace 时触发
+ */
+export function parseSystemClipboardContent(content: string): ForkMindClipboardParseResult {
+    if (content.length > FORKMIND_CLIPBOARD_MAX_TEXT_LENGTH) {
+        return {
+            ok: false,
+            error: `剪贴板内容超过 ${FORKMIND_CLIPBOARD_MAX_TEXT_LENGTH} 字符限制`,
+        }
+    }
+    if (content.trim().length === 0) {
+        return { ok: false, error: "剪贴板没有可粘贴文本" }
+    }
+
+    let parsedDocument: unknown = null
+    try {
+        parsedDocument = JSON.parse(content) as unknown
+    } catch {
+        return { ok: true, value: createExternalTextClipboardPayload(content) }
+    }
+
+    if (isUnknownRecord(parsedDocument) && parsedDocument.format === FORKMIND_CLIPBOARD_FORMAT) {
+        return parseForkMindClipboard(content)
+    }
+
+    return { ok: true, value: createExternalTextClipboardPayload(content) }
+}
 
 function isUnknownRecord(value: unknown): value is UnknownRecord {
     return typeof value === "object" && value !== null && !Array.isArray(value)

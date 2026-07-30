@@ -14,19 +14,19 @@ ForkMind 画布复制粘贴只使用系统剪贴板作为唯一事实源。
 
 ## 2. MVP 范围
 
-MVP 只识别 ForkMind JSON，不推断普通文本、URL、图片或文件。
+系统文本剪贴板识别 ForkMind JSON、单个 HTTP(S) URL 和普通文本或 Markdown。
 
 | 系统剪贴板内容 | 画布 Paste 行为 | 编辑器 Paste 行为 |
 | --- | --- | --- |
 | 合法 ForkMind JSON | 校验后创建或替换卡片 | 原生粘贴文本 |
-| 非 ForkMind JSON | 拒绝并显示具体原因 | 原生粘贴文本 |
+| 非 ForkMind JSON | 创建 Note Card | 原生粘贴文本 |
 | 空文本 | 拒绝 | 原生粘贴 |
 | 超过 8 MiB 的文本 | 在 `JSON.parse` 前拒绝 | 原生粘贴 |
-| URL | 暂时按非 ForkMind JSON 拒绝 | 原生粘贴 URL |
-| 普通文本 | 暂时按非 ForkMind JSON 拒绝 | 原生粘贴文本 |
+| URL | 创建 Link Card | 原生粘贴 URL |
+| 普通文本或 Markdown | 创建 Note Card | 原生粘贴文本 |
 | 图片或文件 | 暂不读取二进制 MIME | 由目标输入控件决定 |
 
-MVP 不会因为剪贴板内容不是 JSON 而创建错误卡片，也不会让外部数据绕过领域校验直接进入 Zustand。
+系统文本会先转换为统一的 `CanvasClipboardPayload`，再复用现有 Store 粘贴事务，不会让外部数据绕过领域校验直接进入 Zustand。
 
 ## 3. JSON 契约
 
