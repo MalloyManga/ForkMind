@@ -12,6 +12,8 @@ import type {
     ManagedAssetDataBridgeResponse,
     ManagedAssetImportBridgeResponse,
     ManagedAssetKind,
+    ListOpenAIModelsInput,
+    ListOpenAIModelsResponse,
 } from "./contracts"
 
 const BRIDGE_UNAVAILABLE_ERROR: BridgeErrorPayload = {
@@ -227,5 +229,26 @@ export async function cancelChatCompletionFromBridge(
         return await appBridge.CancelChatCompletion(input)
     } catch (error) {
         return { error: normalizeBridgeException(error) }
+    }
+}
+
+/**
+ * 从当前 OpenAI-compatible Provider 读取可选模型 ID
+ * @param input 入参来自 AI Connection 草稿中的 Base URL 和 API Key
+ * @returns 返回模型 ID 列表 Provider 不支持时返回标准 BridgeError 且不影响手动输入
+ * 用户打开设置弹窗或点击刷新模型时触发
+ */
+export async function listOpenAIModelsFromBridge(
+    input: ListOpenAIModelsInput,
+): Promise<ListOpenAIModelsResponse> {
+    const appBridge = getAppBridge()
+    if (!appBridge) {
+        return { models: [], error: BRIDGE_UNAVAILABLE_ERROR }
+    }
+
+    try {
+        return await appBridge.ListOpenAIModels(input)
+    } catch (error) {
+        return { models: [], error: normalizeBridgeException(error) }
     }
 }

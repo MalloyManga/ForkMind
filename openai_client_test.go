@@ -76,6 +76,60 @@ func TestOpenAIClientStreamCompletion(t *testing.T) {
 	}
 }
 
+// TestOpenAIClientListModels 验证模型发现请求的端点 鉴权 去重和排序
+func TestOpenAIClientListModels(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/models" {
+			t.Errorf("request path = %q, want /v1/models", request.URL.Path)
+		}
+		if authorization := request.Header.Get("Authorization"); authorization != "Bearer secret" {
+			t.Errorf("Authorization = %q, want Bearer secret", authorization)
+		}
+		responseWriter.Header().Set("Content-Type", "application/json")
+		_, _ = responseWriter.Write([]byte(`{"data":[{"id":"z-model"},{"id":"a-model"},{"id":"a-model"},{"id":" "}]}`))
+	}))
+	defer server.Close()
+
+	models, err := newOpenAIClientWithHTTPClient(server.Client()).ListModels(
+		context.Background(),
+		server.URL+"/v1/chat/completions",
+		"secret",
+	)
+	if err != nil {
+		t.Fatalf("ListModels() error = %v", err)
+	}
+	if joined := strings.Join(models, ","); joined != "a-model,z-model" {
+		t.Fatalf("models = %q, want a-model,z-model", joined)
+	}
+}
+
+// TestOpenAIClientListModelsErrors 验证非法地址 Provider 错误和非法 JSON 都会返回明确错误
+func TestOpenAIClientListModelsErrors(t *testing.T) {
+	t.Parallel()
+
+	client := newOpenAIClientWithHTTPClient(&http.Client{})
+	if _, err := client.ListModels(context.Background(), "", ""); err == nil {
+		t.Fatal("empty base URL ListModels() error = nil")
+	}
+
+	for _, responseBody := range []string{`{"error":{"message":"models unavailable"}}`, `{bad}`} {
+		responseBody := responseBody
+		server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, _ *http.Request) {
+			if strings.HasPrefix(responseBody, `{"error"`) {
+				responseWriter.WriteHeader(http.StatusNotFound)
+			}
+			_, _ = responseWriter.Write([]byte(responseBody))
+		}))
+		_, err := newOpenAIClientWithHTTPClient(server.Client()).ListModels(context.Background(), server.URL, "")
+		server.Close()
+		if err == nil {
+			t.Fatalf("ListModels() body %q error = nil", responseBody)
+		}
+	}
+}
+
 // TestConsumeOpenAIEventStreamAggregatesToolCallArguments 验证分散在多个 SSE delta 的工具参数按 index 拼接
 func TestConsumeOpenAIEventStreamAggregatesToolCallArguments(t *testing.T) {
 	t.Parallel()

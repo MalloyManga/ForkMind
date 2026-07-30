@@ -30,6 +30,19 @@ type CancelChatCompletionInput struct {
 	RequestID string `json:"requestId"`
 }
 
+// ListOpenAIModelsInput 是模型发现请求使用的临时连接配置
+// APIKey 只在本次 Wails 调用和 Go 内存中存在 不会进入工作区持久化
+type ListOpenAIModelsInput struct {
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey"`
+}
+
+// ListOpenAIModelsResponse 返回 Provider 当前公开的模型 ID 列表
+type ListOpenAIModelsResponse struct {
+	Models []string     `json:"models"`
+	Error  *BridgeError `json:"error,omitempty"`
+}
+
 // AIStreamChunkEvent 是 Go 每收到一段 delta.content 发给 React 的事件
 type AIStreamChunkEvent struct {
 	RequestID string `json:"requestId"`
@@ -135,6 +148,22 @@ func (a *App) StartChatCompletion(input StartChatCompletionInput) OperationRespo
 
 	go a.runChatCompletion(requestContext, input, runtimeContext)
 	return OperationResponse{}
+}
+
+// ListOpenAIModels 通过当前 OpenAI-compatible Provider 的 /models 端点发现模型
+// input 来自 AI Connection 尚未保存的 Base URL 和 API Key
+// 返回值为空数组表示 Provider 合法响应但没有公开模型 Error 表示网络 协议或鉴权失败
+// 用户打开模型选择或主动刷新时触发 不会修改 AISettingsStore
+func (a *App) ListOpenAIModels(input ListOpenAIModelsInput) ListOpenAIModelsResponse {
+	if a.openAIClient == nil {
+		return ListOpenAIModelsResponse{Error: newBridgeError(errorCodeInternal, fmt.Errorf("AI runtime is unavailable"), true)}
+	}
+
+	models, err := a.openAIClient.ListModels(context.Background(), input.BaseURL, input.APIKey)
+	if err != nil {
+		return ListOpenAIModelsResponse{Error: classifyOpenAIError(err)}
+	}
+	return ListOpenAIModelsResponse{Models: models}
 }
 
 // CancelChatCompletion 取消仍在运行的 OpenAI 请求

@@ -10,6 +10,7 @@ export {
     importWorkspaceFromBridge,
     importManagedAssetFromBridge,
     loadWorkspaceFromBridge,
+    listOpenAIModelsFromBridge,
     readManagedAssetDataURLFromBridge,
     saveWorkspaceToBridge,
     startChatCompletionFromBridge,
