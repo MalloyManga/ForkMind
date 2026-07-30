@@ -162,7 +162,7 @@ function App() {
         deleteThread,
     } = useWorkspaceController()
     const workspacePersistence = useWorkspacePersistence()
-    const workspaceTransfer = useWorkspaceTransfer()
+    const workspaceTransfer = useWorkspaceTransfer({ canvasEditor })
     const aiCompletion = useAICompletion()
     const areSidebarsHidden = isLeftSidebarCollapsed && isRightSidebarCollapsed
 
@@ -674,12 +674,7 @@ function App() {
                                 void workspaceTransfer.exportWorkspace()
                             }}
                             onImportWorkspace={() => {
-                                const shouldReplaceWorkspace = window.confirm(
-                                    "导入会替换当前完整工作区 请确认当前内容已经保存或导出",
-                                )
-                                if (shouldReplaceWorkspace) {
-                                    void workspaceTransfer.importWorkspace()
-                                }
+                                void workspaceTransfer.importWorkspace()
                             }}
                             onOpenAISettings={() => {
                                 setIsAISettingsOpen(true)
