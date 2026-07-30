@@ -157,6 +157,20 @@ func (a *App) StartChatCompletion(input StartChatCompletionInput) OperationRespo
 	if err != nil {
 		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
 	}
+	runtimeContext, err = AttachAIReferenceImages(
+		runtimeContext,
+		input.Thread,
+		input.ActiveNodeID,
+		func(asset ManagedAssetDTO) ([]byte, string, error) {
+			if a.workspaceRepository == nil {
+				return nil, "", fmt.Errorf("workspace repository is unavailable")
+			}
+			return a.workspaceRepository.ReadManagedAsset(asset.ID)
+		},
+	)
+	if err != nil {
+		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
+	}
 
 	requestContext, cancel := context.WithCancel(a.ctx)
 	if err := a.aiRequestManager.Register(input.RequestID, cancel); err != nil {
