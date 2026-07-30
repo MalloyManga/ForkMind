@@ -10,6 +10,7 @@ import {
     Check,
     FileText,
     GitFork,
+    Globe2,
     ImageIcon,
     Link2,
     MessageSquareText,
@@ -70,7 +71,7 @@ interface RightEditorSidebarProps {
     activeAIRequestNodeId: string | null
     canStartAIRequest: boolean
     aiErrorMessage: string | null
-    onStartAIRequest: (nodeId: string) => void
+    onStartAIRequest: (nodeId: string, allowWebSearch: boolean) => void
     onCancelAIRequest: (nodeId: string) => void
     onForkTextSelection: (anchor: ConversationTextAnchor) => void
     pendingCanvasPlan: PendingCanvasPlan | null
@@ -229,6 +230,7 @@ export function RightEditorSidebar({
     onRejectCanvasPlan,
 }: RightEditorSidebarProps) {
     const [manualChatPromptRatio, setManualChatPromptRatio] = useState<number | null>(null)
+    const [allowWebSearch, setAllowWebSearch] = useState(false)
     const chatEditorContainerRef = useRef<HTMLDivElement | null>(null)
     const chatResizeStateRef = useRef<ChatEditorResizeState | null>(null)
     const [textSelection, setTextSelection] = useState<ConversationTextAnchor | null>(null)
@@ -242,6 +244,7 @@ export function RightEditorSidebar({
     useEffect(() => {
         setTextSelection(null)
         setManualChatPromptRatio(null)
+        setAllowWebSearch(false)
     }, [activeNode?.id])
 
     const chatPromptRatio = activeNode?.cardType === "chat"
@@ -455,10 +458,39 @@ export function RightEditorSidebar({
                                                 Stop
                                             </Button>
                                         ) : (
-                                            <Button type="button" size="xs" variant="secondary" disabled={!canStartAIRequest} onClick={() => onStartAIRequest(activeNode.id)}>
-                                                <Send className="h-3 w-3" />
-                                                {activeNode.aiResponse.trim().length > 0 ? "Regenerate" : "Send"}
-                                            </Button>
+                                            <>
+                                                <Button
+                                                    type="button"
+                                                    size="xs"
+                                                    variant="ghost"
+                                                    className={cn(
+                                                        allowWebSearch
+                                                            ? "cursor-pointer bg-sky-100 text-sky-700 ring-1 ring-inset ring-sky-300 hover:bg-sky-200 theme-dark:bg-sky-500/20 theme-dark:text-sky-300 theme-dark:ring-sky-400/40 theme-dark:hover:bg-sky-500/30"
+                                                            : "cursor-pointer text-muted-foreground",
+                                                    )}
+                                                    aria-pressed={allowWebSearch}
+                                                    aria-label={allowWebSearch ? "关闭本轮联网" : "允许本轮联网"}
+                                                    title="仅允许本轮请求使用 Provider 原生联网能力 是否支持由当前模型与服务决定"
+                                                    onClick={() => setAllowWebSearch((currentValue) => !currentValue)}
+                                                >
+                                                    <Globe2 className="h-3 w-3" />
+                                                    联网
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="xs"
+                                                    variant="secondary"
+                                                    disabled={!canStartAIRequest}
+                                                    onClick={() => {
+                                                        onStartAIRequest(activeNode.id, allowWebSearch)
+                                                        // 联网权限只作用于当前一次发送 下一轮需要用户再次明确开启
+                                                        setAllowWebSearch(false)
+                                                    }}
+                                                >
+                                                    <Send className="h-3 w-3" />
+                                                    {activeNode.aiResponse.trim().length > 0 ? "Regenerate" : "Send"}
+                                                </Button>
+                                            </>
                                         )}
                                     </div>
                                 )}

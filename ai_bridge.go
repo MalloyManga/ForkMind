@@ -19,10 +19,11 @@ const (
 // StartChatCompletionInput 是 React 点击 Send 时提交给 Wails 的完整请求
 // Thread 是当前会话快照 Config 是本轮 OpenAI-compatible 设置 APIKey 不会持久化
 type StartChatCompletionInput struct {
-	RequestID    string                    `json:"requestId"`
-	Thread       ConversationThreadDTO     `json:"thread"`
-	ActiveNodeID string                    `json:"activeNodeId"`
-	Config       OpenAICompletionConfigDTO `json:"config"`
+	RequestID      string                    `json:"requestId"`
+	Thread         ConversationThreadDTO     `json:"thread"`
+	ActiveNodeID   string                    `json:"activeNodeId"`
+	Config         OpenAICompletionConfigDTO `json:"config"`
+	AllowWebSearch bool                      `json:"allowWebSearch"`
 }
 
 // CancelChatCompletionInput 标识需要取消的流式请求
@@ -149,25 +150,12 @@ func (a *App) StartChatCompletion(input StartChatCompletionInput) OperationRespo
 	if err != nil {
 		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
 	}
+	input.Thread = hydratedThread
 
 	runtimeContext, err := BuildAIRuntimeContext(BuildAIContextInput{
 		Thread:       hydratedThread,
 		ActiveNodeID: input.ActiveNodeID,
 	})
-	if err != nil {
-		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
-	}
-	runtimeContext, err = AttachAIReferenceImages(
-		runtimeContext,
-		input.Thread,
-		input.ActiveNodeID,
-		func(asset ManagedAssetDTO) ([]byte, string, error) {
-			if a.workspaceRepository == nil {
-				return nil, "", fmt.Errorf("workspace repository is unavailable")
-			}
-			return a.workspaceRepository.ReadManagedAsset(asset.ID)
-		},
-	)
 	if err != nil {
 		return OperationResponse{Error: newBridgeError(errorCodeInvalidData, err, false)}
 	}
@@ -260,27 +248,50 @@ func (a *App) runChatCompletion(
 		}
 		runtimeContext = hydratedContext
 	}
-
-	result, err := a.openAIClient.StreamCompletion(
-		requestContext,
-		openAIStreamRequest{
-			BaseURL:     input.Config.BaseURL,
-			APIKey:      input.Config.APIKey,
-			Model:       input.Config.Model,
-			Messages:    runtimeContext.Messages,
-			Temperature: defaultOpenAITemperature,
-			MaxTokens:   defaultOpenAIMaxTokens,
-			Tools:       []openAIToolDefinition{canvasPlanToolDefinition()},
-		},
-		func(content string) error {
-			emitWailsEvent(a.ctx, aiEventChunk, AIStreamChunkEvent{
-				RequestID: input.RequestID,
-				NodeID:    input.ActiveNodeID,
-				Delta:     content,
-			})
-			return nil
+	runtimeContext, err := AttachAIReferenceImages(
+		runtimeContext,
+		input.Thread,
+		input.ActiveNodeID,
+		func(asset ManagedAssetDTO) ([]byte, string, error) {
+			if a.workspaceRepository == nil {
+				return nil, "", fmt.Errorf("workspace repository is unavailable")
+			}
+			return a.workspaceRepository.ReadManagedAsset(asset.ID)
 		},
 	)
+	if err != nil {
+		emitWailsEvent(a.ctx, aiEventError, AIStreamErrorEvent{
+			RequestID: input.RequestID,
+			NodeID:    input.ActiveNodeID,
+			Error:     *newBridgeError(errorCodeInvalidData, err, false),
+		})
+		return
+	}
+
+	streamRequest := openAIStreamRequest{
+		BaseURL:     input.Config.BaseURL,
+		APIKey:      input.Config.APIKey,
+		Model:       input.Config.Model,
+		Messages:    runtimeContext.Messages,
+		Temperature: defaultOpenAITemperature,
+		MaxTokens:   defaultOpenAIMaxTokens,
+		Tools:       []openAIToolDefinition{canvasPlanToolDefinition()},
+	}
+	onChunk := func(content string) error {
+		emitWailsEvent(a.ctx, aiEventChunk, AIStreamChunkEvent{
+			RequestID: input.RequestID,
+			NodeID:    input.ActiveNodeID,
+			Delta:     content,
+		})
+		return nil
+	}
+
+	var result OpenAIStreamResult
+	if input.AllowWebSearch {
+		result, err = a.openAIClient.StreamNativeWebSearch(requestContext, streamRequest, onChunk)
+	} else {
+		result, err = a.openAIClient.StreamCompletion(requestContext, streamRequest, onChunk)
+	}
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			emitWailsEvent(a.ctx, aiEventDone, AIStreamDoneEvent{
@@ -290,6 +301,9 @@ func (a *App) runChatCompletion(
 				Cancelled:    true,
 			})
 			return
+		}
+		if input.AllowWebSearch {
+			err = fmt.Errorf("native web search is unavailable for the current model or Provider: %w", err)
 		}
 
 		bridgeError := classifyOpenAIError(err)

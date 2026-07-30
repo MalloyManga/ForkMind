@@ -53,9 +53,9 @@ function getImportPastePoint(canvasEditor: Editor): ConversationCardPosition {
 }
 
 /**
- * 管理完整工作区单文件导入导出
- * @returns 返回两个命令以及当前进度和用户可读结果
+ * 管理完整工作区导出和卡片追加导入
  * @param params.canvasEditor 入参来自 App 用于计算导入落点并在投影完成后选中新卡片
+ * @returns 返回两个命令以及当前进度和用户可读结果
  * 左侧栏按钮触发 Go 系统文件对话框 导入数据通过领域校验后追加到当前 Zustand thread
  */
 export function useWorkspaceTransfer({ canvasEditor }: UseWorkspaceTransferParams) {
@@ -119,7 +119,7 @@ export function useWorkspaceTransfer({ canvasEditor }: UseWorkspaceTransferParam
     /**
      * 导入文件 active thread 的 cards 并追加到当前画布
      * @returns Promise 在文件读取 JSON 解析 领域校验和 Store 粘贴事务全部完成后结束
-     * 用户点击 Import 时触发 任一边界失败都不会修改当前工作区
+     * 用户点击 Import cards 时触发 任一边界失败都不会修改当前工作区
      */
     const importWorkspace = useCallback(async (): Promise<void> => {
         setTransferState({ status: "importing", message: null, error: null })

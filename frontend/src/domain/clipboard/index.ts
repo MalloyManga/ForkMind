@@ -3,6 +3,7 @@ import {
     DEFAULT_CARD_MIN_HEIGHT,
     DEFAULT_CARD_WIDTH,
     NODE_STATUS_DONE,
+    NODE_STATUS_IDLE,
 } from "../conversation/constants"
 import type { ConversationCard, ManagedAssetReference } from "../conversation/types"
 import {
@@ -16,11 +17,6 @@ import type {
     CanvasClipboardPayload,
     ClipboardNodeSnapshot,
 } from "../../stores/conversationStore"
-import {
-    DEFAULT_CARD_MIN_HEIGHT,
-    DEFAULT_CARD_WIDTH,
-    NODE_STATUS_IDLE,
-} from "../conversation/constants"
 import {
     ClipboardGetText,
     ClipboardSetText,

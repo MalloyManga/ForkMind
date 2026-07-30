@@ -26,7 +26,7 @@ export interface UseAICompletionResult {
     error: BridgeErrorPayload | null
     pendingCanvasPlan: PendingCanvasPlan | null
     canStart: (nodeId: string) => boolean
-    startCompletion: (nodeId: string) => Promise<void>
+    startCompletion: (nodeId: string, allowWebSearch: boolean) => Promise<void>
     cancelCompletion: (nodeId: string) => Promise<void>
     clearError: () => void
     acceptCanvasPlan: () => void
@@ -163,10 +163,11 @@ export function useAICompletion(): UseAICompletionResult {
     /**
      * 启动指定 Chat 节点的流式生成
      * @param nodeId 入参来自 Send 或 Regenerate 按钮
+     * @param allowWebSearch 入参来自右侧栏本轮联网开关 true 时由 Go 请求 Provider 原生 web_search
      * @returns Promise 在 Wails 接受或拒绝启动请求后完成 实际文本继续通过事件到达
      * 用户发送 Prompt 时触发 并在调用 Bridge 前建立唯一活动请求和撤销基线
      */
-    const startCompletion = useCallback(async (nodeId: string): Promise<void> => {
+    const startCompletion = useCallback(async (nodeId: string, allowWebSearch: boolean): Promise<void> => {
         if (activeRequestRef.current) {
             setError(createClientError(
                 AI_ERROR_CODE_REQUEST_ACTIVE,
@@ -225,6 +226,7 @@ export function useAICompletion(): UseAICompletionResult {
                 apiKey,
                 model: persistedSettings.model.trim(),
             },
+            allowWebSearch,
         })
 
         if (response.error && activeRequestRef.current?.requestId === requestId) {

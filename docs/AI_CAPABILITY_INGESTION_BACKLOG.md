@@ -200,7 +200,9 @@ File Card reference
 - `fetch_url(url)`：用户已经提供目标 URL。
 - `web_search(query)`：模型或用户需要发现未知网页。
 
-`web_search` 需要独立的搜索 Provider 或 API Key，不能仅靠 OpenAI-compatible Chat API 自动获得。它应在未来作为单独的 Tool Calling 能力设计，默认关闭，并且每次请求都要受超时、域名、结果数量和内容大小约束。
+当前 MVP 使用模型 Provider 托管的 Responses API `web_search` 能力 不引入独立搜索服务或额外 API Key。用户通过右侧栏为单次请求授权联网 开启后请求切换到同一 Base URL 的 `/responses` 并由模型决定是否搜索。
+
+仅支持 `/chat/completions` 的 Provider 不具备这个可控开关 开启时会返回可理解的能力错误。未来如果需要覆盖不支持 Responses 的模型 再考虑接入独立搜索 Provider 作为降级方案。
 
 ## 8. 实施顺序
 
@@ -215,4 +217,4 @@ File Card reference
 - [x] 多模态 message content
 - [x] 图片引用到 vision 模型 Provider 能力自动发现留待模型能力分支
 - [x] `fetch_url` 安全封装
-- [ ] `web_search` 独立工具和权限
+- [x] Provider 原生 `web_search` 和单次请求权限

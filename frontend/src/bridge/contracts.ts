@@ -79,6 +79,7 @@ export interface StartChatCompletionInput {
     thread: ConversationThread
     activeNodeId: string
     config: OpenAICompletionConfig
+    allowWebSearch: boolean
 }
 
 export interface CancelChatCompletionInput {

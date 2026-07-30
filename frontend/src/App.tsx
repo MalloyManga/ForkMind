@@ -757,8 +757,8 @@ function App() {
                                     : false
                             }
                             aiErrorMessage={aiCompletion.error?.message ?? null}
-                            onStartAIRequest={(nodeId) => {
-                                void aiCompletion.startCompletion(nodeId)
+                            onStartAIRequest={(nodeId, allowWebSearch) => {
+                                void aiCompletion.startCompletion(nodeId, allowWebSearch)
                             }}
                             onCancelAIRequest={(nodeId) => {
                                 void aiCompletion.cancelCompletion(nodeId)

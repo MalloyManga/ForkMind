@@ -19,6 +19,7 @@ import (
 const (
 	openAIChatCompletionsPath = "/chat/completions"
 	openAIModelsPath          = "/models"
+	openAIResponsesPath       = "/responses"
 	maxOpenAIErrorBodyBytes   = 1024 * 1024
 	defaultOpenAITemperature  = 0.7
 	defaultOpenAIMaxTokens    = 4096
@@ -325,7 +326,7 @@ func resolveOpenAIEndpointURL(baseURL string, endpointPath string) (string, erro
 	}
 
 	trimmedPath := strings.TrimRight(parsedURL.Path, "/")
-	for _, knownEndpointPath := range []string{openAIChatCompletionsPath, openAIModelsPath} {
+	for _, knownEndpointPath := range []string{openAIChatCompletionsPath, openAIModelsPath, openAIResponsesPath} {
 		if strings.HasSuffix(trimmedPath, knownEndpointPath) {
 			trimmedPath = strings.TrimSuffix(trimmedPath, knownEndpointPath)
 			break
