@@ -1,6 +1,6 @@
 # ForkMind AI 能力与资料读取 Backlog
 
-本文记录模型选择、文件解析、URL 读取、视觉输入和联网工具的讨论结论。当前只定义方向和验收边界，不代表功能已经实现。
+本文记录模型选择、文件解析、URL 读取、视觉输入和联网工具的讨论结论。勾选项表示对应功能已在当前功能分支实现 未勾选项仍是后续方向。
 
 ## 1. 目标体验
 
@@ -207,13 +207,13 @@ File Card reference
 - [ ] `ListModels` Go Bridge 和 AI Connection 下拉框
 - [ ] 模型列表加载失败时的手动输入降级
 - [ ] Provider / 本地注册表 / unknown 三层能力来源
-- [ ] Link Card 确定 URL 抓取 MVP
+- [x] Link Card 确定 URL 抓取 MVP
 - [ ] Markdown 和 TXT 文件提取
 - [ ] PDF 文本提取
 - [ ] DOCX 文本提取
 - [ ] 文件读取权限和大小限制 UI
 - [ ] 多模态 message content
 - [ ] 图片引用到 vision 模型
-- [ ] `fetch_url` 安全封装
+- [x] `fetch_url` 安全封装
 - [ ] `web_search` 独立工具和权限
 

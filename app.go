@@ -10,6 +10,7 @@ type App struct {
 	workspaceRepository *WorkspaceRepository
 	initializationError error
 	openAIClient        *OpenAIClient
+	urlContentFetcher   *URLContentFetcher
 	aiRequestManager    *AIRequestManager
 	closeCoordinator    *AppCloseCoordinator
 }
@@ -21,6 +22,7 @@ func NewApp() *App {
 		workspaceRepository: workspaceRepository,
 		initializationError: err,
 		openAIClient:        NewOpenAIClient(),
+		urlContentFetcher:   NewURLContentFetcher(),
 		aiRequestManager:    NewAIRequestManager(),
 		closeCoordinator:    NewAppCloseCoordinator(),
 	}
