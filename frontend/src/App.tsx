@@ -35,6 +35,7 @@ import type {
 import { useCanvasBridge } from "./hooks/useCanvasBridge"
 import { useCanvasContextMenuExecutor } from "./hooks/useCanvasContextMenuExecutor"
 import { useCanvasContextMenuResolver } from "./hooks/useCanvasContextMenuResolver"
+import { ThemeMode, loadTheme, saveTheme } from "./hooks/useThemeMode"
 import { useAICompletion } from "./hooks/useAICompletion"
 import { type CanvasTool } from "./hooks/canvasToolTypes"
 import { useWorkspaceController } from "./hooks/useWorkspaceController"
@@ -55,8 +56,6 @@ import {
     useConversationStore,
 } from "./stores/useConversationStore"
 
-type ThemeMode = "dark" | "light"
-
 interface ResizeDragState {
     side: "left" | "right"
     startX: number
@@ -69,7 +68,7 @@ interface CanvasContextMenuState {
     items: CanvasContextMenuItem[]
 }
 
-interface CanvasTextSelectionState extends CanvasTextSelectionEventDetail {}
+interface CanvasTextSelectionState extends CanvasTextSelectionEventDetail { }
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
@@ -126,7 +125,7 @@ function hasBrowserTextSelection(): boolean {
 }
 
 function App() {
-    const [themeMode, setThemeMode] = useState<ThemeMode>("dark")
+    const [themeMode, setThemeMode] = useState<ThemeMode>(loadTheme)
     const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false)
     const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false)
     const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
@@ -213,6 +212,7 @@ function App() {
         // Radix Portal 挂在 body 下 将主题放到 html 才能让弹窗继承同一套亮暗变量
         document.documentElement.dataset.theme = themeMode
         document.documentElement.classList.toggle("dark", themeMode === "dark")
+        saveTheme(themeMode)
     }, [themeMode])
 
     /**
@@ -644,44 +644,44 @@ function App() {
                             style={{ width: leftSidebarWidth }}
                         >
                             <LeftConversationSidebar
-                            threadTitle={activeThread.title}
-                            cardCount={cards.length}
-                            rootNodeCount={rootNodeCount}
-                            threads={threads}
-                            activeThreadId={activeThreadId}
-                            persistenceStatus={workspacePersistence.status}
-                            persistenceErrorMessage={workspacePersistence.error?.message ?? null}
-                            isThreadManagementDisabled={aiCompletion.isRequestActive}
-                            workspaceTransferMessage={workspaceTransfer.message}
-                            workspaceTransferErrorMessage={workspaceTransfer.error?.message ?? null}
-                            isWorkspaceTransferBusy={workspaceTransfer.isBusy}
-                            themeMode={themeMode}
-                            panelsToggleControl={
-                                <PanelsToggleButton
-                                    isMinimized={areSidebarsHidden}
-                                    onToggle={() => {
-                                        setAreSidebarsHidden(true)
-                                    }}
-                                />
-                            }
-                            onCreateThread={() => {
-                                createThread()
-                            }}
-                            onSwitchThread={switchThread}
-                            onRenameThread={renameThread}
-                            onDeleteThread={deleteThread}
-                            onExportWorkspace={() => {
-                                void workspaceTransfer.exportWorkspace()
-                            }}
-                            onImportWorkspace={() => {
-                                void workspaceTransfer.importWorkspace()
-                            }}
-                            onOpenAISettings={() => {
-                                setIsAISettingsOpen(true)
-                            }}
-                            onToggleTheme={() => {
-                                setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
-                            }}
+                                threadTitle={activeThread.title}
+                                cardCount={cards.length}
+                                rootNodeCount={rootNodeCount}
+                                threads={threads}
+                                activeThreadId={activeThreadId}
+                                persistenceStatus={workspacePersistence.status}
+                                persistenceErrorMessage={workspacePersistence.error?.message ?? null}
+                                isThreadManagementDisabled={aiCompletion.isRequestActive}
+                                workspaceTransferMessage={workspaceTransfer.message}
+                                workspaceTransferErrorMessage={workspaceTransfer.error?.message ?? null}
+                                isWorkspaceTransferBusy={workspaceTransfer.isBusy}
+                                themeMode={themeMode}
+                                panelsToggleControl={
+                                    <PanelsToggleButton
+                                        isMinimized={areSidebarsHidden}
+                                        onToggle={() => {
+                                            setAreSidebarsHidden(true)
+                                        }}
+                                    />
+                                }
+                                onCreateThread={() => {
+                                    createThread()
+                                }}
+                                onSwitchThread={switchThread}
+                                onRenameThread={renameThread}
+                                onDeleteThread={deleteThread}
+                                onExportWorkspace={() => {
+                                    void workspaceTransfer.exportWorkspace()
+                                }}
+                                onImportWorkspace={() => {
+                                    void workspaceTransfer.importWorkspace()
+                                }}
+                                onOpenAISettings={() => {
+                                    setIsAISettingsOpen(true)
+                                }}
+                                onToggleTheme={() => {
+                                    setThemeMode((prevMode) => (prevMode === "dark" ? "light" : "dark"))
+                                }}
                             />
                         </div>
                     </div>
@@ -737,36 +737,36 @@ function App() {
                             style={{ width: rightSidebarWidth }}
                         >
                             <RightEditorSidebar
-                            activeNode={activeNode}
-                            onUpdateChatPrompt={updateChatPrompt}
-                            onUpdateChatResponse={updateChatResponse}
-                            onUpdateNoteContent={updateNoteContent}
-                            onUpdateImageNode={updateImageNode}
-                            onUpdateLinkNode={updateLinkNode}
-                            onUpdateFileNode={updateFileNode}
-                            onSelectManagedAsset={(nodeId, kind) => {
-                                void handleSelectManagedAsset(nodeId, kind)
-                            }}
-                            managedAssetErrorMessage={managedAssetErrorMessage}
-                            onBeginTextEdit={beginTextEdit}
-                            onEndTextEdit={endTextEdit}
-                            activeAIRequestNodeId={aiCompletion.activeRequestNodeId}
-                            canStartAIRequest={
-                                activeNode?.cardType === "chat"
-                                    ? aiCompletion.canStart(activeNode.id)
-                                    : false
-                            }
-                            aiErrorMessage={aiCompletion.error?.message ?? null}
-                            onStartAIRequest={(nodeId, allowWebSearch) => {
-                                void aiCompletion.startCompletion(nodeId, allowWebSearch)
-                            }}
-                            onCancelAIRequest={(nodeId) => {
-                                void aiCompletion.cancelCompletion(nodeId)
-                            }}
-                            onForkTextSelection={handleForkTextSelection}
-                            pendingCanvasPlan={aiCompletion.pendingCanvasPlan}
-                            onAcceptCanvasPlan={aiCompletion.acceptCanvasPlan}
-                            onRejectCanvasPlan={aiCompletion.rejectCanvasPlan}
+                                activeNode={activeNode}
+                                onUpdateChatPrompt={updateChatPrompt}
+                                onUpdateChatResponse={updateChatResponse}
+                                onUpdateNoteContent={updateNoteContent}
+                                onUpdateImageNode={updateImageNode}
+                                onUpdateLinkNode={updateLinkNode}
+                                onUpdateFileNode={updateFileNode}
+                                onSelectManagedAsset={(nodeId, kind) => {
+                                    void handleSelectManagedAsset(nodeId, kind)
+                                }}
+                                managedAssetErrorMessage={managedAssetErrorMessage}
+                                onBeginTextEdit={beginTextEdit}
+                                onEndTextEdit={endTextEdit}
+                                activeAIRequestNodeId={aiCompletion.activeRequestNodeId}
+                                canStartAIRequest={
+                                    activeNode?.cardType === "chat"
+                                        ? aiCompletion.canStart(activeNode.id)
+                                        : false
+                                }
+                                aiErrorMessage={aiCompletion.error?.message ?? null}
+                                onStartAIRequest={(nodeId, allowWebSearch) => {
+                                    void aiCompletion.startCompletion(nodeId, allowWebSearch)
+                                }}
+                                onCancelAIRequest={(nodeId) => {
+                                    void aiCompletion.cancelCompletion(nodeId)
+                                }}
+                                onForkTextSelection={handleForkTextSelection}
+                                pendingCanvasPlan={aiCompletion.pendingCanvasPlan}
+                                onAcceptCanvasPlan={aiCompletion.acceptCanvasPlan}
+                                onRejectCanvasPlan={aiCompletion.rejectCanvasPlan}
                             />
                         </div>
                     </div>
