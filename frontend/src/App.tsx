@@ -601,7 +601,7 @@ function App() {
             {isLeftSidebarCollapsed && !isCanvasUiHidden ? (
                 <div className="pointer-events-none absolute left-4 top-4 z-40">
                     <div className="pointer-events-auto inline-flex items-center gap-2.5 rounded-2xl border border-border/60 bg-background/80 py-1.5 pl-2 pr-1.5 shadow-[0_8px_32px_-8px_rgba(15,23,42,0.24)] backdrop-blur-xl transition-all duration-200">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-indigo-500 text-white">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-linear-to-br from-sky-400 to-indigo-500 text-white">
                             <GitFork className="h-3 w-3" strokeWidth={2.4} />
                         </span>
                         <div className="max-w-56 truncate text-sm font-medium">{activeThread.title}</div>
