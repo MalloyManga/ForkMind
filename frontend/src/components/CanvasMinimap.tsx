@@ -257,7 +257,7 @@ export function CanvasMinimap() {
                 {projection.items.map((item, index) => (
                     <div
                         key={index}
-                        className="absolute rounded-[2px] transition-all"
+                        className="absolute rounded-xs transition-all"
                         style={{
                             left: item.x,
                             top: item.y,

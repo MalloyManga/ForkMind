@@ -116,7 +116,7 @@ export function AISettingsSheet({ open, onOpenChange }: AISettingsSheetProps) {
             <DialogContent>
                 <DialogHeader className="border-b border-border/70 px-5 py-4">
                     <div className="flex items-center gap-3 pr-8">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-white shadow-[0_5px_16px_-5px_rgba(56,189,248,0.7)]">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-sky-400 to-indigo-500 text-white shadow-[0_5px_16px_-5px_rgba(56,189,248,0.7)]">
                             <ServerCog className="h-4 w-4" />
                         </span>
                         <div>

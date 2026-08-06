@@ -145,7 +145,7 @@ export function LeftConversationSidebar({
             {/* 品牌头部 */}
             <header className="flex h-14 shrink-0 items-center justify-between px-4">
                 <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-white shadow-[0_4px_12px_-2px_rgba(56,189,248,0.5)]">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br from-sky-400 to-indigo-500 text-white shadow-[0_4px_12px_-2px_rgba(56,189,248,0.5)]">
                         <GitFork className="h-4 w-4" strokeWidth={2.4} />
                     </div>
                     <div className="leading-none">
@@ -158,7 +158,7 @@ export function LeftConversationSidebar({
                 {panelsToggleControl}
             </header>
 
-            <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+            <div className="mx-4 h-px bg-linear-to-r from-transparent via-border to-transparent" />
 
             {/* 会话概览 */}
             <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-3 py-4">
@@ -170,7 +170,7 @@ export function LeftConversationSidebar({
                 </div>
 
                 <div className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-shadow hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18)]">
-                    <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-sky-400 via-indigo-400 to-transparent opacity-80" />
+                    <div className="absolute inset-x-0 top-0 h-0.75 bg-linear-to-r from-sky-400 via-indigo-400 to-transparent opacity-80" />
                     <div className="flex items-center gap-2">
                         <span className="relative flex h-2 w-2">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />

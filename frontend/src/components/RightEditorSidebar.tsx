@@ -385,7 +385,7 @@ export function RightEditorSidebar({
         if (!activeNode) {
             return (
                 <div className="flex h-full flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border/60 px-6 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-muted/80 to-muted/40 text-muted-foreground/40">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-muted/80 to-muted/40 text-muted-foreground/40">
                         <SquareMousePointer className="h-7 w-7" strokeWidth={1.6} />
                     </div>
                     <div className="space-y-1.5">
@@ -403,7 +403,7 @@ export function RightEditorSidebar({
                 return (
                     <div ref={chatEditorContainerRef} className="flex h-full min-h-0 flex-col">
                         {activeNode.sourceAnchor ? (
-                            <div className="mb-2 shrink-0 rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2">
+                            <div className="mb-2 shrink-0 rounded-xl border border-sky-500/20 bg-sky-500/6 px-3 py-2">
                                 <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-600 theme-dark:text-sky-400">
                                     <GitFork className="h-3 w-3" />
                                     Anchored from {activeNode.sourceAnchor.field}
@@ -699,7 +699,7 @@ export function RightEditorSidebar({
                 )}
             </header>
 
-            <div className="mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+            <div className="mx-4 h-px bg-linear-to-r from-transparent via-border to-transparent" />
 
             {pendingCanvasPlan ? (
                 <section
