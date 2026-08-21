@@ -5,7 +5,6 @@ import { assertNever } from "../lib/utils"
 import { type ForkMindCardShape, FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
 import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
-    type ArrowAnchorOverride,
     areSameShapeIdSet,
     createStableArrowProjections,
     getCardShapeHeight,
@@ -152,7 +151,6 @@ interface UseCanvasBridgeCanvasSyncParams {
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
     isApplyingStoreToCanvasRef: MutableRefObject<boolean>
     isUserMultiSelectionRef: MutableRefObject<boolean>
-    arrowAnchorOverrideByIdRef: MutableRefObject<Map<TLShapeId, ArrowAnchorOverride>>
     syncStableArrowProjection: typeof SyncStableArrowProjectionFn
 }
 
@@ -168,7 +166,6 @@ export function useCanvasBridgeCanvasSync({
     linkDragSessionRef,
     isApplyingStoreToCanvasRef,
     isUserMultiSelectionRef,
-    arrowAnchorOverrideByIdRef,
     syncStableArrowProjection,
 }: UseCanvasBridgeCanvasSyncParams) {
     useEffect(() => {
@@ -299,8 +296,7 @@ export function useCanvasBridgeCanvasSync({
                 // 4：计算 Arrow（连线）的 Diff，并呼叫 projection 层兜底更新
                 // 当前 store 的当中所有卡片推断出他们之间的箭头信息
                 const stableArrowProjections = createStableArrowProjections(
-                    cards,
-                    arrowAnchorOverrideByIdRef.current,
+                    cards
                 )
                 const desiredArrowIdSet = new Set(
                     stableArrowProjections.map((projection) => projection.id),
@@ -311,12 +307,6 @@ export function useCanvasBridgeCanvasSync({
                 )
                 if (staleArrowIds.length > 0) {
                     canvasEditor.deleteShapes(staleArrowIds)
-                }
-
-                for (const overrideArrowId of Array.from(arrowAnchorOverrideByIdRef.current.keys())) {
-                    if (!desiredArrowIdSet.has(overrideArrowId)) {
-                        arrowAnchorOverrideByIdRef.current.delete(overrideArrowId)
-                    }
                 }
                 // ----------------------
 
@@ -347,7 +337,6 @@ export function useCanvasBridgeCanvasSync({
         }
     }, [
         activeNodeId,
-        arrowAnchorOverrideByIdRef,
         canvasEditor,
         cards,
         isApplyingStoreToCanvasRef,

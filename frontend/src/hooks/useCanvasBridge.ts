@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+﻿import { useCallback, useEffect, useRef, useState } from "react"
 import { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { assertNever } from "../lib/utils"
@@ -82,8 +82,6 @@ export function useCanvasBridge({
     const activeNodeIdRef = useRef<string | null>(null)
     const cardsRef = useRef<ConversationCard[]>(cards)
     const currentCanvasToolRef = useRef<CanvasTool>(currentCanvasTool)
-
-    const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点
 
     /**
      * 当前正在拖拽出的箭头都对象的快照
@@ -243,7 +241,6 @@ export function useCanvasBridge({
         linkDragSessionRef,
         isApplyingStoreToCanvasRef,
         isUserMultiSelectionRef,
-        arrowAnchorOverrideByIdRef,
         syncStableArrowProjection,
     })
 
@@ -258,7 +255,6 @@ export function useCanvasBridge({
         activeNodeIdRef,
         cardsRef,
         linkDragSessionRef,
-        arrowAnchorOverrideByIdRef,
         clearPointerListeners,
         setActiveNodeId,
         moveNode,

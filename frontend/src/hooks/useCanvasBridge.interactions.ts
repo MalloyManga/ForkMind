@@ -5,8 +5,6 @@ import { FORK_MIND_CARD_SHAPE_TYPE } from "../lib/forkMindCardShape"
 import { parseCanvasArrowDescriptor, parseNodeIdFromShapeId, toCanvasNodeShapeId } from "./canvasNodeIds"
 import {
     getCardShapeHeight,
-    type ArrowAnchorOverride,
-    closestAnchorSideToNormalizedAnchor,
     createStableArrowProjections,
     isTextEditingTarget,
     type LinkDragSession,
@@ -20,7 +18,6 @@ interface UseCanvasBridgeInteractionsParams {
     activeNodeIdRef: MutableRefObject<string | null>
     cardsRef: MutableRefObject<ConversationCard[]>
     linkDragSessionRef: MutableRefObject<LinkDragSession | null>
-    arrowAnchorOverrideByIdRef: MutableRefObject<Map<TLShapeId, ArrowAnchorOverride>>
     clearPointerListeners: () => void
     setActiveNodeId: (nodeId: string | null) => void
     moveNode: (nodeId: string, nextPosition: { x: number; y: number }) => void
@@ -44,7 +41,6 @@ export function useCanvasBridgeInteractions({
     activeNodeIdRef,
     cardsRef,
     linkDragSessionRef,
-    arrowAnchorOverrideByIdRef,
     clearPointerListeners,
     setActiveNodeId,
     moveNode,
@@ -462,7 +458,6 @@ export function useCanvasBridgeInteractions({
                 return
             }
 
-            const nextOverrideById = new Map(arrowAnchorOverrideByIdRef.current)
             for (const selectedArrowId of selectedArrowIds) {
                 const bindings = canvasEditor.getBindingsFromShape(selectedArrowId, "arrow")
                 const startBinding = bindings.find((binding) => binding.props.terminal === "start")
@@ -471,21 +466,12 @@ export function useCanvasBridgeInteractions({
                 if (!startBinding || !endBinding) {
                     continue
                 }
-
-                nextOverrideById.set(selectedArrowId, {
-                    sourceSide: closestAnchorSideToNormalizedAnchor(startBinding.props.normalizedAnchor),
-                    targetSide: closestAnchorSideToNormalizedAnchor(endBinding.props.normalizedAnchor),
-                })
             }
-
-            // 保存拖拽之后得到的锚点覆盖值
-            arrowAnchorOverrideByIdRef.current = nextOverrideById
 
             // 按新的锚点重新计算所有箭头投影
             const projectionById = new Map(
                 createStableArrowProjections(
                     cardsRef.current,
-                    nextOverrideById,
                 ).map((projection) => [projection.id, projection]),
             )
 
@@ -505,7 +491,6 @@ export function useCanvasBridgeInteractions({
             window.removeEventListener("pointerup", handleArrowPointerUp, true)
         }
     }, [
-        arrowAnchorOverrideByIdRef,
         canvasEditor,
         cardsRef,
         isApplyingStoreToCanvasRef,

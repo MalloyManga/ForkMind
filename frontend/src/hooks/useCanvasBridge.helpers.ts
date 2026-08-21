@@ -451,7 +451,6 @@ export function computeArrowBend(sourcePoint: Point, targetPoint: Point): number
  */
 export function createStableArrowProjections(
     cards: ConversationCard[],
-    anchorOverrideByArrowId?: Map<TLShapeId, ArrowAnchorOverride>,
 ): StableArrowProjection[] {
     const cardById = new Map(cards.map((card) => [card.id, card] as const))
     const projections: StableArrowProjection[] = []
@@ -461,9 +460,8 @@ export function createStableArrowProjections(
             const parentCard = cardById.get(card.parentId)
             if (parentCard) {
                 const sides = deriveLinkSides(parentCard, card)
-                const override = anchorOverrideByArrowId?.get(toCanvasParentArrowId(card.id))
-                const sourceSide = override?.sourceSide ?? sides.sourceSide
-                const targetSide = override?.targetSide ?? sides.targetSide
+                const sourceSide = sides.sourceSide
+                const targetSide = sides.targetSide
                 const startPoint = edgePointBySide(
                     {
                         x: parentCard.position.x,
@@ -505,9 +503,8 @@ export function createStableArrowProjections(
 
             const sides = deriveLinkSides(card, targetCard)
             const referenceArrowId = toCanvasReferenceArrowId(card.id, targetCard.id)
-            const override = anchorOverrideByArrowId?.get(referenceArrowId)
-            const sourceSide = override?.sourceSide ?? sides.sourceSide
-            const targetSide = override?.targetSide ?? sides.targetSide
+            const sourceSide = sides.sourceSide
+            const targetSide = sides.targetSide
             const startPoint = edgePointBySide(
                 {
                     x: card.position.x,
