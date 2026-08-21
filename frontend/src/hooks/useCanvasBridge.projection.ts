@@ -144,7 +144,7 @@ export function syncStableArrowProjection(editor: Editor, projection: StableArro
 }
 
 /**
- * 幽灵卡片信息
+ * 预创建卡片信息
  */
 export type ForkMindCardShapePartial = {
     id: TLShapeId

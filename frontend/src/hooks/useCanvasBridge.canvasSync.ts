@@ -85,12 +85,6 @@ function areSameForkMindCardShapeProps(
 }
 
 /**
- * 计算卡片类型对应的默认画布高度
- * @param card Store 中的业务 card 用于读取 card.cardType 并暴露新增类型的编译期提醒
- * @returns 返回 tldraw 自定义 shape 本轮同步时应使用的默认高度
- * 只影响显示高度 不改 Store 原文内容
- */
-/**
  * 将 Store 业务节点转换为 tldraw 自定义 shape props
  * @param card Store 中的 ConversationCard 是业务层唯一事实源
  * @returns 返回 tldraw shape props 只包含画布渲染需要的字段
@@ -164,7 +158,8 @@ interface UseCanvasBridgeCanvasSyncParams {
 
 /**
  * Store 为唯一事实源 持续投影成 tldraw 的节点形状和关系箭头
- * 仅作 store canvas 的状态对比diff计算 真正执行绘制渲染由syncStableArrowProjection负责
+ * 仅作 store canvas 的状态对比diff计算 真正执行绘制渲染由 syncStableArrowProjection 负责
+ * 先写入 store 之后由这里绘制(计算 diff 之后绘制)
  */
 export function useCanvasBridgeCanvasSync({
     canvasEditor,
@@ -187,6 +182,7 @@ export function useCanvasBridgeCanvasSync({
             canvasEditor.run(() => {
                 // 1：拉取 tldraw 画布当前的真实图形状态
                 const currentPageShapes = canvasEditor.getCurrentPageShapes()
+                // 当前 tldraw 画布上的所有 shapeId
                 const nodeShapeMap = new Map<string, TLShapeId>()
                 const descriptorArrowIds = new Set<TLShapeId>()
                 const transientShapeIds: TLShapeId[] = []
@@ -195,11 +191,13 @@ export function useCanvasBridgeCanvasSync({
                     const currentShapeId = currentShape.id as TLShapeId
                     const nodeId = parseNodeIdFromShapeId(currentShapeId)
 
+                    // 记录 node 卡片 id 和 shapeId
                     if (nodeId) {
                         nodeShapeMap.set(nodeId, currentShapeId)
                         continue
                     }
 
+                    // 记录 arrow id
                     const arrowDescriptor = parseCanvasArrowDescriptor(currentShapeId)
                     if (arrowDescriptor) {
                         descriptorArrowIds.add(currentShapeId)
@@ -226,6 +224,7 @@ export function useCanvasBridgeCanvasSync({
                 }
 
                 // 2: 拉取 Zustand cards 对 Node 进行全量 Diff 计算
+                // 当前 store 当中的 nodeIdMap
                 const currentNodeIdSet = new Set(cards.map((card) => card.id))
                 const createNodePayload: Array<{
                     id: TLShapeId
@@ -235,13 +234,16 @@ export function useCanvasBridgeCanvasSync({
                     props: ForkMindCardShape["props"]
                 }> = []
                 const updateNodePayload: ForkMindCardShapePartial[] = []
+                const deleteNodePayLoad = Array.from(nodeShapeMap.entries())
+                    .filter(([nodeId]) => !currentNodeIdSet.has(nodeId))
+                    .map(([, shapeId]) => shapeId)
 
                 for (const card of cards) {
                     const nextShapeId = toCanvasNodeShapeId(card.id)
                     const nextProps = createForkMindCardShapeProps(card)
 
                     const existingShapeId = nodeShapeMap.get(card.id)
-                    if (!existingShapeId) {
+                    if (!existingShapeId) { // 画布上不存在我们 store 力存储的shapeId
                         createNodePayload.push({
                             id: nextShapeId,
                             type: FORK_MIND_CARD_SHAPE_TYPE,
@@ -252,6 +254,7 @@ export function useCanvasBridgeCanvasSync({
                         continue
                     }
 
+                    // 画布上已经存在我们 store 存储的 id 判断是否一致 不一致时进行同步
                     const existingShape = canvasEditor.getShape(existingShapeId)
                     if (
                         existingShape?.type === FORK_MIND_CARD_SHAPE_TYPE &&
@@ -265,6 +268,7 @@ export function useCanvasBridgeCanvasSync({
                         continue
                     }
 
+                    // 卡片的 tldraw 和 store 内容不一致 / 卡片被删除 store 不存在但是 画布上存在
                     updateNodePayload.push({
                         id: existingShapeId,
                         type: FORK_MIND_CARD_SHAPE_TYPE,
@@ -275,10 +279,6 @@ export function useCanvasBridgeCanvasSync({
                 }
 
                 //  3：结算 Diff，批量提交 Node（卡片）的增、删、改
-                const removeNodeShapeIds = Array.from(nodeShapeMap.entries())
-                    .filter(([nodeId]) => !currentNodeIdSet.has(nodeId))
-                    .map(([, shapeId]) => shapeId)
-
                 if (createNodePayload.length > 0) {
                     canvasEditor.createShapes(
                         createNodePayload as unknown as Parameters<Editor["createShapes"]>[0],
@@ -289,14 +289,15 @@ export function useCanvasBridgeCanvasSync({
                         updateNodePayload as unknown as Parameters<Editor["updateShapes"]>[0],
                     )
                 }
-                if (removeNodeShapeIds.length > 0) {
-                    canvasEditor.deleteShapes(removeNodeShapeIds)
+                if (deleteNodePayLoad.length > 0) {
+                    canvasEditor.deleteShapes(deleteNodePayLoad)
                 }
-                if (transientShapeIds.length > 0) {
+                if (transientShapeIds.length > 0) { // 清理意外出现的 shapeId
                     canvasEditor.deleteShapes(transientShapeIds)
                 }
 
                 // 4：计算 Arrow（连线）的 Diff，并呼叫 projection 层兜底更新
+                // 当前 store 的当中所有卡片推断出他们之间的箭头信息
                 const stableArrowProjections = createStableArrowProjections(
                     cards,
                     arrowAnchorOverrideByIdRef.current,
@@ -304,10 +305,10 @@ export function useCanvasBridgeCanvasSync({
                 const desiredArrowIdSet = new Set(
                     stableArrowProjections.map((projection) => projection.id),
                 )
+                // 过滤出 store 当中没有推断出的但是画布上存在的 arrowId 之后清除
                 const staleArrowIds = Array.from(descriptorArrowIds).filter(
                     (arrowShapeId) => !desiredArrowIdSet.has(arrowShapeId),
                 )
-
                 if (staleArrowIds.length > 0) {
                     canvasEditor.deleteShapes(staleArrowIds)
                 }
@@ -317,11 +318,13 @@ export function useCanvasBridgeCanvasSync({
                         arrowAnchorOverrideByIdRef.current.delete(overrideArrowId)
                     }
                 }
+                // ----------------------
 
                 for (const projection of stableArrowProjections) {
                     syncStableArrowProjection(canvasEditor, projection) // 执行更新
                 }
 
+                // 选中创建之后的 card
                 const nextSelectedNodeShapeIds = activeNodeId ? [toCanvasNodeShapeId(activeNodeId)] : []
                 const currentSelectedNodeShapeIds = canvasEditor
                     .getSelectedShapeIds()

@@ -21,7 +21,7 @@ import {
 
 /**
  * 创建 chat 节点
- * 点击“新增对话卡片”或从现有卡片分叉提问时调用
+ * 输入卡片创建的入参 补齐其他生成字段 返回完整 node 对象
  */
 export function createChatNode(
     input: AddNodeDraftInput<"chat">,

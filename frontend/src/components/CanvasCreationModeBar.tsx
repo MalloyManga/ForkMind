@@ -148,6 +148,7 @@ export function CanvasCreationModeBar({
         <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center">
             <div className="pointer-events-auto relative flex items-center gap-1 rounded-2xl border border-zinc-300/70 bg-white/92 p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl theme-dark:border-zinc-700/80 theme-dark:bg-zinc-900/92 theme-dark:shadow-[0_18px_48px_rgba(0,0,0,0.35)]">
                 <div className="flex items-center rounded-xl bg-zinc-100/90 p-0.5 theme-dark:bg-zinc-800/90">
+                    {/* 左侧的两个画布通用tool */}
                     <ToolButtonShell
                         isTooltipVisible={visibleTooltipTool === (isMoveHandlePreview ? "hand-tool" : "move")}
                         tooltipLabel={isMoveHandlePreview ? "Hand tool" : "Move"}
@@ -175,6 +176,7 @@ export function CanvasCreationModeBar({
                         )}
                     </ToolButtonShell>
 
+                    {/* 两个画布操作tool右侧的切换button */}
                     <ToolButtonShell
                         isTooltipVisible={visibleTooltipTool === "tool-variants"}
                         tooltipLabel="Move tools"

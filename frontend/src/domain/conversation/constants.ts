@@ -25,3 +25,8 @@ export const DEFAULT_CARD_MIN_HEIGHT = 160
 // 从父卡片 Fork 子卡片时的默认偏移量，避免新卡片与父卡片重叠。
 export const CARD_FORK_OFFSET_X = 420
 export const CARD_FORK_OFFSET_Y = 60
+
+// 最小拖拽阈值 与 卡片最小尺寸
+export const CREATION_DRAG_THRESHOLD = 6
+export const MIN_CREATED_CARD_WIDTH = 200
+export const MIN_CREATED_CARD_HEIGHT = 120

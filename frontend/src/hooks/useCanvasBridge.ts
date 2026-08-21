@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Editor, TLShapeId } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { assertNever } from "../lib/utils"
@@ -74,7 +74,7 @@ export function useCanvasBridge({
     undo,
     redo,
 }: UseCanvasBridgeParams): UseCanvasBridgeResult {
-    const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null) // // 全局 canvas editor 变量
+    const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null) // 全局 canvas editor 变量
 
     // 以下ref为桥接层的“运行时缓存” 让高频画布事件能读到最新状态而不必反复重渲染
     const isApplyingStoreToCanvasRef = useRef(false)
@@ -83,7 +83,7 @@ export function useCanvasBridge({
     const cardsRef = useRef<ConversationCard[]>(cards)
     const currentCanvasToolRef = useRef<CanvasTool>(currentCanvasTool)
 
-    const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点 覆盖自动生成的
+    const arrowAnchorOverrideByIdRef = useRef<Map<TLShapeId, ArrowAnchorOverride>>(new Map()) // 存储用户手动指定的箭头首尾锚点
 
     /**
      * 当前正在拖拽出的箭头都对象的快照
@@ -115,6 +115,7 @@ export function useCanvasBridge({
     }, [canvasEditor, currentCanvasTool])
 
     /**
+     * 卡片创建提交
      * 接收cardType创建卡片类型 position卡片位置 父nodeId(直接创建时为null)
      * 返回创建成功之后的NodeId
      */
@@ -221,8 +222,9 @@ export function useCanvasBridge({
 
     /**
      * 1.5 挂载 创建拖拽状态机
-     * 在 Chat / Note 工具下接管空白画布拖拽
-     * 产出蓝色预创建框，并在松手时提交真实业务卡片
+     * 在 Chat / Note 等卡片创建工具下接管空白画布拖拽
+     * 返回蓝色预创建框 Rect 实例 并在松手时 调用传入的提交函数 提交真实业务卡片到 store
+     * 挂载监听器监听用户的行为 之后将创建的 card 示例写入 store
      */
     const { creationPreviewRect } = useCanvasBridgeCreation({
         canvasEditor,
@@ -232,6 +234,7 @@ export function useCanvasBridge({
 
     /**
      * 2. 挂载 VDOM Diff 同步
+     * 这里正式绘制 cards
      */
     useCanvasBridgeCanvasSync({
         canvasEditor,

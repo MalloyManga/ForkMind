@@ -210,54 +210,9 @@ function resolveTextMutationHistory(
 }
 
 /**
- * Store 内部 chat 节点创建实现
- * input 来自 addNode 的统一 draft 入口 或 fork 业务动作
- * 返回值是补齐 id 时间戳 关系和尺寸后的完整 Store 节点
- */
-function addChatNode(
-    input: AddNodeDraftInput<"chat">,
-    nodes: readonly ConversationCard[],
-): ConversationCard {
-    return createChatNode(input, nodes)
-}
-
-/**
- * Store 内部 note 节点创建实现
- * input 来自 addNode 的统一 draft 入口 或 fork 业务动作
- * 返回值是补齐 id 时间戳 关系和尺寸后的完整 Store 节点
- */
-function addNoteNode(
-    input: AddNodeDraftInput<"note">,
-    nodes: readonly ConversationCard[],
-): ConversationCard {
-    return createNoteNode(input, nodes)
-}
-
-function addImageNode(
-    input: AddNodeDraftInput<"image">,
-    nodes: readonly ConversationCard[],
-): ConversationCard {
-    return createImageNode(input, nodes)
-}
-
-function addLinkNode(
-    input: AddNodeDraftInput<"link">,
-    nodes: readonly ConversationCard[],
-): ConversationCard {
-    return createLinkNode(input, nodes)
-}
-
-function addFileNode(
-    input: AddNodeDraftInput<"file">,
-    nodes: readonly ConversationCard[],
-): ConversationCard {
-    return createFileNode(input, nodes)
-}
-
-/**
  * Store 新增节点的唯一分发点
  * input.cardType 是业务判别字段 用来选择具体节点工厂
- * hooks/components 只调用 addNode 不再直接依赖 chat/note 分支函数
+ * 输入自然键 补齐代理键之后 返回完整的 node 对象
  */
 function createNodeFromDraft(
     input: AddConversationNodeDraftInput,
@@ -265,15 +220,15 @@ function createNodeFromDraft(
 ): ConversationCard {
     switch (input.cardType) {
         case "chat":
-            return addChatNode(input, nodes)
+            return createChatNode(input, nodes)
         case "note":
-            return addNoteNode(input, nodes)
+            return createNoteNode(input, nodes)
         case "image":
-            return addImageNode(input, nodes)
+            return createImageNode(input, nodes)
         case "link":
-            return addLinkNode(input, nodes)
+            return createLinkNode(input, nodes)
         case "file":
-            return addFileNode(input, nodes)
+            return createFileNode(input, nodes)
     }
 
     return assertNever(input)
@@ -651,7 +606,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 return {}
             }
 
-            const nextNode = addChatNode(
+            const nextNode = createChatNode(
                 {
                     parentId: sourceNode.id,
                     userPrompt: input.userPrompt,
@@ -700,7 +655,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 return {}
             }
 
-            const nextNode = addNoteNode(
+            const nextNode = createNoteNode(
                 {
                     parentId: sourceNode.id,
                     noteContent: input.noteContent,
