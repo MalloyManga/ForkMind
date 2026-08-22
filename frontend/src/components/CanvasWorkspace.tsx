@@ -11,13 +11,13 @@ import { CanvasCreationDragOverlay } from "./CanvasCreationDragOverlay"
 import { CanvasCreationModeBar } from "./CanvasCreationModeBar"
 import { CanvasLinkHandlesOverlay } from "./CanvasLinkHandlesOverlay"
 import { CanvasMinimap } from "./CanvasMinimap"
+import { useCanvasToolsStore } from "../stores/useCanvasToolsStore"
 
 interface CanvasWorkspaceProps {
     // tldraw 挂载完成后 把 editor 实例经由 App 交回桥接层 canvasBridge 处理
     onCanvasMount: (editor: Editor) => void
     onStartLinkDrag: (input: StartLinkDragInput) => void
     onOpenContextMenu: (context: CanvasContextMenuContext) => void
-    currentCanvasTool: CanvasTool // 当前底部工具条选中的工具
     // 底部工具条切换工具时 回写到 App
     onSelectCanvasTool: (canvasTool: CanvasTool) => void
     isCanvasUiVisible: boolean
@@ -33,6 +33,8 @@ interface CanvasWorkspaceProps {
     licenseKey?: string
 }
 
+const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
+
 /**
  * 中间无限画布区
  * 承载 tldraw 画布 hover 连线触点 底部创建工具条和自定义右键菜单入口
@@ -41,7 +43,6 @@ export function CanvasWorkspace({
     onCanvasMount,
     onStartLinkDrag,
     onOpenContextMenu,
-    currentCanvasTool,
     onSelectCanvasTool,
     isCanvasUiVisible,
     isContextMenuOpen,
@@ -166,7 +167,6 @@ export function CanvasWorkspace({
             <CanvasCreationDragOverlay previewRect={creationPreviewRect} />
             {isCanvasUiVisible ? (
                 <CanvasCreationModeBar
-                    currentCanvasTool={currentCanvasTool}
                     onSelectCanvasTool={onSelectCanvasTool}
                 />
             ) : null}

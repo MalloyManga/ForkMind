@@ -1,12 +1,11 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react"
-import { Editor, TLShapeId } from "tldraw"
+import { Editor } from "tldraw"
 import type { ConversationCard, ConversationNodeType } from "../domain/conversation/types"
 import { assertNever } from "../lib/utils"
 import type { AddConversationNodeDraftInput } from "../stores/conversationStore"
 import { StartLinkDragInput } from "./canvasLinkTypes"
 import type { CanvasTool } from "./canvasToolTypes"
 import {
-    type ArrowAnchorOverride,
     type LinkDragSession,
     type Point,
 } from "./useCanvasBridge.helpers"
@@ -15,13 +14,12 @@ import { useCanvasBridgeCreation } from "./useCanvasBridge.creation"
 import { useCanvasBridgeCanvasSync } from "./useCanvasBridge.canvasSync"
 import { useCanvasBridgeLinkDrag } from "./useCanvasBridge.linkDrag"
 import { useCanvasBridgeInteractions } from "./useCanvasBridge.interactions"
+import { useCanvasToolsStore } from "../stores/useCanvasToolsStore"
 
 interface UseCanvasBridgeParams {
     cards: ConversationCard[]
     activeNodeId: string | null
-    currentCanvasTool: CanvasTool
     setActiveNodeId: (nodeId: string | null) => void
-    setCurrentCanvasTool: (canvasTool: CanvasTool) => void // 真正修改 App 当前工具状态的 React setState
     addNode: (input: AddConversationNodeDraftInput) => string
     moveNode: (nodeId: string, nextPosition: { x: number; y: number }) => void
     resizeNode: (nodeId: string, nextSize: { mode: "auto" | "fixed"; width: number; minHeight: number }) => void
@@ -56,15 +54,17 @@ interface UseCanvasBridgeResult {
     } | null
 }
 
+const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
+const setCurrentCanvasTool = useCanvasToolsStore((state) => state.setCurrentCanvasTool)
+
+
 /**
  * 统一编排四层模块：linkDrag（高频拖拽）、canvasSync（Store 投影）、interactions（用户语义动作）、Creation（创建状态机）
  */
 export function useCanvasBridge({
     cards,
     activeNodeId,
-    currentCanvasTool,
     setActiveNodeId,
-    setCurrentCanvasTool,
     addNode,
     moveNode,
     resizeNode,

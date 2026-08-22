@@ -37,7 +37,6 @@ import { useCanvasContextMenuExecutor } from "./hooks/useCanvasContextMenuExecut
 import { useCanvasContextMenuResolver } from "./hooks/useCanvasContextMenuResolver"
 import { ThemeMode, loadTheme, saveTheme } from "./hooks/useThemeMode"
 import { useAICompletion } from "./hooks/useAICompletion"
-import { type CanvasTool } from "./hooks/canvasToolTypes"
 import { useWorkspaceController } from "./hooks/useWorkspaceController"
 import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence"
 import { useWorkspaceTransfer } from "./hooks/useWorkspaceTransfer"
@@ -55,6 +54,7 @@ import {
     selectActiveThreadCards,
     useConversationStore,
 } from "./stores/useConversationStore"
+import { useCanvasToolsStore } from "./stores/useCanvasToolsStore"
 
 interface ResizeDragState {
     side: "left" | "right"
@@ -129,7 +129,6 @@ function App() {
     const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false)
     const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false)
     const [isCanvasUiHidden, setIsCanvasUiHidden] = useState(false) // 所有UI均隐藏的状态源
-    const [currentCanvasTool, setCurrentCanvasTool] = useState<CanvasTool>("move") // 全局 canvasTool 唯一状态源
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
     const [contextMenuState, setContextMenuState] = useState<CanvasContextMenuState | null>(null)
     const [isAISettingsOpen, setIsAISettingsOpen] = useState(false)
@@ -201,6 +200,7 @@ function App() {
     const replaceNodesFromClipboard = useConversationStore((state) => state.replaceNodesFromClipboard)
     const undo = useConversationStore((state) => state.undo)
     const redo = useConversationStore((state) => state.redo)
+    const setCurrentCanvasTool = useCanvasToolsStore((store) => store.setCurrentCanvasTool)
 
     const rootNodeCount = useMemo(
         // 左侧栏保留根节点数量统计 但不再根据数量展示告警
@@ -252,8 +252,6 @@ function App() {
         cards,
         activeNodeId,
         setActiveNodeId,
-        currentCanvasTool,
-        setCurrentCanvasTool,
         addNode,
         moveNode,
         resizeNode,
@@ -703,7 +701,6 @@ function App() {
                     onCanvasMount={handleAppCanvasMount}
                     onStartLinkDrag={handleLinkHandlePointerDown}
                     onOpenContextMenu={handleOpenContextMenu}
-                    currentCanvasTool={currentCanvasTool}
                     onSelectCanvasTool={setCurrentCanvasTool}
                     // UI 全隐藏时 画布内部的 hover handle 和 mode bar 也要一起隐藏
                     isCanvasUiVisible={!isCanvasUiHidden}

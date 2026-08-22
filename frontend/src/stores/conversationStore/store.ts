@@ -10,7 +10,7 @@ import {
     NODE_STATUS_IDLE,
     NODE_STATUS_STREAMING,
 } from "../../domain/conversation/constants"
-import type { CanvasPlan, CanvasPlanNode } from "../../domain/canvasPlan"
+import type { CanvasPlanNode } from "../../domain/canvasPlan"
 import { deriveThreadTitleFromPrompt } from "../../domain/conversation/helpers"
 import type {
     BaseNode,
@@ -21,7 +21,6 @@ import type {
 } from "../../domain/conversation/types"
 import type {
     AddConversationNodeDraftInput,
-    AddNodeDraftInput,
     ApplyCanvasPlanInput,
     CanvasClipboardPayload,
     ClipboardNodeSnapshot,

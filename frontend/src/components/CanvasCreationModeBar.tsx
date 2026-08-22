@@ -5,9 +5,9 @@ import { CANVAS_CREATION_REGISTRY } from "./canvasCreationRegistry"
 import { ChevronDownIcon } from "./icons/ChevronDownIcon"
 import { MousePointerIcon } from "./icons/MousePointerIcon"
 import { MoveHandleIcon } from "./icons/MoveHandleIcon"
+import { useCanvasToolsStore } from "../stores/useCanvasToolsStore"
 
 interface CanvasCreationModeBarProps {
-    currentCanvasTool: CanvasTool
     onSelectCanvasTool: (canvasTool: CanvasTool) => void
 }
 
@@ -31,6 +31,8 @@ interface ToolButtonShellProps {
     onTooltipIntentEnd: () => void
     buttonClassName: string
 }
+
+const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
 
 /**
  * 当前 ModeBar 当中 button 的提示条
@@ -92,7 +94,6 @@ function ToolButtonShell({
  * 画布底部创建模式条
  */
 export function CanvasCreationModeBar({
-    currentCanvasTool,
     onSelectCanvasTool,
 }: CanvasCreationModeBarProps) {
     const tooltipDelayTimerRef = useRef<number | null>(null)
