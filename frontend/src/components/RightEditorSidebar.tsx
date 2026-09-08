@@ -69,7 +69,7 @@ interface RightEditorSidebarProps {
     onBeginTextEdit: (nodeId: string, field: ConversationTextField) => void
     onEndTextEdit: () => void
     activeAIRequestNodeId: string | null
-    canStartAIRequest: boolean
+    canStartAIRequest: boolean // 是否可以开始请求
     aiErrorMessage: string | null
     onStartAIRequest: (nodeId: string, allowWebSearch: boolean) => void
     onCancelAIRequest: (nodeId: string) => void
@@ -476,6 +476,7 @@ export function RightEditorSidebar({
                                                     <Globe2 className="h-3 w-3" />
                                                     联网
                                                 </Button>
+
                                                 <Button
                                                     type="button"
                                                     size="xs"
@@ -490,6 +491,7 @@ export function RightEditorSidebar({
                                                     <Send className="h-3 w-3" />
                                                     {activeNode.aiResponse.trim().length > 0 ? "Regenerate" : "Send"}
                                                 </Button>
+
                                             </>
                                         )}
                                     </div>

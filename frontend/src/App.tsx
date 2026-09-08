@@ -755,7 +755,7 @@ function App() {
                                 }
                                 aiErrorMessage={aiCompletion.error?.message ?? null}
                                 onStartAIRequest={(nodeId, allowWebSearch) => {
-                                    void aiCompletion.startCompletion(nodeId, allowWebSearch)
+                                    void aiCompletion.startCompletion(nodeId, allowWebSearch) // 右侧编辑栏信息转发给 useAICompletion
                                 }}
                                 onCancelAIRequest={(nodeId) => {
                                     void aiCompletion.cancelCompletion(nodeId)

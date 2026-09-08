@@ -8,18 +8,25 @@ import {
 import { useAISettingsStore } from "../stores/useAISettingsStore"
 import { useConversationStore } from "../stores/useConversationStore"
 import type { PendingCanvasPlan } from "../domain/canvasPlan"
+import {
+    AI_REQUEST_ID_PREFIX,
+    AI_ERROR_CODE_REQUEST_ACTIVE,
+    AI_ERROR_CODE_INVALID_NODE,
+    AI_ERROR_CODE_INVALID_SETTINGS
+} from "../constants/aiCompletion"
 
-const AI_REQUEST_ID_PREFIX = "ai-request"
-const AI_ERROR_CODE_REQUEST_ACTIVE = "request_active"
-const AI_ERROR_CODE_INVALID_NODE = "invalid_node"
-const AI_ERROR_CODE_INVALID_SETTINGS = "invalid_settings"
-
+/**
+ * 当前的活跃请求实例接口
+ */
 interface ActiveAIRequest {
     requestId: string
     threadId: string
     nodeId: string
 }
 
+/**
+ * AI 补全文本的 res
+ */
 export interface UseAICompletionResult {
     isRequestActive: boolean
     activeRequestNodeId: string | null
@@ -33,6 +40,10 @@ export interface UseAICompletionResult {
     rejectCanvasPlan: () => void
 }
 
+/**
+ * 创建AI请求ID
+ * @returns 
+ */
 function createAIRequestId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return `${AI_REQUEST_ID_PREFIX}-${crypto.randomUUID()}`
@@ -55,7 +66,7 @@ function createClientError(code: string, message: string): BridgeErrorPayload {
  * App 挂载时订阅 Wails Events 并把通过 requestId 校验的事件写入 conversationStore
  */
 export function useAICompletion(): UseAICompletionResult {
-    const activeRequestRef = useRef<ActiveAIRequest | null>(null)
+    const activeRequestRef = useRef<ActiveAIRequest | null>(null) // 当前的活跃请求实例
     const [activeRequestNodeId, setActiveRequestNodeId] = useState<string | null>(null)
     const [error, setError] = useState<BridgeErrorPayload | null>(null)
     const [pendingCanvasPlan, setPendingCanvasPlan] = useState<PendingCanvasPlan | null>(null)
@@ -76,10 +87,13 @@ export function useAICompletion(): UseAICompletionResult {
         setActiveRequestNodeId(null)
     }, [])
 
+    // 创建 wails event 的 AI res 触发的回调函数
     useEffect(() => subscribeAIEvents({
         onChunk: (event) => {
             const activeRequest = activeRequestRef.current
             const conversationState = useConversationStore.getState()
+
+            // wails 事件总线为全局广播 每一个 hook 都需要做过滤
             if (
                 !activeRequest ||
                 event.requestId !== activeRequest.requestId ||
@@ -89,6 +103,7 @@ export function useAICompletion(): UseAICompletionResult {
                 return
             }
 
+            // 收到 eventdealta 时 append
             conversationState.appendChatResponseChunk(event.nodeId, event.delta)
         },
         onDone: (event) => {
@@ -162,7 +177,7 @@ export function useAICompletion(): UseAICompletionResult {
 
     /**
      * 启动指定 Chat 节点的流式生成
-     * @param nodeId 入参来自 Send 或 Regenerate 按钮
+     * @param nodeId 入参来自 Send 或 Regenerate 按钮 读取当前chat节点的prompt信息
      * @param allowWebSearch 入参来自右侧栏本轮联网开关 true 时由 Go 请求 Provider 原生 web_search
      * @returns Promise 在 Wails 接受或拒绝启动请求后完成 实际文本继续通过事件到达
      * 用户发送 Prompt 时触发 并在调用 Bridge 前建立唯一活动请求和撤销基线
@@ -176,18 +191,11 @@ export function useAICompletion(): UseAICompletionResult {
             return
         }
 
-        const conversationState = useConversationStore.getState()
-        const targetNode = conversationState.activeThread.cards.find((node) => node.id === nodeId)
-        if (!targetNode || targetNode.cardType !== "chat" || targetNode.userPrompt.trim().length === 0) {
-            setError(createClientError(
-                AI_ERROR_CODE_INVALID_NODE,
-                "请先选择 Chat 节点并输入 Prompt",
-            ))
-            return
-        }
+        const conversationState = useConversationStore.getState() // 复用当前会话状态供后续使用
 
-        const settingsState = useAISettingsStore.getState()
+        const settingsState = useAISettingsStore.getState() // 读取当前的apikey以及baseurl
         const { persistedSettings, apiKey } = settingsState
+        // 未配置
         if (!persistedSettings.baseUrl.trim() || !persistedSettings.model.trim()) {
             setError(createClientError(
                 AI_ERROR_CODE_INVALID_SETTINGS,
@@ -196,14 +204,7 @@ export function useAICompletion(): UseAICompletionResult {
             return
         }
 
-        const requestId = createAIRequestId()
-        const activeRequest: ActiveAIRequest = {
-            requestId,
-            threadId: conversationState.activeThread.id,
-            nodeId,
-        }
-        const requestThread = conversationState.activeThread
-
+        // store 检测是否可以开始生成(无效与幽灵card) 并清空旧回答进入 streaming 状态
         if (!conversationState.startChatResponse(nodeId)) {
             setError(createClientError(
                 AI_ERROR_CODE_INVALID_NODE,
@@ -212,11 +213,20 @@ export function useAICompletion(): UseAICompletionResult {
             return
         }
 
+        const requestId = createAIRequestId() // 创建 reqId 为后续的时间路由提供匹配按键
+        const activeRequest: ActiveAIRequest = {
+            requestId,
+            threadId: conversationState.activeThread.id,
+            nodeId,
+        }
+        const requestThread = conversationState.activeThread
+
         activeRequestRef.current = activeRequest
         setActiveRequestNodeId(nodeId)
         setError(null)
         setPendingCanvasPlan(null)
 
+        // 通过 react bridge 正式调用
         const response = await startChatCompletionFromBridge({
             requestId,
             thread: requestThread,

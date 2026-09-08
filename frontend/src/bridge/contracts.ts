@@ -74,6 +74,9 @@ export interface ListOpenAIModelsResponse {
     error?: BridgeErrorPayload
 }
 
+/**
+ * chat 请求 req 实例接口
+ */
 export interface StartChatCompletionInput {
     requestId: string
     thread: ConversationThread

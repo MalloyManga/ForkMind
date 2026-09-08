@@ -18,6 +18,9 @@ const AI_EVENT_CANVAS_PLAN = "forkmind:ai:canvas-plan"
 
 type UnknownRecord = Record<string, unknown>
 
+/**
+ * AI res 事件实例对象
+ */
 interface AIEventHandlers {
     onChunk: (event: AIStreamChunkEvent) => void
     onDone: (event: AIStreamDoneEvent) => void
@@ -134,6 +137,7 @@ function parseCanvasPlanEvent(value: unknown): AICanvasPlanEvent | null {
  * 订阅 Go OpenAI 流式事件
  * 每个 payload 都从 unknown 校验后才交给业务 Hook
  * 返回函数会一次性解除全部监听 避免 React StrictMode 重复订阅
+ * EventsOn 注册一个回调函数监听这个事件名称 直到调用 unsubscribe 来解除订阅
  */
 export function subscribeAIEvents(handlers: AIEventHandlers): () => void {
     const runtimeGlobal = globalThis as typeof globalThis & { runtime?: unknown }

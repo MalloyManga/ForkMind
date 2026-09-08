@@ -23,6 +23,9 @@ const BRIDGE_UNAVAILABLE_ERROR: BridgeErrorPayload = {
     retryable: false,
 }
 
+/**
+ * 返回 go appBridge runtime 实例
+ */
 function getAppBridge(): ForkMindAppBridge | null {
     return window.go?.main?.App ?? null
 }
@@ -217,7 +220,7 @@ export async function abortAppCloseFromBridge(): Promise<OperationBridgeResponse
 
 /**
  * 启动 OpenAI-compatible 流式请求
- * 成功返回只表示后台任务已经开始 后续结果通过 Wails Events 发送
+ * 成功立刻返回空对象 表示后台任务已经开始 后续结果通过 Wails Events 发送
  */
 export async function startChatCompletionFromBridge(
     input: StartChatCompletionInput,

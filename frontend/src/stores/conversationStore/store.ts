@@ -788,7 +788,7 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
 
         set((state) => {
             const targetNode = findNodeById(state.activeThread.cards, nodeId)
-            if (
+            if ( // 目标节点不存在 类型不正确 无prompt 正在进行输出 -> 返回 false
                 !targetNode ||
                 targetNode.cardType !== "chat" ||
                 targetNode.userPrompt.trim().length === 0 ||
@@ -802,8 +802,8 @@ export const useConversationStore = create<ConversationStoreState>()((set, get) 
                 node.id === nodeId && node.cardType === "chat"
                     ? {
                         ...node,
-                        aiResponse: "",
-                        status: NODE_STATUS_STREAMING,
+                        aiResponse: "", // 清空旧回答
+                        status: NODE_STATUS_STREAMING, // 进入 streaming 状态 之后返回 true
                         updatedAt: now,
                     }
                     : node,
