@@ -192,6 +192,12 @@ export function useAICompletion(): UseAICompletionResult {
         }
 
         const conversationState = useConversationStore.getState() // 复用当前会话状态供后续使用
+        // 缓存旧回答用于 Bridge 失败时恢复（Store.startChatResponse 会将其清空为 ""）
+        const targetCard = conversationState.activeThread.cards.find((n) => n.id === nodeId)
+        let prevResponse = ""
+        if (targetCard?.cardType === "chat") {
+            prevResponse = targetCard.aiResponse ?? ""
+        }
 
         const settingsState = useAISettingsStore.getState() // 读取当前的apikey以及baseurl
         const { persistedSettings, apiKey } = settingsState
@@ -240,6 +246,8 @@ export function useAICompletion(): UseAICompletionResult {
         })
 
         if (response.error && activeRequestRef.current?.requestId === requestId) {
+            // 恢复旧回答文本（Bridge 返回 error 时的乐观回退）
+            useConversationStore.getState().updateChatResponse(nodeId, prevResponse)
             useConversationStore.getState().failChatResponse(nodeId)
             setError(response.error)
             clearActiveRequest(requestId)
