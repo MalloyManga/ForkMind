@@ -54,10 +54,6 @@ interface UseCanvasBridgeResult {
     } | null
 }
 
-const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
-const setCurrentCanvasTool = useCanvasToolsStore((state) => state.setCurrentCanvasTool)
-
-
 /**
  * 统一编排四层模块：linkDrag（高频拖拽）、canvasSync（Store 投影）、interactions（用户语义动作）、Creation（创建状态机）
  */
@@ -74,6 +70,9 @@ export function useCanvasBridge({
     undo,
     redo,
 }: UseCanvasBridgeParams): UseCanvasBridgeResult {
+    // 订阅画布工具状态源 供拖拽会话与创建状态机读取
+    const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
+    const setCurrentCanvasTool = useCanvasToolsStore((state) => state.setCurrentCanvasTool)
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null) // 全局 canvas editor 变量
 
     // 以下ref为桥接层的“运行时缓存” 让高频画布事件能读到最新状态而不必反复重渲染

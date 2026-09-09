@@ -32,8 +32,6 @@ interface ToolButtonShellProps {
     buttonClassName: string
 }
 
-const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
-
 /**
  * 当前 ModeBar 当中 button 的提示条
  */
@@ -96,6 +94,8 @@ function ToolButtonShell({
 export function CanvasCreationModeBar({
     onSelectCanvasTool,
 }: CanvasCreationModeBarProps) {
+    // 订阅画布工具状态源 供 state 初始化 工具映射 effect 和按钮高亮判断使用
+    const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
     const tooltipDelayTimerRef = useRef<number | null>(null)
     const [isMoveHandlePreview, setIsMoveHandlePreview] = useState(currentCanvasTool === "hand-tool")
     const [visibleTooltipTool, setVisibleTooltipTool] = useState<ToolbarToolId | null>(null)

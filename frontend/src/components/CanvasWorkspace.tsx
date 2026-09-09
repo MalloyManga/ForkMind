@@ -33,8 +33,6 @@ interface CanvasWorkspaceProps {
     licenseKey?: string
 }
 
-const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
-
 /**
  * 中间无限画布区
  * 承载 tldraw 画布 hover 连线触点 底部创建工具条和自定义右键菜单入口
@@ -50,6 +48,8 @@ export function CanvasWorkspace({
     creationPreviewRect,
     licenseKey,
 }: CanvasWorkspaceProps) {
+    // 订阅画布工具状态源 供连线触点可用性与底部工具条映射使用
+    const currentCanvasTool = useCanvasToolsStore((state) => state.currentCanvasTool)
     const [canvasEditor, setCanvasEditor] = useState<Editor | null>(null)
     const isCanvasResizing = useValue(
         "ForkMind canvas resizing",
