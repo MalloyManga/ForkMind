@@ -31,58 +31,19 @@ export interface ResidualAIRequest {
     settledAt: number
 }
 
-/**
- * WeakMap 的复合 key
- * 使用 对象 作为 key 是为了利用 WeakMap 弱引用语义 条目在强引用集合移除后自动可回收
- */
-interface ResidualAIKey {
-    requestId: string
-    nodeId: string
-}
+// 残留缓冲本体: 复合 key `${requestId}:${nodeId}` -> 请求记录
+// 单活请求语义下同一时刻最多 1 条未终止缓冲 积压的都是已终止且用户未再访问的线程
+const residualRequests = new Map<string, ResidualAIRequest>()
 
 // 残留在途请求的内存上限 超出后淘汰最老的已终止条目 防止长时间重度使用后无限增长
 const MAX_RESIDUAL_REQUESTS = 16
 
-// 缓冲本体: 弱引用 key -> 请求记录
-const residualRequests = new WeakMap<ResidualAIKey, ResidualAIRequest>()
-
-// 强引用集合: 保持 key 在可重放期间存活 重放 删除线程或清空时显式移除
-// WeakMap 本身不会阻止 key 被回收 只有这个集合持有 key 才能保证缓冲不被 GC
-// 单活请求语义下同一时刻最多 1 条未终止缓冲 积压的都是已终止且用户未再访问的线程
-const residualKeys = new Set<ResidualAIKey>()
-
 /**
- * 按 requestId + nodeId 在强引用集合中查找已有 key 没有则创建新记录
- * @param requestId 入参来自事件或活跃请求 全局唯一
- * @param nodeId 入参是被生成回答的聊天节点 id
- * @param threadId 入参是请求归属线程 id 首次缓冲时固定 后续事件沿用
- * @returns 返回该请求的残留记录 用于调用方判断是否已终止
- * 首次为某请求写入缓冲时触发 若缓存已满会先淘汰最老的已终止条目
+ * 拼接残留缓冲的复合 key
+ * requestId 全局唯一 加上 nodeId 是为未来多请求并发预留的防碰撞兜底
  */
-function findOrCreateRequest(requestId: string, nodeId: string, threadId: string): ResidualAIRequest {
-    for (const key of residualKeys) {
-        const entry = residualRequests.get(key)
-        if (entry && entry.requestId === requestId && entry.nodeId === nodeId) {
-            return entry
-        }
-    }
-
-    if (residualKeys.size >= MAX_RESIDUAL_REQUESTS) {
-        evictOldestSettled()
-    }
-
-    const key: ResidualAIKey = { requestId, nodeId }
-    const entry: ResidualAIRequest = {
-        requestId,
-        nodeId,
-        threadId,
-        events: [],
-        settled: false,
-        settledAt: 0,
-    }
-    residualKeys.add(key)
-    residualRequests.set(key, entry)
-    return entry
+function buildResidualKey(requestId: string, nodeId: string): string {
+    return `${requestId}:${nodeId}`
 }
 
 /**
@@ -91,19 +52,17 @@ function findOrCreateRequest(requestId: string, nodeId: string, threadId: string
  * 因为未终止请求背后是当前唯一活跃请求 淘汰它会导致事件永久丢失
  */
 function evictOldestSettled(): void {
-    let oldestKey: ResidualAIKey | null = null
+    let oldestKey: string | null = null
     let oldestAt = Infinity
 
-    for (const key of residualKeys) {
-        const entry = residualRequests.get(key)
-        if (entry && entry.settled && entry.settledAt < oldestAt) {
+    for (const [key, entry] of residualRequests) {
+        if (entry.settled && entry.settledAt < oldestAt) {
             oldestAt = entry.settledAt
             oldestKey = key
         }
     }
 
     if (oldestKey) {
-        residualKeys.delete(oldestKey)
         residualRequests.delete(oldestKey)
     }
 }
@@ -123,7 +82,23 @@ export function bufferAIEvent(
     threadId: string,
     event: ResidualAIEvent,
 ): ResidualAIRequest {
-    const entry = findOrCreateRequest(requestId, nodeId, threadId)
+    const key = buildResidualKey(requestId, nodeId)
+    let entry = residualRequests.get(key)
+    if (!entry) {
+        if (residualRequests.size >= MAX_RESIDUAL_REQUESTS) {
+            evictOldestSettled()
+        }
+        entry = {
+            requestId,
+            nodeId,
+            threadId,
+            events: [],
+            settled: false,
+            settledAt: 0,
+        }
+        residualRequests.set(key, entry)
+    }
+
     entry.events.push(event)
     if (event.kind === "done" || event.kind === "error") {
         entry.settled = true
@@ -139,10 +114,8 @@ export function bufferAIEvent(
  * 用户切回残留请求归属线程时触发 取走即从缓冲移除 调用方重放完毕后不会二次重放
  */
 export function takeResidualForThread(threadId: string): ResidualAIRequest | null {
-    for (const key of residualKeys) {
-        const entry = residualRequests.get(key)
-        if (entry && entry.threadId === threadId) {
-            residualKeys.delete(key)
+    for (const [key, entry] of residualRequests) {
+        if (entry.threadId === threadId) {
             residualRequests.delete(key)
             return entry
         }
@@ -156,10 +129,8 @@ export function takeResidualForThread(threadId: string): ResidualAIRequest | nul
  * 用户删除一个仍有残留请求的线程时触发 线程已不存在 缓冲失去重放意义 立即释放内存
  */
 export function dropResidualAIRequest(threadId: string): void {
-    for (const key of [...residualKeys]) {
-        const entry = residualRequests.get(key)
-        if (entry && entry.threadId === threadId) {
-            residualKeys.delete(key)
+    for (const [key, entry] of residualRequests) {
+        if (entry.threadId === threadId) {
             residualRequests.delete(key)
         }
     }
@@ -170,5 +141,5 @@ export function dropResidualAIRequest(threadId: string): void {
  * 工作区整体导入或重置后触发 旧请求 id 与新文档无任何关联 全部释放
  */
 export function clearAllResidualAIRequests(): void {
-    residualKeys.clear()
+    residualRequests.clear()
 }

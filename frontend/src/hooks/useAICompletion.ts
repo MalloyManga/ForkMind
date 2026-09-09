@@ -115,21 +115,29 @@ export function useAICompletion(): UseAICompletionResult {
         }
     }, [])
 
-    // 线程切换时处理残留 AI 请求: 旧线程未结算的 plan 移入缓冲 新线程有缓冲则按序重放
+    // 最新 plan 快照 供线程切换 effect 读取 避免把 state 放进依赖导致 effect 因 plan 变化反复空跑
+    const pendingCanvasPlanRef = useRef<PendingCanvasPlan | null>(pendingCanvasPlan)
     useEffect(() => {
-        if (pendingCanvasPlan && pendingCanvasPlan.threadId !== activeThreadId) {
+        pendingCanvasPlanRef.current = pendingCanvasPlan // 时刻读取到当前线程的最新 pendingCanvasPlan
+    })
+
+    // 线程切换时处理残留 AI 请求: 旧线程未结算的 plan 移入缓冲 新线程有缓冲则按序重放
+    // 依赖只有 activeThreadId 与稳定函数 因此只在切换线程时执行一次 不存在循环触发
+    useEffect(() => {
+        const plan = pendingCanvasPlanRef.current
+        if (plan && plan.threadId !== activeThreadId) {
             // 用户切走时 plan 提案尚未结算 移入缓冲 切回后由重放恢复 避免提案永久丢失
             bufferAIEvent(
-                pendingCanvasPlan.requestId,
-                pendingCanvasPlan.sourceNodeId,
-                pendingCanvasPlan.threadId,
+                plan.requestId,
+                plan.sourceNodeId,
+                plan.threadId,
                 {
                     kind: "canvasPlan",
                     event: {
-                        requestId: pendingCanvasPlan.requestId,
-                        nodeId: pendingCanvasPlan.sourceNodeId,
-                        schemaVersion: pendingCanvasPlan.schemaVersion,
-                        plan: pendingCanvasPlan.plan,
+                        requestId: plan.requestId,
+                        nodeId: plan.sourceNodeId,
+                        schemaVersion: plan.schemaVersion,
+                        plan: plan.plan,
                     },
                 },
             )
@@ -138,11 +146,11 @@ export function useAICompletion(): UseAICompletionResult {
 
         // 监听 activeThreadId 切回时取出该线程的残留请求并依序重放
         // 取走即从缓冲移除 即使重放被 Store 守卫空转也不会二次重放
-        const residual = takeResidualForThread(activeThreadId)
+        const residual = takeResidualForThread(activeThreadId) // 切换回原线程时尝试取出缓存 pendingCanvasPlan 并重新
         if (residual) {
             replayResidualEvents(residual)
         }
-    }, [activeThreadId, pendingCanvasPlan, replayResidualEvents])
+    }, [activeThreadId, replayResidualEvents])
 
     const clearActiveRequest = useCallback((requestId: string) => {
         if (activeRequestRef.current?.requestId !== requestId) {
