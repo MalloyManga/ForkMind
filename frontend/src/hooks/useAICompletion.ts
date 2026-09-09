@@ -7,6 +7,11 @@ import {
 } from "../bridge"
 import { useAISettingsStore } from "../stores/useAISettingsStore"
 import { useConversationStore } from "../stores/useConversationStore"
+import {
+    bufferAIEvent,
+    takeResidualForThread,
+    type ResidualAIRequest,
+} from "../bridge/residualAIEventBuffer"
 import type { PendingCanvasPlan } from "../domain/canvasPlan"
 import {
     AI_REQUEST_ID_PREFIX,
@@ -72,11 +77,72 @@ export function useAICompletion(): UseAICompletionResult {
     const [pendingCanvasPlan, setPendingCanvasPlan] = useState<PendingCanvasPlan | null>(null)
     const activeThreadId = useConversationStore((state) => state.activeThread.id)
 
+    /**
+     * 依序重放一条残留请求的全部事件
+     * @param residual 入参来自 takeResidualForThread 取出的整条缓冲记录
+     * @returns 无返回值 各事件直接路由到 Store 动作
+     * Store 自身的状态守卫保证重放安全: 节点已删除或状态已变化时动作自动空转
+     */
+    const replayResidualEvents = useCallback((residual: ResidualAIRequest) => {
+        const conversationState = useConversationStore.getState()
+
+        for (const item of residual.events) {
+            switch (item.kind) {
+                case "chunk":
+                    conversationState.appendChatResponseChunk(item.event.nodeId, item.event.delta)
+                    break
+                case "canvasPlan":
+                    setPendingCanvasPlan({
+                        requestId: item.event.requestId,
+                        threadId: residual.threadId,
+                        sourceNodeId: item.event.nodeId,
+                        schemaVersion: item.event.schemaVersion,
+                        plan: item.event.plan,
+                    })
+                    break
+                case "done":
+                    if (item.event.cancelled) {
+                        conversationState.cancelChatResponse(item.event.nodeId)
+                    } else {
+                        conversationState.completeChatResponse(item.event.nodeId)
+                    }
+                    break
+                case "error":
+                    conversationState.failChatResponse(item.event.nodeId)
+                    setError(item.event.error)
+                    break
+            }
+        }
+    }, [])
+
+    // 线程切换时处理残留 AI 请求: 旧线程未结算的 plan 移入缓冲 新线程有缓冲则按序重放
     useEffect(() => {
-        setPendingCanvasPlan((currentPlan) =>
-            currentPlan && currentPlan.threadId !== activeThreadId ? null : currentPlan,
-        )
-    }, [activeThreadId])
+        if (pendingCanvasPlan && pendingCanvasPlan.threadId !== activeThreadId) {
+            // 用户切走时 plan 提案尚未结算 移入缓冲 切回后由重放恢复 避免提案永久丢失
+            bufferAIEvent(
+                pendingCanvasPlan.requestId,
+                pendingCanvasPlan.sourceNodeId,
+                pendingCanvasPlan.threadId,
+                {
+                    kind: "canvasPlan",
+                    event: {
+                        requestId: pendingCanvasPlan.requestId,
+                        nodeId: pendingCanvasPlan.sourceNodeId,
+                        schemaVersion: pendingCanvasPlan.schemaVersion,
+                        plan: pendingCanvasPlan.plan,
+                    },
+                },
+            )
+            setPendingCanvasPlan(null)
+        }
+
+        // 监听 activeThreadId 切回时取出该线程的残留请求并依序重放
+        // 取走即从缓冲移除 即使重放被 Store 守卫空转也不会二次重放
+        const residual = takeResidualForThread(activeThreadId)
+        if (residual) {
+            replayResidualEvents(residual)
+        }
+    }, [activeThreadId, pendingCanvasPlan, replayResidualEvents])
 
     const clearActiveRequest = useCallback((requestId: string) => {
         if (activeRequestRef.current?.requestId !== requestId) {
@@ -94,16 +160,26 @@ export function useAICompletion(): UseAICompletionResult {
             const conversationState = useConversationStore.getState()
 
             // wails 事件总线为全局广播 每一个 hook 都需要做过滤
+            // 只认本 hook 发起的请求 其他请求的事件一律丢弃
             if (
                 !activeRequest ||
                 event.requestId !== activeRequest.requestId ||
-                event.nodeId !== activeRequest.nodeId ||
-                conversationState.activeThread.id !== activeRequest.threadId
+                event.nodeId !== activeRequest.nodeId
             ) {
                 return
             }
 
-            // 收到 eventdealta 时 append
+            // 线程不符: 事件写入残留缓冲 等待用户切回该线程后重放
+            // 不再直接丢弃 避免节点永久卡在 streaming 状态
+            if (conversationState.activeThread.id !== activeRequest.threadId) {
+                bufferAIEvent(activeRequest.requestId, activeRequest.nodeId, activeRequest.threadId, {
+                    kind: "chunk",
+                    event,
+                })
+                return
+            }
+
+            // 收到 eventdelta 时 append
             conversationState.appendChatResponseChunk(event.nodeId, event.delta)
         },
         onDone: (event) => {
@@ -112,9 +188,21 @@ export function useAICompletion(): UseAICompletionResult {
             if (
                 !activeRequest ||
                 event.requestId !== activeRequest.requestId ||
-                event.nodeId !== activeRequest.nodeId ||
-                conversationState.activeThread.id !== activeRequest.threadId
+                event.nodeId !== activeRequest.nodeId
             ) {
+                return
+            }
+
+            // 线程不符: done 是终止事件 缓冲后请求即判定死亡
+            // 释放全局单活锁 用户在别的线程可以立即开始新生成 无需等切回原线程
+            if (conversationState.activeThread.id !== activeRequest.threadId) {
+                const buffered = bufferAIEvent(activeRequest.requestId, activeRequest.nodeId, activeRequest.threadId, {
+                    kind: "done",
+                    event,
+                })
+                if (buffered.settled) {
+                    clearActiveRequest(activeRequest.requestId)
+                }
                 return
             }
 
@@ -131,9 +219,21 @@ export function useAICompletion(): UseAICompletionResult {
             if (
                 !activeRequest ||
                 event.requestId !== activeRequest.requestId ||
-                event.nodeId !== activeRequest.nodeId ||
-                conversationState.activeThread.id !== activeRequest.threadId
+                event.nodeId !== activeRequest.nodeId
             ) {
+                return
+            }
+
+            // 线程不符: error 是终止事件 缓冲后请求即判定死亡
+            // 错误详情不跨线程弹出 等用户切回原线程时由重放统一呈现
+            if (conversationState.activeThread.id !== activeRequest.threadId) {
+                const buffered = bufferAIEvent(activeRequest.requestId, activeRequest.nodeId, activeRequest.threadId, {
+                    kind: "error",
+                    event,
+                })
+                if (buffered.settled) {
+                    clearActiveRequest(activeRequest.requestId)
+                }
                 return
             }
 
@@ -144,6 +244,15 @@ export function useAICompletion(): UseAICompletionResult {
         onCanvasPlan: (event) => {
             const activeRequest = activeRequestRef.current
             if (!activeRequest || event.requestId !== activeRequest.requestId || event.nodeId !== activeRequest.nodeId) {
+                return
+            }
+
+            // 线程不符: plan 提案写入缓冲 切回后随重放恢复 避免提案永久丢失
+            if (useConversationStore.getState().activeThread.id !== activeRequest.threadId) {
+                bufferAIEvent(activeRequest.requestId, activeRequest.nodeId, activeRequest.threadId, {
+                    kind: "canvasPlan",
+                    event,
+                })
                 return
             }
 

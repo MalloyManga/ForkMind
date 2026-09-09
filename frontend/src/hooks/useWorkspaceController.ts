@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react"
 import type { ConversationThread } from "../domain/conversation/types"
 import { useConversationStore } from "../stores/useConversationStore"
+import { dropResidualAIRequest } from "../bridge/residualAIEventBuffer"
 import {
     selectWorkspaceActiveThreadId,
     selectWorkspaceThreads,
@@ -89,6 +90,8 @@ export function useWorkspaceController() {
      * 删除最后一个会话时 workspaceStore 会自动创建空白会话
      */
     const deleteThread = useCallback((threadId: string) => {
+        // 线程删除后其残留缓冲失去重放目标 立即释放避免内存积压
+        dropResidualAIRequest(threadId)
         const isDeletingActiveThread = threadId === activeThread.id
         const nextActiveThread = removeWorkspaceThread(threadId)
         forgetThreadRuntime(threadId)

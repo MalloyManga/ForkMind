@@ -16,6 +16,7 @@ import {
 import { useAISettingsStore } from "../stores/useAISettingsStore"
 import { useConversationStore } from "../stores/useConversationStore"
 import { useWorkspaceStore } from "../stores/useWorkspaceStore"
+import { clearAllResidualAIRequests } from "../bridge/residualAIEventBuffer"
 
 const WORKSPACE_SAVE_DEBOUNCE_MS = 800
 const WORKSPACE_CLOSE_ERROR_CODE = "workspace_close_failed"
@@ -115,6 +116,8 @@ async function hydrateWorkspaceOnce(): Promise<WorkspaceHydrationOutcome> {
 
     const document = validationResult.value
     useAISettingsStore.getState().hydratePersistedSettings(document.settings)
+    // 工作区整体替换后 旧请求 id 不再关联任何线程 清空残留缓冲释放内存
+    clearAllResidualAIRequests()
     const activeThread = useWorkspaceStore
         .getState()
         .hydrateWorkspace(document.threads, document.activeThreadId)
